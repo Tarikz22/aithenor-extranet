@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --red: #C0392B;
+  --red-light: #FDECEA;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #0A1628;
+  color: var(--gray-900);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── PASSWORD GATE ── */
+#gate-screen {
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+}
+
+.gate-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.gate-logo-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 5px;
+  color: white;
+  text-transform: uppercase;
+}
+
+.gate-logo-sub {
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.gate-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 36px 32px;
+}
+
+.gate-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.gate-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 24px;
+}
+
+.field-label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 6px;
+}
+
+.field-input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: white;
+  font-size: 14px;
+  padding: 11px 14px;
+  border-radius: 4px;
+  outline: none;
+  font-family: 'DM Sans', sans-serif;
+  margin-bottom: 16px;
+  transition: border-color 0.2s;
+}
+
+.field-input:focus { border-color: rgba(201,168,76,0.5); }
+
+.gate-btn {
+  width: 100%;
+  background: var(--gold);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.gate-btn:hover { background: var(--gold-light); }
+
+.gate-error {
+  display: none;
+  background: var(--red-light);
+  border: 1px solid var(--red);
+  color: var(--red);
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  margin-bottom: 14px;
+}
+
+/* ── ADMIN PANEL ── */
+#admin-screen {
+  display: none;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--cream);
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.admin-wrap {
+  width: 100%;
+  max-width: 860px;
+  padding: 48px 32px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.admin-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--navy);
+  letter-spacing: 0.3px;
+}
+
+.admin-subtitle {
+  font-size: 12px;
+  color: var(--gray-400);
+  margin-top: 3px;
+}
+
+.admin-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--navy);
+  text-transform: uppercase;
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  letter-spacing: 0.2px;
+}
+
+.card-desc {
+  font-size: 12px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
+.card-body { padding: 24px; }
+
+/* ── CREATE USER FORM ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field.full { grid-column: 1 / -1; }
+
+.form-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.form-input {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  color: var(--gray-900);
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 5px;
+  outline: none;
+  font-family: 'DM Sans', sans-serif;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--gold);
+  background: var(--white);
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
+.create-btn {
+  background: var(--navy);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 11px 28px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.5px;
+  transition: background 0.15s;
+}
+
+.create-btn:hover { background: var(--navy-mid); }
+.create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.form-feedback {
+  display: none;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 5px;
+  margin-top: 14px;
+}
+
+.form-feedback.success {
+  background: var(--green-light);
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+
+.form-feedback.error {
+  background: var(--red-light);
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+
+/* ── USERS TABLE ── */
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.users-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-100);
+}
+
+.users-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--gray-900);
+  vertical-align: middle;
+}
+
+.users-table tr:last-child td { border-bottom: none; }
+.users-table tr:hover td { background: var(--gray-100); }
+
+.hotel-pill {
+  display: inline-block;
+  background: rgba(201,168,76,0.12);
+  color: #8B6914;
+  border: 1px solid rgba(201,168,76,0.3);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.no-hotel-pill {
+  display: inline-block;
+  background: var(--red-light);
+  color: var(--red);
+  border: 1px solid rgba(192,57,43,0.2);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.table-loading {
+  text-align: center;
+  padding: 32px;
+  color: var(--gray-400);
+  font-size: 13px;
+  font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.refresh-link {
+  font-size: 12px;
+  color: var(--gold);
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.signout-btn {
+  background: transparent;
+  border: 1px solid var(--gray-200);
+  color: var(--gray-600);
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+
+.signout-btn:hover { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div id="gate-screen">
+  <div class="gate-logo">
+    <div class="gate-logo-text">Aithenor</div>
+    <div class="gate-logo-sub">Admin Access</div>
+  </div>
+  <div class="gate-box">
+    <div class="gate-title">Admin Panel</div>
+    <div class="gate-sub">Restricted access. Enter the admin password to continue.</div>
+    <div class="gate-error" id="gate-error">Incorrect password. Please try again.</div>
+    <div class="field-label">Admin Password</div>
+    <input class="field-input" type="password" id="gate-password" placeholder="••••••••••••••••"
+      onkeydown="if(event.key==='Enter') checkPassword()">
+    <button class="gate-btn" onclick="checkPassword()">Enter</button>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="admin-screen">
+  <div class="admin-wrap">
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-title">Hotel User Management</div>
+        <div class="admin-subtitle">Create and manage hotel access accounts</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div class="admin-logo">Aithenor</div>
+        <button class="signout-btn" onclick="adminSignOut()">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Create User -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Create New Hotel User</div>
+          <div class="card-desc">Fill in the details below — the hotel claim is set automatically</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="form-label">Hotel Name</label>
+            <input class="form-input" type="text" id="new-hotel" placeholder="e.g. Hotel Aurem">
+            <div class="form-hint">Must exactly match hotel_name values in the Recommendations table</div>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Email Address</label>
+            <input class="form-input" type="email" id="new-email" placeholder="manager@hotelaurem.com">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Password</label>
+            <input class="form-input" type="text" id="new-password" placeholder="Minimum 8 characters">
+          </div>
+          <div class="form-field" style="align-self:end;">
+            <button class="create-btn" id="create-btn" onclick="createUser()">+ Create Hotel User</button>
+          </div>
+        </div>
+        <div class="form-feedback" id="form-feedback"></div>
+      </div>
+    </div>
+
+    <!-- Users List -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Existing Users</div>
+          <div class="card-desc">All hotel accounts currently in Supabase</div>
+        </div>
+        <button class="refresh-link" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div id="users-container">
+          <div class="table-loading">Loading users...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const ADMIN_PASSWORD = 'Aith3nor-Admin-2026';
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwMzU3MiwiZXhwIjoyMDg4ODc5NTcyfQ.HoBIUxnOV74YM5CShWLHUWi8YBt_CVuQD4NHFLjZ4GE';
+
+// ── PASSWORD GATE ──────────────────────────────────────
+function checkPassword() {
+  const val = document.getElementById('gate-password').value;
+  const err = document.getElementById('gate-error');
+  if (val === ADMIN_PASSWORD) {
+    document.getElementById('gate-screen').style.display = 'none';
+    document.getElementById('admin-screen').style.display = 'flex';
+    document.body.style.alignItems = 'flex-start';
+    loadUsers();
+  } else {
+    err.style.display = 'block';
+    document.getElementById('gate-password').value = '';
+  }
+}
+
+function adminSignOut() {
+  document.getElementById('admin-screen').style.display = 'none';
+  document.getElementById('gate-screen').style.display = 'block';
+  document.body.style.alignItems = 'center';
+  document.getElementById('gate-password').value = '';
+}
+
+// ── CREATE USER ────────────────────────────────────────
+async function createUser() {
+  const hotel = document.getElementById('new-hotel').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  const password = document.getElementById('new-password').value.trim();
+  const feedback = document.getElementById('form-feedback');
+  const btn = document.getElementById('create-btn');
+
+  // Validate
+  if (!hotel || !email || !password) {
+    showFeedback('error', 'Please fill in all three fields.');
+    return;
+  }
+  if (password.length < 8) {
+    showFeedback('error', 'Password must be at least 8 characters.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  feedback.style.display = 'none';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        'apikey': SERVICE_KEY,
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+        email_confirm: true,
+        user_metadata: { hotel: hotel }
+      })
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result.message || result.msg || 'Failed to create user');
+    }
+
+    showFeedback('success', `✓ User created successfully. ${email} can now log in and will see recommendations for "${hotel}".`);
+    document.getElementById('new-hotel').value = '';
+    document.getElementById('new-email').value = '';
+    document.getElementById('new-password').value = '';
+    loadUsers();
+
+  } catch (err) {
+    showFeedback('error', 'Error: ' + err.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '+ Create Hotel User';
+}
+
+// ── LOAD USERS ─────────────────────────────────────────
+async function loadUsers() {
+  const container = document.getElementById('users-container');
+  container.innerHTML = '<div class="table-loading">Loading users...</div>';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      headers: {
+        'apikey': SERVICE_KEY,
+        'Authorization': `Bearer ${SERVICE_KEY}`
+      }
+    });
+
+    const result = await res.json();
+    const users = result.users || [];
+
+    if (users.length === 0) {
+      container.innerHTML = '<div class="table-loading">No users found.</div>';
+      return;
+    }
+
+    const rows = users.map(u => {
+      const hotel = u.user_metadata?.hotel;
+      const created = new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      return `
+        <tr>
+          <td>${escHtml(u.email)}</td>
+          <td>${hotel
+            ? `<span class="hotel-pill">${escHtml(hotel)}</span>`
+            : `<span class="no-hotel-pill">No hotel set</span>`
+          }</td>
+          <td style="color:var(--gray-400); font-size:12px;">${created}</td>
+        </tr>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Hotel</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+  } catch (err) {
+    container.innerHTML = `<div class="table-loading" style="color:var(--red);">Could not load users: ${err.message}</div>`;
+  }
+}
+
+function showFeedback(type, msg) {
+  const el = document.getElementById('form-feedback');
+  el.className = `form-feedback ${type}`;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+
+</body>
+</html>
