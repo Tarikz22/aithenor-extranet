@@ -802,14 +802,16 @@ let currentTab = 'all';
 let currentPeriod = 'all';
 
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
-</script>
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-<script>
-const supabaseClient = window.supabase.createClient(
-  'https://fpnlzpfkygsyvkettjuj.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns'
-);
+function normalize(value) {
+  return (value || '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
 
 async function loadRecommendations() {
   showLoading(true);
@@ -841,18 +843,12 @@ async function loadRecommendations() {
       return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
     });
 
-const normalize = (value) =>
-  (value || '')
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-
-const linkedActions = (actions || []).filter(action =>
-  normalize(action.hotel_name) === normalize(finding.hotel_name) &&
-  normalize(action.period) === normalize(finding.period) &&
-  normalize(action.finding_title_reference) === normalize(finding.finding_title)
-);
+    allData = cleanFindings.map(finding => {
+      const linkedActions = (actions || []).filter(action =>
+        normalize(action.hotel_name) === normalize(finding.hotel_name) &&
+        normalize(action.period) === normalize(finding.period) &&
+        normalize(action.finding_title_reference) === normalize(finding.finding_title)
+      );
 
       return {
         ...finding,
@@ -916,6 +912,10 @@ function renderDashboard(data) {
     document.getElementById('sidebar-hotel').textContent = hotel;
     document.getElementById('sidebar-period').textContent = period;
     document.getElementById('stat-period-label').textContent = period;
+  } else {
+    document.getElementById('sidebar-hotel').textContent = 'No Hotel Selected';
+    document.getElementById('sidebar-period').textContent = 'No Period';
+    document.getElementById('stat-period-label').textContent = 'No Period';
   }
 
   const criticalCount = periodFiltered.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
