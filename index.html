@@ -1021,7 +1021,10 @@ function renderCard(r) {
   ].filter(Boolean);
   const firstOwner = ownerParts.length ? ownerParts.join(' · ') : '—';
   const firstUrgency = firstAction.urgency || capitalize(priority);
-  const firstDueDate = firstAction.due_date ? formatDate(firstAction.due_date) : '—';
+  const firstDueDate =
+  linkedActions.find(a => a?.due_date)?.due_date ||
+  linkedActions.find(a => a?.dueDate)?.dueDate ||
+  '—';
   const triggerDisplay = r.trigger_metric || '—';
   const actionListHtml = formatActionDetails(linkedActions, r);
   const rootCause = r.root_cause || r.cause || '—';
