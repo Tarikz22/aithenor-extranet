@@ -841,12 +841,18 @@ async function loadRecommendations() {
       return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
     });
 
-    allData = cleanFindings.map(finding => {
-      const linkedActions = (actions || []).filter(action =>
-        action.hotel_name === finding.hotel_name &&
-        action.period === finding.period &&
-        action.finding_title_reference === finding.finding_title
-      );
+const normalize = (value) =>
+  (value || '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const linkedActions = (actions || []).filter(action =>
+  normalize(action.hotel_name) === normalize(finding.hotel_name) &&
+  normalize(action.period) === normalize(finding.period) &&
+  normalize(action.finding_title_reference) === normalize(finding.finding_title)
+);
 
       return {
         ...finding,
@@ -886,8 +892,11 @@ function populatePeriodFilter(data) {
   });
 
   if (periods.length > 0) {
-    select.value = periods[0];
     currentPeriod = periods[0];
+    select.value = currentPeriod;
+  } else {
+    currentPeriod = 'all';
+    select.value = 'all';
   }
 }
 
