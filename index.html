@@ -26,6 +26,7 @@
   --green-light: #E8F5ED;
   --gray-100: #F5F5F3;
   --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
   --gray-400: #9A9A95;
   --gray-600: #6B6B67;
   --gray-900: #1A1A18;
@@ -181,7 +182,7 @@ body {
 
 .topbar-title {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 500;
   color: var(--navy);
   letter-spacing: 0.3px;
@@ -278,7 +279,7 @@ body {
 
 .error-state p { font-size: 13px; color: var(--red); }
 
-/* ── GOP BANNER ───────────────────────────────────────── */
+/* ── VALUE BANNER ─────────────────────────────────────── */
 .gop-banner {
   background: var(--navy);
   border-radius: 12px;
@@ -339,7 +340,7 @@ body {
   gap: 16px;
 }
 
-.progress-label { font-size: 12px; color: var(--gray-600); min-width: 160px; }
+.progress-label { font-size: 12px; color: var(--gray-600); min-width: 180px; }
 .progress-track { flex: 1; height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden; }
 .progress-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width 1s ease; width: 0%; }
 .progress-pct { font-size: 12px; font-weight: 600; color: var(--navy); min-width: 40px; text-align: right; }
@@ -381,7 +382,7 @@ body {
 .tab.active .tab-count { background: var(--gold-pale); color: var(--amber); }
 
 /* ── FINDINGS ─────────────────────────────────────────── */
-.findings-list { display: flex; flex-direction: column; gap: 8px; }
+.findings-list { display: flex; flex-direction: column; gap: 10px; }
 
 .finding-card {
   background: var(--white);
@@ -394,13 +395,13 @@ body {
 
 .finding-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
 .finding-card.expanded { border-color: rgba(201,168,76,0.35); box-shadow: 0 4px 20px rgba(201,168,76,0.08); }
-.finding-card.actioned { opacity: 0.55; }
+.finding-card.actioned { opacity: 0.58; }
 
 .finding-header {
   display: grid;
   grid-template-columns: 6px 1fr auto;
   align-items: stretch;
-  min-height: 80px;
+  min-height: 82px;
 }
 
 .priority-stripe { width: 6px; flex-shrink: 0; }
@@ -439,17 +440,17 @@ body {
   gap: 5px;
   min-width: 190px;
   border-left: 1px solid var(--gray-100);
-  background: var(--gray-100);
+  background: linear-gradient(to bottom, #fafaf8, #f5f5f2);
 }
 
 .trigger-metric-value {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 500;
   color: var(--navy);
   line-height: 1;
   text-align: right;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
 }
 
 .trigger-metric-label {
@@ -486,6 +487,7 @@ body {
   padding: 3px 9px;
   border-radius: 20px;
   font-weight: 500;
+  border: 1px solid var(--gray-200);
 }
 
 .chevron {
@@ -510,6 +512,8 @@ body {
   padding: 16px 20px;
   border-right: 1px solid var(--gray-100);
 }
+
+.finding-section:nth-child(3n) { border-right: none; }
 
 .finding-section.full-width {
   grid-column: 1/-1;
@@ -578,15 +582,44 @@ body {
 .empty-state h3 { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--navy); margin-bottom: 8px; }
 .empty-state p { font-size: 13px; color: var(--gray-400); }
 
-/* ── MODULE TAG ───────────────────────────────────────── */
+/* ── RESPONSIVE ───────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .finding-sections {
+    grid-template-columns: 1fr 1fr;
+  }
 
-.module-tag {
-  font-size: 10px;
-  color: var(--gray-400);
-  background: var(--gray-100);
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-weight: 500;
+  .finding-section:nth-child(3n) { border-right: 1px solid var(--gray-100); }
+  .finding-section:nth-child(2n) { border-right: none; }
+
+  .gop-banner {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 20px;
+  }
+
+  .gop-stat:nth-child(2) { border-right: none; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 20px; }
+  .topbar { padding: 0 20px; }
+  .finding-header {
+    grid-template-columns: 6px 1fr;
+  }
+  .finding-right {
+    grid-column: 2;
+    align-items: flex-start;
+    min-width: auto;
+    border-left: none;
+    border-top: 1px solid var(--gray-100);
+  }
+  .badges-row { justify-content: flex-start; }
+  .trigger-metric-label, .trigger-metric-value { text-align: left; }
+  .finding-sections { grid-template-columns: 1fr; }
+  .finding-section { border-right: none !important; }
+  .gop-banner { grid-template-columns: 1fr; }
+  .gop-stat { border-right: none !important; padding-left: 0; }
 }
 </style>
 </head>
@@ -610,7 +643,7 @@ body {
         </div>
         <div style="margin-bottom:20px;">
           <div style="font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.35); margin-bottom:6px;">Password</div>
-          <input id="login-password" type="password" required placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; font-size:14px; padding:12px 14px; border-radius:4px; outline:none; font-family:'DM Sans',sans-serif;">
+          <input id="login-password" type="password" required placeholder="••••••••" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; font-size:14px; padding:12px 14px; border-radius:4px; outline:none; font-family:'DM Sans',sans-serif;">
         </div>
         <button id="login-btn" type="submit" style="width:100%; background:#B8973A; color:#0A1628; font-size:13px; font-weight:700; padding:13px; border:none; border-radius:4px; letter-spacing:1.5px; text-transform:uppercase; font-family:'DM Sans',sans-serif; cursor:pointer;">Sign In</button>
       </form>
@@ -624,7 +657,6 @@ body {
 <!-- APP SCREEN -->
 <div id="app-screen" style="display:none;">
 
-<!-- SIDEBAR -->
 <div class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-text">Aithenor</div>
@@ -632,15 +664,15 @@ body {
   </div>
 
   <div class="hotel-card">
-    <div class="hotel-name" id="sidebar-hotel">Hotel Aurem</div>
+    <div class="hotel-name" id="sidebar-hotel">Hotel</div>
     <div class="hotel-meta" id="sidebar-period">Loading...</div>
   </div>
 
   <nav class="nav">
-    <div class="nav-section">Analysis</div>
+    <div class="nav-section">Intelligence</div>
     <div class="nav-item active">
       <span class="nav-icon">◈</span>
-      Recommendations
+      Findings
       <span class="nav-badge" id="badge-count">—</span>
     </div>
     <div class="nav-item">
@@ -651,15 +683,17 @@ body {
       <span class="nav-icon">◇</span>
       Cost Modules
     </div>
+
     <div class="nav-section">Performance</div>
     <div class="nav-item">
       <span class="nav-icon">◇</span>
-      GOP Tracker
+      Value Tracker
     </div>
     <div class="nav-item">
       <span class="nav-icon">◇</span>
       Historical Analysis
     </div>
+
     <div class="nav-section">Settings</div>
     <div class="nav-item">
       <span class="nav-icon">◇</span>
@@ -683,11 +717,10 @@ body {
   </div>
 </div>
 
-<!-- MAIN -->
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title">Diagnostic Recommendations</div>
+      <div class="topbar-title">Strategic Findings</div>
       <select class="period-select" id="period-filter" onchange="filterByPeriod()">
         <option value="all">All Periods</option>
       </select>
@@ -700,54 +733,48 @@ body {
 
   <div class="content">
 
-    <!-- Error -->
     <div class="error-state" id="error-state">
       <p id="error-msg">Could not connect to database.</p>
     </div>
 
-    <!-- Loading -->
     <div class="loading-state" id="loading-state">
       <div class="loading-spinner"></div>
-      <div class="loading-text">Loading recommendations...</div>
+      <div class="loading-text">Loading strategic findings...</div>
     </div>
 
-    <!-- Dashboard (hidden until loaded) -->
     <div id="dashboard" style="display:none">
 
-      <!-- GOP Banner -->
       <div class="gop-banner">
         <div class="gop-stat">
-          <div class="gop-label">Total Opportunity Identified</div>
+          <div class="gop-label">Annual Value at Stake</div>
           <div class="gop-value" id="stat-total">—</div>
-          <div class="gop-sub">Annual GOP impact if all actioned</div>
+          <div class="gop-sub">Estimated upside across active action plans</div>
         </div>
         <div class="gop-stat">
-          <div class="gop-label">Critical Findings</div>
+          <div class="gop-label">Critical Priorities</div>
           <div class="gop-value" id="stat-critical">—</div>
-          <div class="gop-sub">Require immediate action</div>
+          <div class="gop-sub">Require immediate executive focus</div>
         </div>
         <div class="gop-stat">
-          <div class="gop-label">Findings This Period</div>
+          <div class="gop-label">Findings This Cycle</div>
           <div class="gop-value" id="stat-findings">—</div>
           <div class="gop-sub" id="stat-period-label">—</div>
         </div>
         <div class="gop-stat">
-          <div class="gop-label">Actioned</div>
+          <div class="gop-label">Execution Progress</div>
           <div class="gop-value" id="stat-actioned">0</div>
-          <div class="gop-sub">Recommendations in progress</div>
+          <div class="gop-sub">Findings marked actioned</div>
         </div>
       </div>
 
-      <!-- Progress -->
       <div class="progress-section">
-        <div class="progress-label" id="progress-label">0% of opportunity captured</div>
+        <div class="progress-label" id="progress-label">0 of 0 findings actioned</div>
         <div class="progress-track">
           <div class="progress-fill" id="progress-fill"></div>
         </div>
         <div class="progress-pct" id="progress-pct">0%</div>
       </div>
 
-      <!-- Tabs -->
       <div class="tabs-row">
         <div class="tab active" onclick="filterTab('all', this)">All <span class="tab-count" id="tab-all">0</span></div>
         <div class="tab" onclick="filterTab('revenue', this)">Revenue <span class="tab-count" id="tab-revenue">0</span></div>
@@ -756,14 +783,12 @@ body {
         <div class="tab" onclick="filterTab('actioned', this)">Actioned <span class="tab-count" id="tab-actioned">0</span></div>
       </div>
 
-      <!-- Findings list -->
       <div class="findings-list" id="findings-list"></div>
 
-      <!-- Empty state -->
       <div class="empty-state" id="empty-state">
         <div class="empty-state-icon">◈</div>
         <h3>No findings for this filter</h3>
-        <p>Try selecting a different tab or uploading new hotel data.</p>
+        <p>Try selecting a different cycle or upload a new hotel file.</p>
       </div>
 
     </div>
@@ -776,31 +801,68 @@ let actionedIds = new Set();
 let currentTab = 'all';
 let currentPeriod = 'all';
 
-// ── FETCH FROM SUPABASE ────────────────────────────────
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
+</script>
+
+<script>
+const supabaseClient = window.supabase.createClient(
+  'https://fpnlzpfkygsyvkettjuj.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns'
+);
+
 async function loadRecommendations() {
   showLoading(true);
   hideError();
 
   try {
-    const { data, error } = await supabaseClient
-      .from('Recommendations')
-      .select('*')
-      .order('date_generated', { ascending: false })
-      .limit(200);
+    const [
+      { data: findings, error: findingsError },
+      { data: actions, error: actionsError }
+    ] = await Promise.all([
+      supabaseClient
+        .from('Recommendations')
+        .select('*')
+        .order('date_generated', { ascending: false })
+        .limit(200),
 
-    if (error) throw error;
+      supabaseClient
+        .from('actions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500)
+    ]);
 
-    allData = data;
+    if (findingsError) throw findingsError;
+    if (actionsError) throw actionsError;
 
-    if (data.length === 0) {
+    const cleanFindings = (findings || []).filter(r => {
+      const t = r.finding_title || '';
+      return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
+    });
+
+    allData = cleanFindings.map(finding => {
+      const linkedActions = (actions || []).filter(action =>
+        action.hotel_name === finding.hotel_name &&
+        action.period === finding.period &&
+        action.finding_title_reference === finding.finding_title
+      );
+
+      return {
+        ...finding,
+        linked_actions: linkedActions
+      };
+    });
+
+    if (allData.length === 0) {
       showLoading(false);
       document.getElementById('dashboard').style.display = 'block';
       document.getElementById('empty-state').style.display = 'block';
       return;
     }
 
-    populatePeriodFilter(data);
-    renderDashboard(data);
+    populatePeriodFilter(allData);
+    renderDashboard(allData);
     showLoading(false);
     document.getElementById('dashboard').style.display = 'block';
 
@@ -811,38 +873,34 @@ async function loadRecommendations() {
   }
 }
 
-// ── POPULATE PERIOD FILTER ─────────────────────────────
 function populatePeriodFilter(data) {
   const periods = [...new Set(data.map(r => r.period).filter(Boolean))];
   const select = document.getElementById('period-filter');
   select.innerHTML = '<option value="all">All Periods</option>';
+
   periods.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p;
     opt.textContent = p;
     select.appendChild(opt);
   });
-  // Default to most recent period
+
   if (periods.length > 0) {
     select.value = periods[0];
     currentPeriod = periods[0];
   }
 }
 
-// ── FILTER BY PERIOD ───────────────────────────────────
 function filterByPeriod() {
   currentPeriod = document.getElementById('period-filter').value;
   renderDashboard(allData);
 }
 
-// ── RENDER DASHBOARD ───────────────────────────────────
 function renderDashboard(data) {
-  // Filter by period
   const periodFiltered = currentPeriod === 'all'
     ? data
     : data.filter(r => r.period === currentPeriod);
 
-  // Update sidebar
   if (periodFiltered.length > 0) {
     const hotel = periodFiltered[0].hotel_name || 'Hotel';
     const period = periodFiltered[0].period || '';
@@ -851,50 +909,42 @@ function renderDashboard(data) {
     document.getElementById('stat-period-label').textContent = period;
   }
 
-  // Filter out corrupted rows
-  const filtered = periodFiltered.filter(r => {
-    const t = r.finding_title || '';
-    return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
-  });
+  const criticalCount = periodFiltered.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
+  const revenueCount = periodFiltered.filter(r => isRevenue(r)).length;
+  const costCount = periodFiltered.filter(r => !isRevenue(r)).length;
+  const actionedCount = periodFiltered.filter(r => actionedIds.has(r.id)).length;
 
-  // Stats
-  const criticalCount = filtered.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
-  document.getElementById('stat-findings').textContent = filtered.length;
-  document.getElementById('stat-critical').textContent = criticalCount;
-  document.getElementById('badge-count').textContent = filtered.length;
-
-  // Calculate total GOP (parse numbers from gop_saving strings)
-  const totalGop = filtered.reduce((sum, r) => {
-    const saving = extractGopNumber(r.gop_saving || '');
-    return sum + saving;
+  const totalRevenueUpside = periodFiltered.reduce((sum, r) => {
+    const linked = r.linked_actions || [];
+    const rowTotal = linked.reduce((rowSum, a) => rowSum + (Number(a.estimated_revenue_upside) || 0), 0);
+    return sum + rowTotal;
   }, 0);
-  document.getElementById('stat-total').textContent = totalGop > 0
-    ? '€' + formatNumber(totalGop)
+
+  document.getElementById('stat-findings').textContent = periodFiltered.length;
+  document.getElementById('stat-critical').textContent = criticalCount;
+  document.getElementById('badge-count').textContent = periodFiltered.length;
+  document.getElementById('stat-total').textContent = totalRevenueUpside > 0
+    ? '€' + formatNumber(totalRevenueUpside)
     : '—';
 
-  // Tab counts
-  const revenueCount = filtered.filter(r => isRevenue(r)).length;
-  const costCount = filtered.filter(r => !isRevenue(r)).length;
-  const actionedCount = filtered.filter(r => actionedIds.has(r.id)).length;
-
-  document.getElementById('tab-all').textContent = filtered.length;
+  document.getElementById('tab-all').textContent = periodFiltered.length;
   document.getElementById('tab-revenue').textContent = revenueCount;
   document.getElementById('tab-cost').textContent = costCount;
   document.getElementById('tab-critical').textContent = criticalCount;
   document.getElementById('tab-actioned').textContent = actionedCount;
 
-  // Progress
-  const pct = filtered.length > 0 ? Math.round((actionedCount / filtered.length) * 100) : 0;
+  const pct = periodFiltered.length > 0
+    ? Math.round((actionedCount / periodFiltered.length) * 100)
+    : 0;
+
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-pct').textContent = pct + '%';
-  document.getElementById('progress-label').textContent = `${actionedCount} of ${filtered.length} recommendations actioned`;
+  document.getElementById('progress-label').textContent = `${actionedCount} of ${periodFiltered.length} findings actioned`;
   document.getElementById('stat-actioned').textContent = actionedCount;
 
-  // Render findings
-  renderFindings(filtered);
+  renderFindings(periodFiltered);
 }
 
-// ── RENDER FINDINGS ────────────────────────────────────
 function renderFindings(data) {
   let filtered = data;
 
@@ -916,16 +966,23 @@ function renderFindings(data) {
   list.innerHTML = filtered.map(r => renderCard(r)).join('');
 }
 
-// ── RENDER SINGLE CARD ─────────────────────────────────
 function renderCard(r) {
   const priority = (r.priority || 'medium').toLowerCase();
   const isActioned = actionedIds.has(r.id);
   const dept = r.department || '';
-  const module = r.module || 'COM-001';
-  const gopSaving = r.gop_saving || '';
-  const gopNumber = extractGopDisplay(gopSaving);
-  // One-liner: first sentence of situation
+  const linkedActions = r.linked_actions || [];
   const oneLiner = (r.situation || '').split(/[.!?]/)[0].trim();
+
+  const totalRevenueUpside = linkedActions.reduce((sum, a) => {
+    return sum + (Number(a.estimated_revenue_upside) || 0);
+  }, 0);
+
+  const firstOutcome = linkedActions[0]?.expected_outcome || '—';
+  const firstOwner = linkedActions[0]?.owner_role || '—';
+  const firstUrgency = linkedActions[0]?.urgency || capitalize(priority);
+  const firstDueDate = linkedActions[0]?.due_date ? formatDate(linkedActions[0].due_date) : '—';
+  const triggerDisplay = r.trigger_metric || '—';
+  const actionListHtml = formatActionDetails(linkedActions);
 
   return `
     <div class="finding-card ${isActioned ? 'actioned' : ''}" onclick="toggleCard(this)" data-id="${r.id}">
@@ -936,10 +993,8 @@ function renderCard(r) {
           ${oneLiner ? `<div class="finding-oneliner">${escHtml(oneLiner)}.</div>` : ''}
         </div>
         <div class="finding-right">
-          ${r.trigger_metric ? `
-            <div class="trigger-metric-value">${escHtml(r.trigger_metric)}</div>
-            <div class="trigger-metric-label">Trigger</div>
-          ` : ''}
+          <div class="trigger-metric-value">${escHtml(triggerDisplay)}</div>
+          <div class="trigger-metric-label">Key Trigger</div>
           <div class="badges-row">
             <span class="priority-badge ${priority}">${capitalize(priority)}</span>
             <span class="dept-badge">${escHtml(dept)}</span>
@@ -947,33 +1002,45 @@ function renderCard(r) {
           <span class="chevron">▾</span>
         </div>
       </div>
+
       <div class="finding-body">
         <div class="finding-sections">
-          <div class="finding-section">
-            <div class="section-label">Situation</div>
-            <div class="section-text">${escHtml(r.situation || '—')}</div>
-          </div>
           <div class="finding-section">
             <div class="section-label">Diagnosis</div>
             <div class="section-text">${escHtml(r.diagnosis || '—')}</div>
           </div>
+
           <div class="finding-section">
-            <div class="section-label">Cause</div>
+            <div class="section-label">Root Cause</div>
             <div class="section-text">${escHtml(r.cause || '—')}</div>
           </div>
-          <div class="finding-section full-width">
-            <div class="section-label">Recommended Actions</div>
-            <ul class="action-list">${formatActions(r.action || '—')}</ul>
+
+          <div class="finding-section">
+            <div class="section-label">Execution Owner</div>
+            <div class="section-text">
+              <strong>Owner:</strong> ${escHtml(firstOwner)}<br>
+              <strong>Urgency:</strong> ${escHtml(firstUrgency)}<br>
+              <strong>Due:</strong> ${escHtml(firstDueDate)}
+            </div>
           </div>
+
+          <div class="finding-section full-width">
+            <div class="section-label">Action Plan</div>
+            <ul class="action-list">${actionListHtml}</ul>
+          </div>
+
           <div class="finding-section full-width" style="border-top:none;">
             <div class="section-label">Expected Outcome</div>
-            <div class="section-text">${escHtml(r.expected_outcome || '—')}</div>
+            <div class="section-text">${escHtml(firstOutcome)}</div>
           </div>
         </div>
+
         <div class="gop-saving-bar">
           <div class="gop-saving-left">
-            <div class="gop-saving-value">${escHtml(gopSaving || '—')}</div>
-            <div class="gop-saving-desc">if actioned · Generated ${formatDate(r.date_generated)}</div>
+            <div class="gop-saving-value">
+              ${totalRevenueUpside > 0 ? '€' + formatNumber(totalRevenueUpside) : '—'}
+            </div>
+            <div class="gop-saving-desc">Estimated revenue upside · Generated ${formatDate(r.date_generated)}</div>
           </div>
           <button class="action-btn ${isActioned ? 'actioned' : ''}"
             onclick="event.stopPropagation(); markActioned(this, '${r.id}')">
@@ -985,7 +1052,6 @@ function renderCard(r) {
   `;
 }
 
-// ── HELPERS ────────────────────────────────────────────
 function toggleCard(card) {
   card.classList.toggle('expanded');
 }
@@ -1009,51 +1075,44 @@ function filterTab(tab, el) {
 function isRevenue(r) {
   const revDepts = ['revenue management', 'sales', 'marketing', 'distribution'];
   const dept = (r.department || '').toLowerCase();
-  const module = (r.module || '').toLowerCase();
-  return revDepts.some(d => dept.includes(d)) || module.includes('revenue') || module.includes('com-');
+  return revDepts.some(d => dept.includes(d));
 }
 
-function extractGopNumber(str) {
-  if (!str) return 0;
-  // Look for annual figure first (usually larger)
-  const annualMatch = str.match(/€([\d,]+(?:\.\d+)?)\s*(?:\/\s*year|per year|annually)/i);
-  if (annualMatch) return parseFloat(annualMatch[1].replace(/,/g, ''));
-  // Fallback: first number
-  const match = str.match(/[\d,]+(?:\.\d+)?/);
-  return match ? parseFloat(match[0].replace(/,/g, '')) : 0;
-}
+function formatActionDetails(actions) {
+  if (!actions || actions.length === 0) return '<li>No actions specified</li>';
 
-function extractGopDisplay(str) {
-  if (!str || str === '—') return '';
-  // Try to extract annual value for display
-  const annualMatch = str.match(/€([\d,]+(?:\.\d+)?)\s*(?:\/\s*year|per year|annually)/i);
-  if (annualMatch) return '€' + annualMatch[1] + ' / yr';
-  // Fallback
-  const match = str.match(/€[\d,]+(?:\.\d+)?/);
-  return match ? match[0] + ' / yr' : '';
-}
+  const lines = [];
 
-function formatActions(actionStr) {
-  if (!actionStr || actionStr === '—') return '<li>No actions specified</li>';
-  // Split on bullet points, numbered lists, or newlines
-  const lines = actionStr
-    .split(/\n|•|→|\d+\.|—/)
-    .map(s => s.replace(/^[\s\-\*•→]+/, '').trim())
-    .filter(s => s.length > 5);
-  if (lines.length === 0) return `<li>${escHtml(actionStr)}</li>`;
-  return lines.map(l => `<li>${escHtml(l)}</li>`).join('');
+  actions.forEach(action => {
+    if (action.action_title) {
+      lines.push(action.action_title);
+    } else if (action.action_detail) {
+      const parts = action.action_detail
+        .split(/\n|•|→|\d+\.|—/)
+        .map(s => s.replace(/^[\s\-\*•→]+/, '').trim())
+        .filter(s => s.length > 5);
+
+      if (parts.length) lines.push(...parts);
+    }
+  });
+
+  if (lines.length === 0) return '<li>No actions specified</li>';
+
+  return lines.map(line => `<li>${escHtml(line)}</li>`).join('');
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   try {
     return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch { return dateStr; }
+  } catch {
+    return dateStr;
+  }
 }
 
 function formatNumber(n) {
-  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
-  if (n >= 1000) return Math.round(n/1000) + 'K';
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return Math.round(n / 1000) + 'K';
   return n.toString();
 }
 
@@ -1083,11 +1142,6 @@ function showError(msg) {
 function hideError() {
   document.getElementById('error-state').style.display = 'none';
 }
-
-// ── AUTH ───────────────────────────────────────────────
-const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function showLogin() {
   document.getElementById('login-screen').style.display = 'flex';
@@ -1132,7 +1186,6 @@ async function logout() {
   showLogin();
 }
 
-// ── INIT ───────────────────────────────────────────────
 (async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
@@ -1144,6 +1197,6 @@ async function logout() {
 })();
 </script>
 
-</div><!-- end app-screen -->
+</div>
 </body>
 </html>
