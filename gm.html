@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aithenor — GM Briefing</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #0f1f3d;
+  --navy-2: #13284b;
+  --ink: #0f1728;
+  --paper: #f6f3ec;
+  --card: #fffdf8;
+  --line: rgba(15,31,61,0.12);
+  --line-strong: rgba(15,31,61,0.2);
+  --gold: #c8a24a;
+  --gold-soft: rgba(200,162,74,0.12);
+  --muted: #65708a;
+  --critical: #9c2f2f;
+  --high: #b06b00;
+  --medium: #39537a;
+  --low: #4d7a5f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top right, rgba(200,162,74,0.12), transparent 24%),
+    linear-gradient(180deg, #f7f4ed 0%, #f1ece2 100%);
+}
+.login-screen {
+  min-height: 100vh;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.login-card {
+  width: 100%;
+  max-width: 460px;
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(15,31,61,0.08);
+  box-shadow: 0 24px 80px rgba(15,31,61,0.12);
+  border-radius: 22px;
+  padding: 34px;
+}
+.brand-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 12px;
+}
+.brand-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 42px;
+  color: var(--navy);
+  margin: 0 0 10px;
+}
+.brand-copy {
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy);
+  margin: 18px 0 8px;
+}
+.input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,31,61,0.14);
+  font-size: 14px;
+  font-family: inherit;
+  background: rgba(255,255,255,0.9);
+}
+.login-btn {
+  width: 100%;
+  margin-top: 22px;
+  border: none;
+  border-radius: 12px;
+  padding: 15px 18px;
+  background: linear-gradient(135deg, var(--navy) 0%, #1b3766 100%);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-error {
+  display: none;
+  margin-top: 14px;
+  color: var(--critical);
+  font-size: 13px;
+}
+.app-screen { display: none; }
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(246,243,236,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(15,31,61,0.08);
+}
+.topbar-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 18px 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.topbar-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 34px;
+  color: var(--navy);
+  margin: 0;
+}
+.topbar-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+.topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  color: var(--navy);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.btn {
+  border: 1px solid rgba(15,31,61,0.12);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-primary {
+  background: var(--navy);
+  color: white;
+  border-color: var(--navy);
+}
+.btn-secondary {
+  background: rgba(255,255,255,0.76);
+  color: var(--navy);
+}
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px;
+}
+.loading-state, .error-state, .empty-state {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 46vh;
+  text-align: center;
+  color: var(--muted);
+  flex-direction: column;
+}
+.loading-spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(15,31,61,0.12);
+  border-top-color: var(--gold);
+  animation: spin 0.9s linear infinite;
+  margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.hero {
+  background: linear-gradient(135deg, rgba(15,31,61,0.98) 0%, rgba(19,40,75,0.96) 100%);
+  color: #f8f7f2;
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: 0 24px 60px rgba(15,31,61,0.18);
+}
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.hero-kicker {
+  color: rgba(200,162,74,0.95);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 46px;
+  line-height: 1;
+  margin: 0 0 8px;
+}
+.hero-copy {
+  max-width: 780px;
+  color: rgba(248,247,242,0.76);
+  line-height: 1.7;
+}
+.meta-box {
+  min-width: 280px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  border-radius: 20px;
+  padding: 18px 18px 16px;
+}
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.meta-row:last-child { border-bottom: none; }
+.meta-label { color: rgba(248,247,242,0.58); }
+.meta-value { color: white; text-align: right; }
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.stat-card {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  border-radius: 18px;
+  padding: 18px;
+}
+.stat-label {
+  color: rgba(248,247,242,0.6);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.stat-sub { color: rgba(248,247,242,0.72); font-size: 13px; }
+.section {
+  margin-top: 26px;
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(15,31,61,0.08);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 14px 40px rgba(15,31,61,0.06);
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.section-kicker {
+  color: var(--gold);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.section-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 34px;
+  color: var(--navy);
+  margin: 0;
+}
+.section-copy { color: var(--muted); line-height: 1.7; max-width: 820px; }
+.executive-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 18px;
+}
+.executive-grid-v4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.headline-panel {
+  border: 1px solid rgba(200,162,74,0.18);
+  background: linear-gradient(135deg, rgba(200,162,74,0.08) 0%, rgba(15,31,61,0.03) 100%);
+  border-radius: 20px;
+  padding: 22px;
+  margin-bottom: 18px;
+}
+.headline-copy {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 34px;
+  line-height: 1.15;
+  color: var(--navy);
+  max-width: 1100px;
+}
+.decision-note {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(200,162,74,0.18);
+  background: rgba(200,162,74,0.08);
+}
+.decision-note .info-title { margin-bottom: 8px; }
+.panel {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 20px;
+  padding: 20px;
+}
+.panel-title {
+  color: var(--navy);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  font-weight: 700;
+}
+.priority-list, .signal-list { display: grid; gap: 12px; }
+.priority-item, .signal-item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.priority-item strong, .signal-item strong { color: var(--navy); }
+.priority-meta, .signal-meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.department-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.department-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 22px;
+}
+.department-name {
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--navy);
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+.department-sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.department-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.mini {
+  background: rgba(15,31,61,0.03);
+  border: 1px solid rgba(15,31,61,0.06);
+  border-radius: 14px;
+  padding: 12px;
+}
+.mini-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+.mini-value { font-size: 20px; font-weight: 700; color: var(--navy); }
+.mini-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.dept-leads { display: grid; gap: 12px; }
+.dept-lead {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.dept-lead:first-child { border-top: none; padding-top: 0; }
+.dept-lead-title { color: var(--navy); font-weight: 700; margin-bottom: 6px; }
+.dept-lead-copy { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.briefing-section { margin-top: 18px; }
+.finding-grid { display: grid; gap: 18px; }
+.finding-brief {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+}
+.finding-top {
+  padding: 20px 22px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.finding-kicker { color: var(--gold); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px; }
+.finding-title { font-family: 'Cormorant Garamond', serif; color: var(--navy); font-size: 34px; line-height: 1; margin-bottom: 8px; }
+.finding-summary { color: var(--muted); line-height: 1.7; max-width: 860px; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.badge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.badge.critical { background: rgba(156,47,47,0.1); color: var(--critical); border-color: rgba(156,47,47,0.16); }
+.badge.high { background: rgba(176,107,0,0.12); color: var(--high); border-color: rgba(176,107,0,0.16); }
+.badge.medium { background: rgba(57,83,122,0.1); color: var(--medium); border-color: rgba(57,83,122,0.14); }
+.badge.low { background: rgba(77,122,95,0.1); color: var(--low); border-color: rgba(77,122,95,0.16); }
+.badge.dept { background: rgba(15,31,61,0.05); color: var(--navy); border-color: rgba(15,31,61,0.08); }
+.finding-body { padding: 22px; }
+.finding-columns {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 18px;
+}
+.info-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  padding: 18px;
+}
+.info-title { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.info-text { color: var(--ink); line-height: 1.75; font-size: 14px; }
+.info-text strong { color: var(--navy); }
+.action-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  line-height: 1.75;
+  font-size: 14px;
+}
+.action-list li + li { margin-top: 8px; }
+.exec-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.exec-cell {
+  background: rgba(15,31,61,0.03);
+  border: 1px solid rgba(15,31,61,0.06);
+  border-radius: 14px;
+  padding: 12px;
+}
+.exec-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.exec-value { color: var(--navy); font-size: 14px; line-height: 1.55; }
+.exec-value strong { font-size: 18px; line-height: 1; }
+.footer-note {
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 1180px) {
+  .hero-stats, .department-grid, .exec-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .executive-grid, .executive-grid-v4, .finding-columns { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .page, .topbar-inner { padding: 18px; }
+  .hero, .section { padding: 20px; }
+  .hero-title { font-size: 36px; }
+  .section-title, .finding-title, .department-name { font-size: 28px; }
+  .hero-stats, .department-grid, .department-stats, .exec-matrix { grid-template-columns: 1fr; }
+  .finding-top { flex-direction: column; }
+  .badges { justify-content: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="brand-kicker">Aithenor</div>
+    <h1 class="brand-title">GM Briefing</h1>
+    <div class="brand-copy">A one-page executive briefing built for General Managers — translating hotel data into departmental priorities, accountabilities, and bottom-line impact.</div>
+    <form onsubmit="handleLogin(event)">
+      <label class="field-label">Email</label>
+      <input class="input" type="email" id="login-email" required>
+      <label class="field-label">Password</label>
+      <input class="input" type="password" id="login-password" required>
+      <button class="login-btn" id="login-btn" type="submit">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<div class="app-screen" id="app-screen">
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <h1 class="topbar-title">GM Briefing</h1>
+        <div class="topbar-sub">One-page executive reader by department — Revenue, Sales, Marketing.</div>
+      </div>
+      <div class="topbar-actions">
+        <div class="chip" id="user-email">—</div>
+        <button class="btn btn-secondary" onclick="loadRecommendations()">Refresh</button>
+        <button class="btn btn-primary" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="error-state" id="error-state"><div id="error-msg">Could not connect to database.</div></div>
+    <div class="loading-state" id="loading-state">
+      <div class="loading-spinner"></div>
+      <div>Preparing the latest GM briefing…</div>
+    </div>
+    <div class="empty-state" id="empty-state">
+      <div>No latest briefing data was found for the active hotel cycle.</div>
+    </div>
+
+    <div id="dashboard" style="display:none;">
+      <section class="hero">
+        <div class="hero-top">
+          <div>
+            <div class="hero-kicker">Executive Performance Briefing</div>
+            <h2 class="hero-title" id="hero-hotel">—</h2>
+            <div class="hero-copy" id="hero-copy">A concise weekly management briefing translating current findings into departmental actions, owners, and financial impact.</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-row"><span class="meta-label">Analysis Period</span><span class="meta-value" id="meta-period">—</span></div>
+            <div class="meta-row"><span class="meta-label">Generated</span><span class="meta-value" id="meta-generated">—</span></div>
+            <div class="meta-row"><span class="meta-label">Hotel</span><span class="meta-value" id="meta-hotel">—</span></div>
+            <div class="meta-row"><span class="meta-label">Cycle Scope</span><span class="meta-value" id="meta-scope">Latest run only</span></div>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div class="stat-card">
+            <div class="stat-label">Strategic Findings</div>
+            <div class="stat-value" id="stat-findings">—</div>
+            <div class="stat-sub">Current briefing priorities</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Annual Revenue at Stake</div>
+            <div class="stat-value" id="stat-revenue">—</div>
+            <div class="stat-sub">Across linked execution plans</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Estimated GOP Impact</div>
+            <div class="stat-value" id="stat-gop">—</div>
+            <div class="stat-sub">Directional, based on action economics</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Critical Priorities</div>
+            <div class="stat-value" id="stat-critical">—</div>
+            <div class="stat-sub">Require direct GM sponsorship</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">GM Reader</div>
+            <h3 class="section-title">Executive Overview</h3>
+          </div>
+          <div class="section-copy">A one-page read of what matters now, where financial exposure sits, which departments require intervention, and which decisions cannot wait for the next cycle.</div>
+        </div>
+        <div class="headline-panel" id="headline-panel">
+          <div class="panel-title">GM Headline</div>
+          <div class="headline-copy" id="gm-headline">—</div>
+        </div>
+        <div class="executive-grid executive-grid-v4">
+          <div class="panel">
+            <div class="panel-title">Immediate Priorities</div>
+            <div class="priority-list" id="priority-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">GM Steering Notes</div>
+            <div class="signal-list" id="signal-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Decisions Required</div>
+            <div class="signal-list" id="decision-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Cross-Department Friction</div>
+            <div class="signal-list" id="friction-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">Department View</div>
+            <h3 class="section-title">Department Snapshot</h3>
+          </div>
+          <div class="section-copy">A concise overview of what Revenue, Sales, and Marketing need to address, with scale of risk, top issues, and immediate owner accountability.</div>
+        </div>
+        <div class="department-grid" id="department-grid"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">Actionable Detail</div>
+            <h3 class="section-title">Department Briefing</h3>
+          </div>
+          <div class="section-copy">Each finding is structured as a GM conversation starter: what happened, why it matters, who owns it, what must happen next, and by when.</div>
+        </div>
+        <div class="briefing-section">
+          <div class="finding-grid" id="finding-grid"></div>
+        </div>
+        <div class="footer-note" id="footer-note">This briefing uses the latest uploaded cycle only and groups findings into GM-friendly departments. Revenue upside and GOP impact are directional estimates based on linked action plans.</div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+let allData = [];
+
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+</script>
+<script>
+// Preserve the current anon key from the working dashboard.
+const CURRENT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+</script>
+<script>
+// Replace placeholder keys with the working anon key from the current app before using in production.
+const supabaseClient = window.supabase.createClient('https://fpnlzpfkygsyvkettjuj.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns');
+
+function normalize(value) {
+  return (value || '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function escHtml(str) {
+  if (str == null) return '';
+  return str.toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatNumber(n) {
+  const num = Number(n) || 0;
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return Math.round(num / 1000) + 'K';
+  return Math.round(num).toString();
+}
+
+function parseNumericValue(value) {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return value;
+  const cleaned = value.toString().replace(/,/g, '');
+  const matches = cleaned.match(/-?\d+(?:\.\d+)?/g);
+  if (!matches || !matches.length) return 0;
+  return Number(matches[matches.length - 1]) || 0;
+}
+
+function calculateRevenueUpside(record) {
+  const linked = record.linked_actions || [];
+  return linked.reduce((sum, a) => sum + (Number(a.estimated_revenue_upside) || 0), 0);
+}
+
+function calculateGopImpact(record) {
+  const linked = record.linked_actions || [];
+  return linked.reduce((sum, a) => {
+    const explicit = parseNumericValue(a.estimated_gop_saving);
+    if (explicit > 0) return sum + explicit;
+    return sum + ((Number(a.estimated_revenue_upside) || 0) * 0.65);
+  }, 0);
+}
+
+function getGeneratedDate(record) {
+  const linkedActions = record.linked_actions || [];
+  const candidates = [];
+  linkedActions.forEach(a => {
+    [a.date_generated, a.generated_at, a.updated_at, a.created_at].forEach(v => { if (v) candidates.push(v); });
+  });
+  [record.date_generated, record.generated_at, record.updated_at, record.created_at].forEach(v => { if (v) candidates.push(v); });
+  const valid = candidates.map(v => new Date(v)).filter(d => !Number.isNaN(d.getTime())).sort((a, b) => b - a);
+  return valid.length ? formatDate(valid[0].toISOString()) : '—';
+}
+
+function getDepartmentBucket(record) {
+  const source = `${record.department || ''} ${record.owner_department || ''}`.toLowerCase();
+  if (source.includes('sales')) return 'sales';
+  if (source.includes('marketing') || source.includes('distribution') || source.includes('digital')) return 'marketing';
+  return 'revenue';
+}
+
+function priorityScore(priority) {
+  const p = (priority || '').toLowerCase();
+  if (p === 'critical') return 4;
+  if (p === 'high') return 3;
+  if (p === 'medium') return 2;
+  return 1;
+}
+
+function sortRecords(records) {
+  return [...records].sort((a, b) => {
+    const prioDiff = priorityScore(b.priority) - priorityScore(a.priority);
+    if (prioDiff !== 0) return prioDiff;
+    return calculateRevenueUpside(b) - calculateRevenueUpside(a);
+  });
+}
+
+function formatActionList(actions, finding = {}) {
+  if (!actions || actions.length === 0) {
+    const fallback = finding.action_plan || finding.action || '';
+    return fallback ? `<li>${escHtml(fallback)}</li>` : '<li>No action plan attached in the latest cycle.</li>';
+  }
+  const lines = [];
+  actions.forEach(action => {
+    const pieces = [];
+    if (action.action_title) pieces.push(action.action_title);
+    if (action.action_detail) pieces.push(action.action_detail);
+    if (!pieces.length) {
+      [action.action_plan, action.recommended_action, action.action].forEach(v => { if (v) pieces.push(v); });
+    }
+    pieces.forEach(piece => {
+      piece.toString()
+        .split(/\n|•|→|\d+\.|—/)
+        .map(s => s.replace(/^[\s\-*•→]+/, '').trim())
+        .filter(s => s.length > 3)
+        .forEach(s => lines.push(s));
+    });
+  });
+  if (!lines.length) return '<li>No action plan attached in the latest cycle.</li>';
+  return lines.map(line => `<li>${escHtml(line)}</li>`).join('');
+}
+
+function getOwner(record) {
+  const action = (record.linked_actions || [])[0] || {};
+  const ownerParts = [
+    action.owner_role,
+    action.owner_department,
+    action.execution_owner,
+    action.owner,
+    record.execution_owner,
+    record.owner,
+    record.department
+  ].filter(Boolean);
+  return ownerParts.length ? ownerParts.join(' · ') : '—';
+}
+
+function getDueDate(record) {
+  const linked = record.linked_actions || [];
+  return linked.find(a => a?.due_date)?.due_date || linked.find(a => a?.dueDate)?.dueDate || '—';
+}
+
+function getOutcome(record) {
+  const action = (record.linked_actions || [])[0] || {};
+  return action.expected_outcome || record.expected_outcome || '—';
+}
+
+function getPrimaryRecords(records, count = 3) {
+  return sortRecords(records).slice(0, count);
+}
+
+function showLoading(show) {
+  document.getElementById('loading-state').style.display = show ? 'flex' : 'none';
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-state').style.display = 'flex';
+}
+
+function hideError() {
+  document.getElementById('error-state').style.display = 'none';
+}
+
+async function loadRecommendations() {
+  showLoading(true);
+  hideError();
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+
+  try {
+    const { data: latestRunRows, error: latestRunError } = await supabaseClient
+      .from('Recommendations')
+      .select('created_at, hotel_name, period')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (latestRunError) throw latestRunError;
+
+    const latestRun = latestRunRows?.[0];
+    if (!latestRun) {
+      allData = [];
+      showLoading(false);
+      document.getElementById('empty-state').style.display = 'flex';
+      return;
+    }
+
+    const latestCreatedAt = new Date(latestRun.created_at);
+    const batchStart = new Date(latestCreatedAt.getTime() - 15 * 60 * 1000).toISOString();
+
+    const recommendationsQuery = supabaseClient
+      .from('Recommendations')
+      .select('*')
+      .eq('hotel_name', latestRun.hotel_name)
+      .eq('period', latestRun.period)
+      .gte('created_at', batchStart)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    const actionsQuery = supabaseClient
+      .from('actions')
+      .select('*')
+      .eq('hotel_name', latestRun.hotel_name)
+      .eq('period', latestRun.period)
+      .gte('created_at', batchStart)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    const [
+      { data: findings, error: findingsError },
+      { data: actions, error: actionsError }
+    ] = await Promise.all([recommendationsQuery, actionsQuery]);
+
+    if (findingsError) throw findingsError;
+    if (actionsError) throw actionsError;
+
+    const cleanFindings = (findings || []).filter(r => {
+      const t = r.finding_title || '';
+      return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
+    });
+
+    allData = cleanFindings.map(finding => {
+      const linkedActions = (actions || []).filter(action =>
+        normalize(action.hotel_name) === normalize(finding.hotel_name) &&
+        normalize(action.period) === normalize(finding.period) &&
+        normalize(action.finding_title_reference) === normalize(finding.finding_title)
+      );
+      return { ...finding, linked_actions: linkedActions };
+    });
+
+    showLoading(false);
+    if (!allData.length) {
+      document.getElementById('empty-state').style.display = 'flex';
+      return;
+    }
+
+    renderDashboard(allData);
+    document.getElementById('dashboard').style.display = 'block';
+  } catch (err) {
+    showLoading(false);
+    showError('Could not load data: ' + err.message);
+    console.error(err);
+  }
+}
+
+
+function formatCurrencyShort(value) {
+  return value > 0 ? `€${formatNumber(Math.round(value))}` : '—';
+}
+
+function getRiskProjection(record) {
+  const revenue = calculateRevenueUpside(record);
+  const gop = calculateGopImpact(record);
+  const quarterlyRevenue = revenue > 0 ? revenue / 4 : 0;
+  const quarterlyGop = gop > 0 ? gop / 4 : 0;
+  if (quarterlyRevenue > 0 && quarterlyGop > 0) {
+    return `If no action is taken, roughly ${formatCurrencyShort(quarterlyRevenue)} revenue and ${formatCurrencyShort(quarterlyGop)} GOP could remain unrealised over the next 90 days.`;
+  }
+  if (quarterlyRevenue > 0) {
+    return `If no action is taken, roughly ${formatCurrencyShort(quarterlyRevenue)} revenue could remain unrealised over the next 90 days.`;
+  }
+  return 'If no action is taken, this issue is likely to continue eroding commercial performance into the next cycle.';
+}
+
+function getDecisionPrompt(record) {
+  const department = getDepartmentBucket(record);
+  const due = getDueDate(record);
+  if (department === 'sales') {
+    return `Confirm account-level recovery plan and commercial guardrails for ${record.finding_title || 'this issue'} by ${due}.`;
+  }
+  if (department === 'marketing') {
+    return `Approve channel visibility and demand-generation response for ${record.finding_title || 'this issue'} by ${due}.`;
+  }
+  return `Validate pricing, mix, and inventory strategy for ${record.finding_title || 'this issue'} by ${due}.`;
+}
+
+function getDepartmentNarrative(bucket) {
+  if (!bucket.records.length) {
+    return `No material ${bucket.label.toLowerCase()} issues were detected in the latest cycle.`;
+  }
+  const top = bucket.records[0];
+  const revenue = calculateRevenueUpside(top);
+  const cause = top.root_cause || top.cause || 'commercial execution gap';
+  return `${top.finding_title} is leading ${bucket.label.toLowerCase()} attention, with ${revenue > 0 ? `${formatCurrencyShort(revenue)} annualised upside at stake` : 'meaningful commercial exposure'} and a root cause tied to ${cause.toLowerCase()}.`;
+}
+
+function getLeadActionSummary(record) {
+  const linked = record.linked_actions || [];
+  const first = linked[0] || {};
+  return first.action_title || first.action_detail || record.action_plan || record.action || 'No action plan attached in the latest cycle.';
+}
+
+function buildGMHeadline(records, buckets, totalRevenueUpside, totalGopImpact) {
+  const topRecords = getPrimaryRecords(records, 2);
+  const topRisk = topRecords[0];
+  const second = topRecords[1];
+  const activeDepartments = Object.values(buckets).filter(bucket => bucket.records.length);
+  const leadDepartments = activeDepartments
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, 2)
+    .map(bucket => bucket.label);
+  const parts = [];
+  if (topRisk) {
+    parts.push(`${topRisk.finding_title} is the lead issue, with ${formatCurrencyShort(calculateRevenueUpside(topRisk))} annualised revenue at stake`);
+  }
+  if (second) {
+    parts.push(`${second.finding_title} is the next pressure point`);
+  }
+  if (leadDepartments.length) {
+    parts.push(`requiring immediate alignment across ${leadDepartments.join(' and ')}`);
+  }
+  if (totalRevenueUpside > 0 || totalGopImpact > 0) {
+    parts.push(`The latest cycle concentrates ${formatCurrencyShort(totalRevenueUpside)} revenue exposure and ${formatCurrencyShort(totalGopImpact)} directional GOP impact`);
+  }
+  return parts.join(', ') + '.';
+}
+
+function buildFrictionPoints(records) {
+  const frictions = [];
+  const revenueRecord = sortRecords(records.filter(r => getDepartmentBucket(r) === 'revenue'))[0];
+  const salesRecord = sortRecords(records.filter(r => getDepartmentBucket(r) === 'sales'))[0];
+  const marketingRecord = sortRecords(records.filter(r => getDepartmentBucket(r) === 'marketing'))[0];
+
+  if (revenueRecord && salesRecord) {
+    frictions.push({
+      title: 'Revenue vs Sales alignment',
+      copy: `${revenueRecord.finding_title} and ${salesRecord.finding_title} should be reviewed together to avoid pricing recovery and account production moving in different directions.`
+    });
+  }
+  if (revenueRecord && marketingRecord) {
+    frictions.push({
+      title: 'Pricing vs demand generation',
+      copy: `${marketingRecord.finding_title} may not convert fully unless ${revenueRecord.finding_title.toLowerCase()} is addressed at the same time.`
+    });
+  }
+  if (!frictions.length && revenueRecord) {
+    frictions.push({
+      title: 'Execution concentration',
+      copy: `${revenueRecord.finding_title} is carrying the bulk of current exposure and requires cross-functional support beyond a single department.`
+    });
+  }
+  return frictions.slice(0, 3);
+}
+
+function renderExecutiveOverview(records) {
+  const totalRevenueUpside = records.reduce((sum, r) => sum + calculateRevenueUpside(r), 0);
+  const totalGopImpact = records.reduce((sum, r) => sum + calculateGopImpact(r), 0);
+  const criticalCount = records.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
+  const topRecords = getPrimaryRecords(records, 3);
+  const hotelName = records[0]?.hotel_name || '—';
+  const period = records[0]?.period || '—';
+  const generated = getGeneratedDate(records[0] || {});
+  const buckets = buildDepartmentBuckets(records);
+  const frictions = buildFrictionPoints(records);
+
+  document.getElementById('hero-hotel').textContent = hotelName;
+  document.getElementById('meta-hotel').textContent = hotelName;
+  document.getElementById('meta-period').textContent = period;
+  document.getElementById('meta-generated').textContent = generated;
+  document.getElementById('hero-copy').textContent = `${records.length} active strategic finding${records.length === 1 ? '' : 's'} were generated for the latest cycle. This briefing translates them into decisions, accountabilities, and risk exposure for Revenue, Sales, and Marketing.`;
+
+  document.getElementById('stat-findings').textContent = records.length;
+  document.getElementById('stat-revenue').textContent = formatCurrencyShort(totalRevenueUpside);
+  document.getElementById('stat-gop').textContent = formatCurrencyShort(totalGopImpact);
+  document.getElementById('stat-critical').textContent = criticalCount;
+  document.getElementById('gm-headline').textContent = buildGMHeadline(records, buckets, totalRevenueUpside, totalGopImpact);
+
+  const priorityList = document.getElementById('priority-list');
+  priorityList.innerHTML = topRecords.map((record, index) => {
+    const impact = calculateRevenueUpside(record);
+    const trigger = record.trigger_metric ? ` · ${escHtml(record.trigger_metric)}` : '';
+    return `
+      <div class="priority-item">
+        <strong>${index + 1}. ${escHtml(record.finding_title || 'Untitled finding')}</strong>
+        <div class="priority-meta">${escHtml(record.diagnosis || record.situation || 'No diagnosis available.')} ${impact > 0 ? `Estimated upside: ${escHtml(formatCurrencyShort(impact))}.` : ''}${trigger}</div>
+      </div>
+    `;
+  }).join('');
+
+  const signalRows = [];
+  ['revenue', 'sales', 'marketing'].forEach(dep => {
+    const bucket = buckets[dep];
+    if (!bucket.records.length) return;
+    signalRows.push(`
+      <div class="signal-item">
+        <strong>${bucket.label}:</strong>
+        <div class="signal-meta">${escHtml(getDepartmentNarrative(bucket))}</div>
+      </div>
+    `);
+  });
+  document.getElementById('signal-list').innerHTML = signalRows.join('');
+
+  const decisionRows = topRecords.map(record => `
+    <div class="signal-item">
+      <strong>${escHtml(record.finding_title)}:</strong>
+      <div class="signal-meta">${escHtml(getDecisionPrompt(record))}</div>
+    </div>
+  `).join('');
+  document.getElementById('decision-list').innerHTML = decisionRows;
+
+  document.getElementById('friction-list').innerHTML = frictions.map(item => `
+    <div class="signal-item">
+      <strong>${escHtml(item.title)}:</strong>
+      <div class="signal-meta">${escHtml(item.copy)}</div>
+    </div>
+  `).join('');
+}
+
+function buildDepartmentBuckets(records) {
+  const buckets = {
+    revenue: { label: 'Revenue', records: [] },
+    sales: { label: 'Sales', records: [] },
+    marketing: { label: 'Marketing', records: [] }
+  };
+  records.forEach(record => {
+    const bucket = getDepartmentBucket(record);
+    buckets[bucket].records.push(record);
+  });
+  Object.values(buckets).forEach(bucket => {
+    bucket.records = sortRecords(bucket.records);
+    bucket.totalRevenue = bucket.records.reduce((sum, r) => sum + calculateRevenueUpside(r), 0);
+    bucket.totalGop = bucket.records.reduce((sum, r) => sum + calculateGopImpact(r), 0);
+    bucket.critical = bucket.records.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
+  });
+  return buckets;
+}
+
+function renderDepartmentSnapshot(records) {
+  const buckets = buildDepartmentBuckets(records);
+  const grid = document.getElementById('department-grid');
+  grid.innerHTML = ['revenue', 'sales', 'marketing'].map(key => {
+    const bucket = buckets[key];
+    const leads = bucket.records.slice(0, 2);
+    return `
+      <div class="department-card">
+        <div class="department-name">${bucket.label}</div>
+        <div class="department-sub">${getDepartmentNarrative(bucket)}</div>
+        <div class="department-stats">
+          <div class="mini">
+            <div class="mini-label">Findings</div>
+            <div class="mini-value">${bucket.records.length}</div>
+            <div class="mini-sub">Current cycle</div>
+          </div>
+          <div class="mini">
+            <div class="mini-label">Revenue</div>
+            <div class="mini-value">${formatCurrencyShort(bucket.totalRevenue)}</div>
+            <div class="mini-sub">Annual at stake</div>
+          </div>
+          <div class="mini">
+            <div class="mini-label">GOP</div>
+            <div class="mini-value">${formatCurrencyShort(bucket.totalGop)}</div>
+            <div class="mini-sub">Directional impact</div>
+          </div>
+        </div>
+        <div class="dept-leads">
+          ${leads.length ? leads.map(item => `
+            <div class="dept-lead">
+              <div class="dept-lead-title">${escHtml(item.finding_title)}</div>
+              <div class="dept-lead-copy">${escHtml(getLeadActionSummary(item))} Owner: ${escHtml(getOwner(item))}. Due: ${escHtml(getDueDate(item))}.</div>
+            </div>
+          `).join('') : '<div class="dept-lead"><div class="dept-lead-copy">No current briefing items for this department.</div></div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderFindingBriefing(records) {
+  const sorted = sortRecords(records);
+  const grid = document.getElementById('finding-grid');
+  grid.innerHTML = sorted.map(record => {
+    const linked = record.linked_actions || [];
+    const revenue = calculateRevenueUpside(record);
+    const gop = calculateGopImpact(record);
+    const generatedDate = getGeneratedDate(record);
+    const department = capitalize(getDepartmentBucket(record));
+    const priority = (record.priority || 'medium').toLowerCase();
+    return `
+      <article class="finding-brief">
+        <div class="finding-top">
+          <div>
+            <div class="finding-kicker">${escHtml(record.module || 'Strategic finding')}</div>
+            <div class="finding-title">${escHtml(record.finding_title || 'Untitled finding')}</div>
+            <div class="finding-summary">${escHtml(record.situation || record.diagnosis || 'No situation summary available.')}</div>
+          </div>
+          <div class="badges">
+            <span class="badge ${priority}">${escHtml(priority)}</span>
+            <span class="badge dept">${escHtml(department)}</span>
+          </div>
+        </div>
+        <div class="finding-body">
+          <div class="finding-columns">
+            <div class="info-card">
+              <div class="info-title">What / Why</div>
+              <div class="info-text"><strong>Diagnosis:</strong> ${escHtml(record.diagnosis || '—')}</div>
+              <div class="info-text" style="margin-top:10px;"><strong>Root cause:</strong> ${escHtml(record.root_cause || record.cause || '—')}</div>
+              <div class="info-text" style="margin-top:10px;"><strong>Action plan:</strong></div>
+              <ul class="action-list">${formatActionList(linked, record)}</ul>
+            </div>
+            <div class="info-card">
+              <div class="info-title">Who / When / Impact</div>
+              <div class="info-text"><strong>Owner:</strong> ${escHtml(getOwner(record))}</div>
+              <div class="info-text" style="margin-top:10px;"><strong>Due date:</strong> ${escHtml(getDueDate(record))}</div>
+              <div class="info-text" style="margin-top:10px;"><strong>Expected outcome:</strong> ${escHtml(getOutcome(record))}</div>
+              <div class="info-text" style="margin-top:10px;"><strong>Generated:</strong> ${escHtml(generatedDate)}</div>
+              <div class="decision-note">
+                <div class="info-title">GM Decision Required</div>
+                <div class="info-text">${escHtml(getDecisionPrompt(record))}</div>
+              </div>
+            </div>
+          </div>
+          <div class="exec-matrix">
+            <div class="exec-cell">
+              <div class="exec-label">Department</div>
+              <div class="exec-value">${escHtml(department)}</div>
+            </div>
+            <div class="exec-cell">
+              <div class="exec-label">Trigger</div>
+              <div class="exec-value">${escHtml(record.trigger_metric || '—')}</div>
+            </div>
+            <div class="exec-cell">
+              <div class="exec-label">Revenue at Stake</div>
+              <div class="exec-value">${revenue > 0 ? `<strong>${escHtml(formatCurrencyShort(revenue))}</strong>` : '—'}</div>
+            </div>
+            <div class="exec-cell">
+              <div class="exec-label">Estimated GOP Impact</div>
+              <div class="exec-value">${gop > 0 ? `<strong>${escHtml(formatCurrencyShort(gop))}</strong>` : '—'}</div>
+            </div>
+          </div>
+          <div class="decision-note">
+            <div class="info-title">If Nothing Is Done</div>
+            <div class="info-text">${escHtml(getRiskProjection(record))}</div>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function renderDashboard(records) {
+  renderExecutiveOverview(records);
+  renderDepartmentSnapshot(records);
+  renderFindingBriefing(records);
+}
+
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+}
+
+function showApp(email) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = email;
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+  errorEl.style.display = 'none';
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    let msg = 'Incorrect email or password. Please try again.';
+    if (error.message.includes('Email not confirmed')) msg = 'Please confirm your email address first.';
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+    return;
+  }
+
+  showApp(data.session.user.email);
+  btn.textContent = 'Sign In';
+  btn.disabled = false;
+  loadRecommendations();
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  showLogin();
+}
+
+(async () => {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    showApp(session.user.email);
+    loadRecommendations();
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
