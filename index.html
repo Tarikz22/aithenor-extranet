@@ -997,14 +997,10 @@ async function loadRecommendations() {
     });
 
     allData = cleanFindings.map(finding => {
-      const linkedActions = (actions || []).filter(action =>
-        normalize(action.hotel_name) === normalize(finding.hotel_name) &&
-        normalize(action.period) === normalize(finding.period) &&
-        (
-          normalize(action.finding_title_reference) === normalize(finding.finding_title || finding.title) ||
-          normalize(action.title) === normalize(finding.finding_title || finding.title)
-        )
-      );
+const linkedActions = (actions || []).filter(action =>
+  normalize(action.hotel_name) === normalize(finding.hotel_name) &&
+  normalize(action.period) === normalize(finding.period)
+);
 
       return {
         ...finding,
