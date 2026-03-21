@@ -987,14 +987,22 @@ async function loadRecommendations() {
     if (findingsError) throw findingsError;
     if (actionsError) throw actionsError;
 
-    const cleanFindings = (findings || []).filter(r => {
-      const t = r.finding_title || r.title || '';
-      const body = r.finding || r.diagnosis || r.situation || '';
-      return (
-        (t && t.length > 3 && !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens')) ||
-        (body && body.length > 3 && !body.startsWith('{') && !body.startsWith('['))
-      );
-    });
+const cleanFindings = (findings || []).filter(r => {
+  const t = (r.finding_title || r.title || '').toString().trim();
+  return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
+});
+
+allData = cleanFindings.map(finding => {
+  const linkedActions = (actions || []).filter(action =>
+    normalize(action.hotel_name) === normalize(finding.hotel_name) &&
+    normalize(action.period) === normalize(finding.period)
+  );
+
+  return {
+    ...finding,
+    linked_actions: linkedActions
+  };
+});
 
     allData = cleanFindings.map(finding => {
 const linkedActions = (actions || []).filter(action =>
@@ -1294,6 +1302,7 @@ function formatActionDetails(actions, finding = {}) {
 
     if (action.action_title) pieces.push(action.action_title);
     if (action.action_detail) pieces.push(action.action_detail);
+    if (action.action_text) pieces.push(action.action_text);
 
     if (pieces.length === 0) {
       [action.action_plan, action.recommended_action, action.action].forEach(v => {
