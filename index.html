@@ -1251,23 +1251,7 @@ function renderCard(r) {
     return sum + (Number(a.estimated_revenue_upside) || 0);
   }, 0);
 
-  const firstAction = linkedActions[0] || {};
-  const firstOutcome = buildExpectedOutcome(r, linkedActions);
-  const ownerParts = [
-  firstAction.owner_role,
-  firstAction.owner_department,
-  firstAction.execution_owner,
-  firstAction.owner,
-  r.owner_department,
-  r.execution_owner,
-  r.owner,
-  r.department,
-  r.category
-].filter(Boolean);
-  const firstOwner =
-  ownerParts.length
-    ? ownerParts.join(' · ')
-    : (r.owner_department || r.department || r.category || '—');
+const firstOwner = r.owner_department || r.department || '—';
   const firstUrgency = firstAction.urgency || capitalize(priority);
   const firstDueDate =
   linkedActions.find(a => a?.due_date)?.due_date ||
