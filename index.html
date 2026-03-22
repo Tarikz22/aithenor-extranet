@@ -1254,14 +1254,16 @@ function renderCard(r) {
   const firstAction = linkedActions[0] || {};
   const firstOutcome = buildExpectedOutcome(r, linkedActions);
   const ownerParts = [
-    firstAction.owner_role,
-    firstAction.owner_department,
-    firstAction.execution_owner,
-    firstAction.owner,
-    r.execution_owner,
-    r.owner,
-    r.department
-  ].filter(Boolean);
+  firstAction.owner_role,
+  firstAction.owner_department,
+  firstAction.execution_owner,
+  firstAction.owner,
+  r.owner_department,
+  r.execution_owner,
+  r.owner,
+  r.department,
+  r.category
+].filter(Boolean);
   const firstOwner = ownerParts.length ? ownerParts.join(' · ') : '—';
   const firstUrgency = firstAction.urgency || capitalize(priority);
   const firstDueDate =
