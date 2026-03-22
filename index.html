@@ -1239,7 +1239,7 @@ function buildExpectedOutcome(r, linkedActions = []) {
 function renderCard(r) {
   const priority = (r.priority || 'medium').toLowerCase();
   const isActioned = actionedIds.has(r.id);
-  const dept = r.department || r.category || '';
+  const dept = r.department || r.category || '—';
   const linkedActions = r.linked_actions || [];
   console.log('CARD CHECK', {
   title: r.finding_title || r.title,
