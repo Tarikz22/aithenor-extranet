@@ -939,6 +939,24 @@ function extractMetric(text, metricName) {
   const match = text.match(regex);
   return match ? match[1] : '—';
 }
+
+function buildExpectedOutcome(r) {
+  const text = r.finding || '';
+
+  if (text.includes('RGI') && text.includes('MPI')) {
+    return 'Recover occupancy share and RevPAR index performance by aligning pricing with demand, while protecting ADR integrity.';
+  }
+
+  if (text.includes('ARI') && text.includes('above')) {
+    return 'Reduce pricing gap versus competitors to improve market share capture without unnecessary rate erosion.';
+  }
+
+  if (text.toLowerCase().includes('conversion')) {
+    return 'Increase conversion efficiency across channels to translate existing demand into measurable revenue growth.';
+  }
+
+  return 'Improve commercial performance through targeted pricing and demand optimization strategies.';
+}
   
 async function loadRecommendations() {
   showLoading(true);
@@ -1266,7 +1284,9 @@ const firstOwner = r.owner_department || r.department || '—';
   linkedActions.find(a => a?.due_date)?.due_date ||
   linkedActions.find(a => a?.dueDate)?.dueDate ||
   '—';
-  const firstOutcome = r.expected_outcome || '—';
+  const firstOutcome =
+  r.expected_outcome ||
+  buildExpectedOutcome(r);
   const triggerDisplay =
   r.trigger_metric ||
   (r.finding
