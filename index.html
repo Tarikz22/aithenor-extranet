@@ -1260,6 +1260,7 @@ const firstOwner = r.owner_department || r.department || '—';
   linkedActions.find(a => a?.due_date)?.due_date ||
   linkedActions.find(a => a?.dueDate)?.dueDate ||
   '—';
+  const firstOutcome = r.expected_outcome || '—';
   const triggerDisplay = r.trigger_metric || (r.impact_value ? `€${formatNumber(r.impact_value)}` : '—');
   const actionListHtml = formatActionDetails(linkedActions, r);
   const rootCause = buildRootCause(r, linkedActions);
