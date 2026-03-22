@@ -1264,7 +1264,10 @@ function renderCard(r) {
   r.department,
   r.category
 ].filter(Boolean);
-  const firstOwner = ownerParts.length ? ownerParts.join(' · ') : '—';
+  const firstOwner =
+  ownerParts.length
+    ? ownerParts.join(' · ')
+    : (r.owner_department || r.department || r.category || '—');
   const firstUrgency = firstAction.urgency || capitalize(priority);
   const firstDueDate =
   linkedActions.find(a => a?.due_date)?.due_date ||
