@@ -933,7 +933,13 @@ function normalize(value) {
     .toLowerCase()
     .replace(/\s+/g, ' ');
 }
-
+function extractMetric(text, metricName) {
+  if (!text) return '—';
+  const regex = new RegExp(`${metricName}\\s*(?:is|at)?\\s*([0-9]+(?:\\.[0-9]+)?)`, 'i');
+  const match = text.match(regex);
+  return match ? match[1] : '—';
+}
+  
 async function loadRecommendations() {
   showLoading(true);
   hideError();
@@ -1261,7 +1267,11 @@ const firstOwner = r.owner_department || r.department || '—';
   linkedActions.find(a => a?.dueDate)?.dueDate ||
   '—';
   const firstOutcome = r.expected_outcome || '—';
-  const triggerDisplay = r.trigger_metric || (r.impact_value ? `€${formatNumber(r.impact_value)}` : '—');
+  const triggerDisplay =
+  r.trigger_metric ||
+  (r.finding
+    ? `MPI ${extractMetric(r.finding, 'MPI')} | ARI ${extractMetric(r.finding, 'ARI')} | RGI ${extractMetric(r.finding, 'RGI')}`
+    : (r.impact_value ? `€${formatNumber(r.impact_value)}` : '—'));
   const actionListHtml = formatActionDetails(linkedActions, r);
   const rootCause = buildRootCause(r, linkedActions);
   const generatedDate = getGeneratedDate(r);
