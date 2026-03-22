@@ -1383,7 +1383,24 @@ function formatActionDetails(actions, finding = {}) {
 
     if (action.action_title) pieces.push(action.action_title);
     if (action.action_detail) pieces.push(action.action_detail);
-    if (action.action_text) pieces.push(action.action_text);
+    if (action.action_text) {
+  let text = action.action_text;
+
+  // Make actions more operational
+  if (text.toLowerCase().includes('recalibrate')) {
+    text = `Review and adjust rate positioning by segment and booking window, ensuring alignment with comp set pricing dynamics.`;
+  }
+
+  if (text.toLowerCase().includes('optimize')) {
+    text = `Restructure pricing hierarchy across room categories to reinforce upsell logic and maximize revenue contribution.`;
+  }
+
+  if (text.toLowerCase().includes('adjust pricing corridors')) {
+    text = `Implement dynamic pricing adjustments between need and compression periods to improve occupancy capture without diluting ADR.`;
+  }
+
+  pieces.push(text);
+}
 
     if (pieces.length === 0) {
       [action.action_plan, action.recommended_action, action.action].forEach(v => {
