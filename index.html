@@ -1000,7 +1000,7 @@ function buildIssueKey(record) {
     normalize(record.hotel_name),
     normalize(record.period),
     normalize(record.department || record.category),
-    normalize(record.finding || record.diagnosis)
+    normalize(record.finding || record.root_cause || record.title)
   ].join('||');
 }
 
@@ -1295,8 +1295,8 @@ function renderCard(r) {
       <div class="finding-body">
         <div class="finding-sections">
           <div class="finding-section">
-            <div class="section-label">Diagnosis</div>
-            <div class="section-text">${escHtml(r.diagnosis || r.finding || '—')}</div>
+            <div class="section-label">Key Insight</div>
+            <div class="section-text">${escHtml(r.finding || r.title || r.root_cause || '-')}</div>
           </div>
 
           <div class="finding-section">
