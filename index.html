@@ -879,7 +879,8 @@ async function submitUpload() {
   statusEl.style.color = '#6B6B67';
 
   try {
-    const filePath = `${hotelCode}/${Date.now()}_${file.name}`;
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${hotelCode}/${Date.now()}_${safeFileName}`;
 
     const { error: uploadError } = await supabaseClient
       .storage
@@ -888,22 +889,42 @@ async function submitUpload() {
 
     if (uploadError) throw uploadError;
 
-    const { data: publicUrlData } = supabaseClient
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient
       .storage
       .from('hotel-uploads')
-      .getPublicUrl(filePath);
+      .createSignedUrl(filePath, 60 * 10);
 
-    const fileUrl = publicUrlData.publicUrl;
+    if (signedUrlError) throw signedUrlError;
 
     const response = await fetch('https://aithenor-api-production.up.railway.app/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        hotelCode: hotelCode,
-        fileUrl: fileUrl,
-        context: context
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hotelCode,
+        fileUrl: signedUrlData.signedUrl,
+        context,
+        originalFileName: file.name
       })
     });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Upload failed');
+    }
+
+    statusEl.textContent = 'Upload successful. Refreshing dashboard...';
+    statusEl.style.color = '#1A6B3C';
+
+    setTimeout(() => {
+      closeUploadModal();
+      loadRecommendations();
+    }, 1200);
+  } catch (err) {
+    statusEl.textContent = err.message;
+    statusEl.style.color = '#C0392B';
+  }
+}
 
     const result = await response.json();
 
