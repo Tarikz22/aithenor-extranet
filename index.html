@@ -1252,7 +1252,10 @@ function renderCard(r) {
   }, 0);
 
 const firstOwner = r.owner_department || r.department || '—';
-  const firstUrgency = firstAction.urgency || capitalize(priority);
+  const firstUrgency =
+  linkedActions.find(a => a?.urgency)?.urgency ||
+  linkedActions.find(a => a?.priority)?.priority ||
+  capitalize(priority);
   const firstDueDate =
   linkedActions.find(a => a?.due_date)?.due_date ||
   linkedActions.find(a => a?.dueDate)?.dueDate ||
