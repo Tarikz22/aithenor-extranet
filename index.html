@@ -963,45 +963,44 @@ async function loadRecommendations() {
   hideError();
 
   try {
-    const { data: latestRunRows, error: latestRunError } = await supabaseClient
-      .from('Recommendations')
-      .select('created_at, hotel_name, period')
-      .order('created_at', { ascending: false })
-      .limit(1);
+const hotelCode = localStorage.getItem('hotelCode') || '';
 
-    if (latestRunError) throw latestRunError;
+const { data: latestRunRows, error: latestRunError } = await supabaseClient
+  .from('Recommendations')
+  .select('hotel_name, snapshot_date, period_label, period_key')
+  .eq('hotel_name', hotelCode)
+  .not('snapshot_date', 'is', null)
+  .order('snapshot_date', { ascending: false })
+  .limit(1);
 
-    const latestRun = latestRunRows?.[0];
-    if (!latestRun) {
-      allData = [];
-      populatePeriodFilter([]);
-      renderDashboard([]);
-      showLoading(false);
-      document.getElementById('dashboard').style.display = 'block';
-      document.getElementById('empty-state').style.display = 'block';
-      return;
-    }
+if (latestRunError) throw latestRunError;
 
-    const latestCreatedAt = new Date(latestRun.created_at);
-    const batchStart = new Date(latestCreatedAt.getTime() - 15 * 60 * 1000).toISOString();
+const latestRun = latestRunRows?.[0];
+if (!latestRun) {
+  allData = [];
+  populatePeriodFilter([]);
+  renderDashboard([]);
+  showLoading(false);
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'block';
+  return;
+}
 
-    const recommendationsQuery = supabaseClient
-      .from('Recommendations')
-      .select('*')
-      .eq('hotel_name', latestRun.hotel_name)
-      .eq('period', latestRun.period)
-      .gte('created_at', batchStart)
-      .order('created_at', { ascending: false })
-      .limit(200);
+const recommendationsQuery = supabaseClient
+  .from('Recommendations')
+  .select('*')
+  .eq('hotel_name', latestRun.hotel_name)
+  .eq('snapshot_date', latestRun.snapshot_date)
+  .order('created_at', { ascending: false })
+  .limit(200);
 
-    const actionsQuery = supabaseClient
-      .from('actions')
-      .select('*')
-      .eq('hotel_name', latestRun.hotel_name)
-      .eq('period', latestRun.period)
-      .gte('created_at', batchStart)
-      .order('created_at', { ascending: false })
-      .limit(500);
+const actionsQuery = supabaseClient
+  .from('actions')
+  .select('*')
+  .eq('hotel_name', latestRun.hotel_name)
+  .eq('snapshot_date', latestRun.snapshot_date)
+  .order('created_at', { ascending: false })
+  .limit(500);
 
     const [
       { data: findings, error: findingsError },
