@@ -733,11 +733,16 @@ body {
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title">Strategic Findings</div>
-      <select class="period-select" id="period-filter" onchange="filterByPeriod()">
-        <option value="all">All Periods</option>
-      </select>
-    </div>
+  <div class="topbar-title">Strategic Findings</div>
+
+  <select class="period-select" id="snapshot-filter" onchange="filterBySnapshot()">
+    <option value="">Loading Snapshots...</option>
+  </select>
+
+  <select class="period-select" id="period-filter" onchange="filterByPeriod()">
+    <option value="">Loading Periods...</option>
+  </select>
+</div>
     <div class="topbar-right">
       <button class="refresh-btn" onclick="loadRecommendations()">↻ Refresh</button>
       <button class="upload-btn" onclick="openUploadModal()">+ Upload Data</button>
@@ -837,9 +842,11 @@ body {
 
 <script>
 let allData = [];
+let allSnapshots = [];
 let actionedIds = new Set();
 let currentTab = 'all';
-let currentPeriod = 'all';
+let currentSnapshot = '';
+let currentPeriod = '';
 
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
@@ -965,19 +972,31 @@ async function loadRecommendations() {
   try {
 const hotelCode = localStorage.getItem('hotelCode') || '';
 
-const { data: latestRunRows, error: latestRunError } = await supabaseClient
+const { data: snapshotRows, error: snapshotError } = await supabaseClient
   .from('Recommendations')
-  .select('hotel_name, snapshot_date, period_label, period_key')
+  .select('hotel_name, snapshot_date')
   .eq('hotel_name', hotelCode)
   .not('snapshot_date', 'is', null)
-  .order('snapshot_date', { ascending: false })
-  .limit(1);
+  .order('snapshot_date', { ascending: false });
 
-if (latestRunError) throw latestRunError;
+if (snapshotError) throw snapshotError;
 
-const latestRun = latestRunRows?.[0];
-if (!latestRun) {
+const uniqueSnapshotsMap = new Map();
+(snapshotRows || []).forEach(row => {
+  const key = `${row.hotel_name}||${row.snapshot_date}`;
+  if (!uniqueSnapshotsMap.has(key)) {
+    uniqueSnapshotsMap.set(key, {
+      hotel_name: row.hotel_name,
+      snapshot_date: row.snapshot_date
+    });
+  }
+});
+
+allSnapshots = Array.from(uniqueSnapshotsMap.values());
+
+if (!allSnapshots.length) {
   allData = [];
+  populateSnapshotFilter([]);
   populatePeriodFilter([]);
   renderDashboard([]);
   showLoading(false);
@@ -986,19 +1005,30 @@ if (!latestRun) {
   return;
 }
 
+if (!currentSnapshot) {
+  currentSnapshot = allSnapshots[0].snapshot_date;
+}
+
+populateSnapshotFilter(allSnapshots);
+
+const selectedSnapshotRow =
+  allSnapshots.find(item => item.snapshot_date === currentSnapshot) || allSnapshots[0];
+
+currentSnapshot = selectedSnapshotRow.snapshot_date;
+
 const recommendationsQuery = supabaseClient
   .from('Recommendations')
   .select('*')
-  .eq('hotel_name', latestRun.hotel_name)
-  .eq('snapshot_date', latestRun.snapshot_date)
+  .eq('hotel_name', selectedSnapshotRow.hotel_name)
+  .eq('snapshot_date', selectedSnapshotRow.snapshot_date)
   .order('created_at', { ascending: false })
   .limit(200);
 
 const actionsQuery = supabaseClient
   .from('actions')
   .select('*')
-  .eq('hotel_name', latestRun.hotel_name)
-  .eq('snapshot_date', latestRun.snapshot_date)
+  .eq('hotel_name', selectedSnapshotRow.hotel_name)
+  .eq('snapshot_date', selectedSnapshotRow.snapshot_date)
   .order('created_at', { ascending: false })
   .limit(500);
 
@@ -1091,24 +1121,80 @@ allData = dedupedFindings.map(finding => {
   }
 }
 
-function populatePeriodFilter(data) {
-  const periods = [...new Set(data.map(r => r.period).filter(Boolean))];
-  const select = document.getElementById('period-filter');
-  select.innerHTML = '<option value="all">All Periods</option>';
+  function populateSnapshotFilter(snapshots) {
+  const select = document.getElementById('snapshot-filter');
+  select.innerHTML = '';
 
-  periods.forEach(p => {
+  if (!snapshots || snapshots.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No Snapshots Available';
+    select.appendChild(opt);
+    currentSnapshot = '';
+    select.value = '';
+    return;
+  }
+
+  snapshots.forEach(snapshot => {
+    const opt = document.createElement('option');
+    opt.value = snapshot.snapshot_date;
+    opt.textContent = formatSnapshotLabel(snapshot.snapshot_date);
+    select.appendChild(opt);
+  });
+
+  if (!currentSnapshot) {
+    currentSnapshot = snapshots[0].snapshot_date;
+  }
+
+  select.value = currentSnapshot;
+}
+
+function formatSnapshotLabel(snapshotDate) {
+  if (!snapshotDate) return 'Unknown Snapshot';
+
+  try {
+    const date = new Date(snapshotDate);
+    return `Snapshot · ${date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    })}`;
+  } catch {
+    return `Snapshot · ${snapshotDate}`;
+  }
+}
+
+function filterBySnapshot() {
+  currentSnapshot = document.getElementById('snapshot-filter').value;
+  currentPeriod = '';
+  loadRecommendations();
+}
+  
+function populatePeriodFilter(data) {
+  const periods = [...new Set(data.map(r => r.period_label || r.period).filter(Boolean))];
+  const select = document.getElementById('period-filter');
+  select.innerHTML = '';
+
+  periods.forEach((p, index) => {
     const opt = document.createElement('option');
     opt.value = p;
     opt.textContent = p;
     select.appendChild(opt);
+
+    if (index === 0) {
+      currentPeriod = p;
+    }
   });
 
   if (periods.length > 0) {
-    currentPeriod = periods[0];
     select.value = currentPeriod;
   } else {
-    currentPeriod = 'all';
-    select.value = 'all';
+    currentPeriod = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No Period Available';
+    select.appendChild(opt);
+    select.value = '';
   }
 }
 
@@ -1118,9 +1204,9 @@ function filterByPeriod() {
 }
 
 function renderDashboard(data) {
-  const periodFiltered = currentPeriod === 'all'
-    ? data
-    : data.filter(r => r.period === currentPeriod);
+  const periodFiltered = !currentPeriod
+  ? data
+  : data.filter(r => (r.period_label || r.period) === currentPeriod);
 
   if (periodFiltered.length > 0) {
     const hotel = periodFiltered[0].hotel_name || 'Hotel';
@@ -1387,7 +1473,9 @@ function filterTab(tab, el) {
   currentTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  const filtered = currentPeriod === 'all' ? allData : allData.filter(r => r.period === currentPeriod);
+  const filtered = !currentPeriod
+  ? allData
+  : allData.filter(r => (r.period_label || r.period) === currentPeriod);
   renderFindings(filtered);
 }
 
