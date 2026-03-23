@@ -1135,7 +1135,10 @@ function renderDashboard(data) {
     document.getElementById('stat-period-label').textContent = 'No Period';
   }
 
-  const criticalCount = periodFiltered.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
+  const criticalCount = periodFiltered.filter(r => {
+  const p = (r.priority || '').toLowerCase();
+  return p === 'critical' || p === 'high';
+}).length;
   const revenueCount = periodFiltered.filter(r => isRevenue(r)).length;
   const costCount = periodFiltered.filter(r => !isRevenue(r)).length;
   const actionedCount = periodFiltered.filter(r => actionedIds.has(r.id)).length;
@@ -1177,7 +1180,10 @@ function renderFindings(data) {
 
   if (currentTab === 'revenue') filtered = data.filter(r => isRevenue(r));
   else if (currentTab === 'cost') filtered = data.filter(r => !isRevenue(r));
-  else if (currentTab === 'critical') filtered = data.filter(r => (r.priority || '').toLowerCase() === 'critical');
+  else if (currentTab === 'critical') filtered = data.filter(r => {
+  const p = (r.priority || '').toLowerCase();
+  return p === 'critical' || p === 'high';
+});
   else if (currentTab === 'actioned') filtered = data.filter(r => actionedIds.has(r.id));
 
   const list = document.getElementById('findings-list');
@@ -1387,8 +1393,8 @@ function filterTab(tab, el) {
 }
 
 function isRevenue(r) {
-  const revDepts = ['revenue management', 'sales', 'marketing', 'distribution'];
-  const dept = (r.department || '').toLowerCase();
+  const revDepts = ['revenue', 'sales', 'marketing', 'distribution'];
+  const dept = (r.owner_department || r.department || '').toLowerCase();
   return revDepts.some(d => dept.includes(d));
 }
 
