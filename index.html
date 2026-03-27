@@ -1098,6 +1098,23 @@ function buildOneLiner(cardSpecificInsight, rootCause) {
   return cardSpecificInsight || rootCause || '';
 }
 
+function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 0, cardCount = 1) {
+  const engineImpact = engineAction?.financial_impact?.impact_range?.high;
+  if (typeof engineImpact === 'number' && engineImpact > 0) return engineImpact;
+
+  const recImpact = Number(recommendation?.expected_impact_value) || Number(recommendation?.impact_value) || 0;
+  if (recImpact > 0) return recImpact;
+
+  const actionUpside = actionRows.reduce((sum, row) => sum + (Number(row.estimated_revenue_upside) || 0), 0);
+  if (actionUpside > 0) return actionUpside;
+
+  if (fallbackTotal > 0 && cardCount > 0) {
+    return Math.round(fallbackTotal / cardCount);
+  }
+
+  return 0;
+}
+  
 function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
     ? JSON.parse(engineRow.engine_json)
