@@ -1154,6 +1154,13 @@ function buildUrgency(engineAction, recommendation) {
 
   return 'Medium'; // default fallback
 }
+
+function buildDueDate(actionRows) {
+  if (!actionRows || !actionRows.length) return '—';
+
+  const due = actionRows.find(a => a.due_date || a.dueDate);
+  return due?.due_date || due?.dueDate || '—';
+}
   
 function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
