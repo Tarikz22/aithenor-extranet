@@ -744,7 +744,7 @@ body {
   </select>
 </div>
     <div class="topbar-right">
-      <button class="refresh-btn" onclick="loadRecommendations()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="loadDashboardFromEngine()">↻ Refresh</button>
       <button class="upload-btn" onclick="openUploadModal()">+ Upload Data</button>
     </div>
   </div>
@@ -844,6 +844,7 @@ body {
 let allData = [];
 let allSnapshots = [];
 let actionedIds = new Set();
+let dashboardEngine = null;
 let currentTab = 'all';
 let currentSnapshot = '';
 let currentPeriod = '';
@@ -852,7 +853,147 @@ const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+async function fetchEngineOutput(snapshotId) {
+  const response = await fetch(`https://aithenor-api-production.up.railway.app/api/engine?snapshot_id=${snapshotId}`);
 
+  if (!response.ok) {
+    throw new Error('Failed to fetch engine output');
+  }
+
+  return await response.json();
+}
+
+  function mapEngineToUI(raw) {
+  return {
+    detection: raw.detection || '',
+    diagnosis: raw.diagnosis || '',
+    focus: raw.focus || '',
+    driver: raw.driver || '',
+    totalOpportunity: raw.total_opportunity || 0,
+
+    actions: (raw.actions || []).map((a, i) => ({
+      id: `action-${i + 1}`,
+      title: a.title || '',
+      description: a.description || '',
+      priority: (a.priority || 'medium').toLowerCase(),
+
+      impactRange: a.financial_impact?.range || '—',
+      timeline: a.financial_impact?.timeline || '—',
+      confidence: a.financial_impact?.confidence || '—'
+    }))
+  };
+}
+
+async function loadDashboardFromEngine() {
+  showLoading(true);
+  hideError();
+
+  try {
+    const snapshotId = currentSnapshot;
+
+    const raw = await fetchEngineOutput(snapshotId);
+    dashboardEngine = mapEngineToUI(raw);
+
+    renderEngineDashboard();
+
+    showLoading(false);
+    document.getElementById('dashboard').style.display = 'block';
+
+  } catch (err) {
+    showLoading(false);
+    showError('Engine failed: ' + err.message);
+    console.error(err);
+  }
+}
+
+function renderEngineDashboard() {
+  if (!dashboardEngine) return;
+
+  // HEADER
+  document.getElementById('sidebar-hotel').textContent = 'Strategic Analysis';
+  document.getElementById('sidebar-period').textContent = currentSnapshot || '';
+
+  // STATS
+  document.getElementById('stat-findings').textContent = dashboardEngine.actions.length;
+  document.getElementById('stat-critical').textContent =
+    dashboardEngine.actions.filter(a => a.priority === 'high').length;
+
+  document.getElementById('stat-total').textContent =
+    dashboardEngine.totalOpportunity > 0
+      ? 'SAR ' + formatNumber(dashboardEngine.totalOpportunity)
+      : '—';
+
+  document.getElementById('badge-count').textContent = dashboardEngine.actions.length;
+
+  // RESET PROGRESS (for now)
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-pct').textContent = '0%';
+  document.getElementById('progress-label').textContent = `0 of ${dashboardEngine.actions.length} actions`;
+
+  // RENDER ACTIONS
+  renderEngineActions(dashboardEngine.actions);
+}
+
+function renderEngineActions(actions) {
+  const list = document.getElementById('findings-list');
+  const empty = document.getElementById('empty-state');
+
+  if (!actions || actions.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+
+  list.innerHTML = actions.map(a => `
+    <div class="finding-card">
+
+      <div class="finding-header">
+        <div class="priority-stripe ${a.priority}"></div>
+
+        <div class="finding-center">
+          <div class="finding-title">${escHtml(a.title)}</div>
+          <div class="finding-oneliner">${escHtml(a.description)}</div>
+        </div>
+
+        <div class="finding-right">
+          <div class="trigger-metric-value">${escHtml(a.impactRange)}</div>
+          <div class="trigger-metric-label">Financial Impact</div>
+
+          <div class="badges-row">
+            <span class="priority-badge ${a.priority}">
+              ${capitalize(a.priority)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="finding-body">
+        <div class="finding-sections">
+
+          <div class="finding-section">
+            <div class="section-label">Timeline</div>
+            <div class="section-text">${escHtml(a.timeline)}</div>
+          </div>
+
+          <div class="finding-section">
+            <div class="section-label">Confidence</div>
+            <div class="section-text">${escHtml(a.confidence)}</div>
+          </div>
+
+          <div class="finding-section full-width">
+            <div class="section-label">Execution Detail</div>
+            <div class="section-text">${escHtml(a.description)}</div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  `).join('');
+}
+  
 function openUploadModal() {
   document.getElementById('upload-modal').style.display = 'flex';
 }
@@ -925,7 +1066,7 @@ async function submitUpload() {
 
     setTimeout(() => {
       closeUploadModal();
-      loadRecommendations();
+      loadDashboardFromEngine();
     }, 1200);
   } catch (err) {
     statusEl.textContent = err.message;
