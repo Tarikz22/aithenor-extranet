@@ -1161,6 +1161,14 @@ function buildDueDate(actionRows) {
   const due = actionRows.find(a => a.due_date || a.dueDate);
   return due?.due_date || due?.dueDate || '—';
 }
+
+function getPriority(engineAction, recommendation) {
+  const priority = normalize(engineAction?.priority || recommendation?.priority || 'medium');
+
+  if (priority === 'high' || priority === 'critical') return 'high';
+  if (priority === 'low') return 'low';
+  return 'medium';
+}
   
 function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
