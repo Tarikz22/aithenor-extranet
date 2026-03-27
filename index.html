@@ -744,7 +744,7 @@ body {
   </select>
 </div>
     <div class="topbar-right">
-      <button class="refresh-btn" onclick="loadDashboardFromEngine()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="loadRecommendations()">↻ Refresh</button>
       <button class="upload-btn" onclick="openUploadModal()">+ Upload Data</button>
     </div>
   </div>
@@ -1083,7 +1083,7 @@ renderEngineDashboard();
 
     setTimeout(() => {
       closeUploadModal();
-      loadDashboardFromEngine();
+      loadRecommendations();
     }, 1200);
   } catch (err) {
     statusEl.textContent = err.message;
@@ -1325,7 +1325,7 @@ function formatSnapshotLabel(snapshotDate) {
 function filterBySnapshot() {
   currentSnapshot = document.getElementById('snapshot-filter').value;
   currentPeriod = '';
-  loadDashboardFromEngine();
+  loadRecommendations();
 }
   
 function populatePeriodFilter(data) {
@@ -1779,7 +1779,7 @@ async function handleLogin(e) {
   localStorage.setItem('hotelCode', hotelCode);
 
   showApp(data.session.user.email);
-  loadDashboardFromEngine();
+  loadRecommendations();
 }
 
 async function logout() {
@@ -1794,13 +1794,13 @@ async function logout() {
     const hotelCode = session.user.user_metadata?.hotel || '';
     localStorage.setItem('hotelCode', hotelCode);
     showApp(session.user.email);
-    loadDashboardFromEngine();
+    loadRecommendations();
   } else {
     showLogin();
   }
 })();
   document.addEventListener('DOMContentLoaded', () => {
-  loadDashboardFromEngine();
+ loadRecommendations();
 });
 </script>
 
