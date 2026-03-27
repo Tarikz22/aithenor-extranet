@@ -866,13 +866,13 @@ async function fetchEngineOutput(snapshotId) {
 
   return await response.json();
 }
-  function mapEngineToUI(raw) {
+function mapEngineToUI(raw) {
   return {
     detection: raw.detection || '',
     diagnosis: raw.diagnosis || '',
     focus: raw.focus || '',
     driver: raw.driver || '',
-    totalOpportunity: raw.total_opportunity || 0,
+    totalOpportunity: raw.total_opportunity?.adjusted_opportunity?.high || 0,
 
     actions: (raw.actions || []).map((a, i) => ({
       id: `action-${i + 1}`,
@@ -880,8 +880,11 @@ async function fetchEngineOutput(snapshotId) {
       description: a.description || '',
       priority: (a.priority || 'medium').toLowerCase(),
 
-      impactRange: a.financial_impact?.range || '—',
-      timeline: a.financial_impact?.timeline || '—',
+      impactRange: a.financial_impact?.impact_range
+        ? `${a.financial_impact.impact_range.low ?? '—'}–${a.financial_impact.impact_range.high ?? '—'}`
+        : '—',
+
+      timeline: a.financial_impact?.impact_timeline || '—',
       confidence: a.financial_impact?.confidence || '—'
     }))
   };
@@ -950,7 +953,7 @@ function renderEngineActions(actions) {
   empty.style.display = 'none';
 
   list.innerHTML = actions.map(a => `
-    <div class="finding-card">
+    <div class="finding-card" onclick="toggleCard(this)">
 
       <div class="finding-header">
         <div class="priority-stripe ${a.priority}"></div>
@@ -1059,11 +1062,13 @@ async function submitUpload() {
     });
 
     const result = await response.json();
+
+if (!response.ok) {
+  throw new Error(result.error || 'Upload failed');
+}
+
 dashboardEngine = mapEngineToUI(result);
 renderEngineDashboard();
-    if (!response.ok) {
-      throw new Error(result.error || 'Upload failed');
-    }
 
     statusEl.textContent = 'Upload successful. Refreshing dashboard...';
     statusEl.style.color = '#1A6B3C';
