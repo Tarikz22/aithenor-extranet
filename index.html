@@ -854,8 +854,9 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function fetchEngineOutput(snapshotId) {
-  const url = `https://aithenor-api-production.up.railway.app/api/engine?snapshot_id=${snapshotId}`;
-  console.log('ENGINE URL:', url);
+  const hotelCode = localStorage.getItem('hotelCode') || '';
+
+  const url = `https://aithenor-api-production.up.railway.app/api/engine-output?hotelCode=${encodeURIComponent(hotelCode)}&snapshot_date=${encodeURIComponent(snapshotId)}`;
 
   const response = await fetch(url);
 
@@ -865,7 +866,6 @@ async function fetchEngineOutput(snapshotId) {
 
   return await response.json();
 }
-
   function mapEngineToUI(raw) {
   return {
     detection: raw.detection || '',
