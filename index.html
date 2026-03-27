@@ -1114,6 +1114,10 @@ function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 
 
   return 0;
 }
+
+function buildCardId(snapshotDate, periodLabel, title) {
+  return `${snapshotDate}||${periodLabel}||${normalize(title)}`;
+}
   
 function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
