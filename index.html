@@ -996,47 +996,69 @@ function buildCardSpecificInsight(engineJson, recommendation, engineAction) {
 }
 
 function buildRootCause(engineJson, recommendation, engineAction) {
-  if (recommendation?.root_cause) return recommendation.root_cause;
-  if (engineJson?.driver?.driver_reason) return engineJson.driver.driver_reason;
-
   const driver = normalize(engineAction?.driver || recommendation?.driver || '');
-  if (driver === 'pricing') {
-    return 'The hotel is carrying a price premium that demand is not fully accepting, limiting share capture.';
-  }
-  if (driver === 'visibility') {
-    return 'Available market demand is not being captured effectively enough across visible demand channels.';
-  }
-  if (driver === 'conversion') {
-    return 'Existing demand is not converting efficiently into booked revenue, indicating friction in the commercial path.';
-  }
-  if (driver === 'mix_strategy') {
-    return 'Current business mix is not fully aligned with the most profitable demand opportunities.';
+  const title = normalize(engineAction?.title || recommendation?.title || '');
+  const explicit = recommendation?.root_cause;
+
+  if (explicit && !explicit.toLowerCase().includes('insufficient')) {
+    return explicit;
   }
 
-  return engineAction?.description || 'Root cause is being structured from the current commercial signal.';
+  if (driver === 'pricing') {
+    if (title.includes('bar premium')) {
+      return 'Rate positioning is above what current demand is willing to accept, limiting share capture.';
+    }
+    return 'Pricing is not optimally aligned with market demand conditions, reducing booking acceptance.';
+  }
+
+  if (driver === 'conversion') {
+    if (title.includes('website conversion')) {
+      return 'Demand is reaching the booking funnel but is not converting efficiently due to friction in the path to purchase.';
+    }
+    if (title.includes('parity')) {
+      return 'Conversion is being constrained by weak content quality, parity gaps, or channel presentation.';
+    }
+    return 'Existing demand is not being converted efficiently into booked revenue.';
+  }
+
+  if (driver === 'visibility') {
+    return 'The hotel is not capturing enough qualified demand because visibility and demand penetration are below potential.';
+  }
+
+  if (driver === 'mix_strategy') {
+    return 'Business mix is not sufficiently aligned with the most profitable demand opportunities.';
+  }
+
+  return 'A commercial performance gap has been identified and requires corrective action.';
 }
 
 function buildExpectedOutcome(engineJson, recommendation, engineAction) {
-  if (recommendation?.expected_outcome) return recommendation.expected_outcome;
-
+  const explicit = recommendation?.expected_outcome;
   const driver = normalize(engineAction?.driver || recommendation?.driver || '');
   const segment = getFocusSegment(engineJson);
-  const impact = engineAction?.financial_impact?.impact_range?.high || null;
 
-  if (impact) {
-    if (driver === 'pricing') {
-      return `Recover ${segment} share and unlock pricing upside of up to SAR ${formatNumber(impact)} through better rate acceptance.`;
-    }
-    if (driver === 'conversion') {
-      return `Improve ${segment} booking efficiency and capture up to SAR ${formatNumber(impact)} of incremental revenue.`;
-    }
-    if (driver === 'visibility') {
-      return `Strengthen ${segment} demand capture and support revenue growth of up to SAR ${formatNumber(impact)}.`;
-    }
-    if (driver === 'mix_strategy') {
-      return `Improve business-mix quality and support up to SAR ${formatNumber(impact)} of value creation.`;
-    }
+  if (explicit && !explicit.toLowerCase().includes('insufficient')) {
+    return explicit;
   }
+
+  if (driver === 'pricing') {
+    return `Improve ${segment} share capture by aligning price positioning more closely with demand acceptance.`;
+  }
+
+  if (driver === 'conversion') {
+    return `Increase ${segment} booking efficiency and capture more revenue from existing demand.`;
+  }
+
+  if (driver === 'visibility') {
+    return `Strengthen ${segment} demand capture through better visibility and stronger market penetration.`;
+  }
+
+  if (driver === 'mix_strategy') {
+    return `Improve revenue quality by rebalancing toward higher-value demand opportunities.`;
+  }
+
+  return 'Improve commercial performance through targeted corrective action.';
+}
 
   if (driver === 'pricing') {
     return `Recover ${segment} share and improve price acceptance in short booking windows.`;
@@ -1073,15 +1095,19 @@ function extractActionLines(actionRows, engineAction) {
     lines.push(engineAction.description);
   }
 
-  if (engineAction?.financial_impact?.impact_timeline) {
-    lines.push(`Execution horizon: ${engineAction.financial_impact.impact_timeline.replace(/_/g, ' ')}.`);
-  }
-
-  if (engineAction?.financial_impact?.confidence) {
-    lines.push(`Confidence level: ${engineAction.financial_impact.confidence}.`);
-  }
-
-  return uniqueBy(lines, line => normalize(line));
+  return uniqueBy(
+    lines.filter(line => {
+      const txt = normalize(line);
+      return (
+        txt &&
+        !txt.includes('confidence') &&
+        !txt.includes('execution horizon') &&
+        !txt.includes('unknown') &&
+        !txt.includes('timeline')
+      );
+    }),
+    line => normalize(line)
+  );
 }
 
 function buildCardId(snapshotDate, periodLabel, title) {
@@ -1126,11 +1152,7 @@ function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 
 }
 
 function buildOneLiner(cardSpecificInsight, rootCause) {
-  const first = cardSpecificInsight || '';
-  const second = rootCause || '';
-  if (!first && !second) return '';
-  if (!second || normalize(first) === normalize(second)) return first;
-  return `${first} ${second}`;
+  return cardSpecificInsight || rootCause || '';
 }
 
 function buildCardsFromData(engineRow, recommendations, actions) {
