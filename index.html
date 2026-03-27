@@ -998,35 +998,33 @@ function buildCardSpecificInsight(engineJson, recommendation, engineAction) {
 function buildRootCause(engineJson, recommendation, engineAction) {
   const driver = normalize(engineAction?.driver || recommendation?.driver || '');
   const title = normalize(engineAction?.title || recommendation?.title || '');
-  const explicit = recommendation?.root_cause;
-
-  if (explicit && !explicit.toLowerCase().includes('insufficient')) {
-    return explicit;
-  }
 
   if (driver === 'pricing') {
-  if (title.includes('bar premium')) {
-    return 'Rate positioning is above what current demand is willing to accept, limiting share capture.';
+    if (title.includes('bar premium')) {
+      return 'Rate positioning is above what current demand is willing to accept, limiting share capture.';
+    }
+    return 'Pricing is not optimally aligned with market demand conditions, reducing booking acceptance.';
   }
-  return 'Pricing is not optimally aligned with market demand conditions, reducing booking acceptance.';
-}
 
-if (driver === 'conversion') {
-  if (title.includes('website conversion')) {
-    return 'Booking friction, user experience gaps, or weak value communication are limiting conversion of existing demand.';
+  if (driver === 'conversion') {
+    if (title.includes('website conversion')) {
+      return 'Booking friction, user experience gaps, or weak value communication are limiting conversion of existing demand.';
+    }
+    if (title.includes('parity')) {
+      return 'Conversion is being constrained by weak content quality, parity gaps, or channel presentation.';
+    }
+    return 'Existing demand is not being converted efficiently into booked revenue.';
   }
-  if (title.includes('parity')) {
-    return 'Conversion is being constrained by weak content quality, parity gaps, or channel presentation.';
+
+  if (driver === 'visibility') {
+    return 'The hotel is not capturing enough qualified demand because visibility and demand penetration are below potential.';
   }
-  return 'Existing demand is not being converted efficiently into booked revenue.';
-}
 
-if (driver === 'visibility') {
-  return 'The hotel is not capturing enough qualified demand because visibility and demand penetration are below potential.';
-}
+  if (driver === 'mix_strategy') {
+    return 'Business mix is not sufficiently aligned with the most profitable demand opportunities.';
+  }
 
-if (driver === 'mix_strategy') {
-  return 'Business mix is not sufficiently aligned with the most profitable demand opportunities.';
+  return 'A commercial performance gap has been identified and requires corrective action.';
 }
 
 function buildExpectedOutcome(engineJson, recommendation, engineAction) {
