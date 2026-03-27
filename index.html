@@ -880,12 +880,17 @@ function mapEngineToUI(raw) {
       description: a.description || '',
       priority: (a.priority || 'medium').toLowerCase(),
 
-      impactRange: a.financial_impact?.range
+      impactRange: (a.financial_impact && a.financial_impact.range)
   ? `${a.financial_impact.range.low ?? '—'}–${a.financial_impact.range.high ?? '—'}`
   : '—',
 
-timeline: a.financial_impact?.timeline || '—',
-confidence: a.financial_impact?.confidence || '—''
+timeline: (a.financial_impact && a.financial_impact.timeline)
+  ? a.financial_impact.timeline
+  : '—',
+
+confidence: (a.financial_impact && a.financial_impact.confidence)
+  ? a.financial_impact.confidence
+  : '—'
     }))
   };
 }
