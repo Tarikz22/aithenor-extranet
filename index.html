@@ -1012,9 +1012,14 @@ function buildRootCause(engineJson, recommendation, engineAction) {
   }
 
   if (driver === 'conversion') {
-    if (title.includes('website conversion')) {
-      return 'Demand is reaching the booking funnel but is not converting efficiently due to friction in the path to purchase.';
-    }
+  if (title.includes('website conversion')) {
+    return 'Booking friction, user experience gaps, or weak value communication are limiting conversion of existing demand.';
+  }
+  if (title.includes('parity')) {
+    return 'Conversion is being constrained by weak content quality, parity gaps, or channel presentation.';
+  }
+  return 'Existing demand is not being converted efficiently into booked revenue.';
+}
     if (title.includes('parity')) {
       return 'Conversion is being constrained by weak content quality, parity gaps, or channel presentation.';
     }
@@ -1095,7 +1100,13 @@ function extractActionLines(actionRows, engineAction) {
 }
 
 function buildOneLiner(cardSpecificInsight, rootCause) {
-  return cardSpecificInsight || rootCause || '';
+  if (cardSpecificInsight) return cardSpecificInsight;
+
+  if (rootCause) {
+    return rootCause.replace('is', 'appears to be');
+  }
+
+  return '';
 }
 
 function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 0, cardCount = 1) {
