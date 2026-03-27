@@ -1118,6 +1118,32 @@ function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 
 function buildCardId(snapshotDate, periodLabel, title) {
   return `${snapshotDate}||${periodLabel}||${normalize(title)}`;
 }
+
+function getOwnerDepartment(engineAction, recommendation) {
+  const driver = normalize(engineAction?.driver || recommendation?.driver || '');
+
+  if (driver.includes('pricing') || driver.includes('revenue')) {
+    return 'Revenue';
+  }
+
+  if (driver.includes('conversion')) {
+    return 'Revenue & Marketing';
+  }
+
+  if (driver.includes('marketing') || driver.includes('visibility')) {
+    return 'Marketing';
+  }
+
+  if (driver.includes('distribution')) {
+    return 'Distribution';
+  }
+
+  if (driver.includes('mix')) {
+    return 'Revenue';
+  }
+
+  return 'Commercial';
+}
   
 function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
