@@ -1059,7 +1059,8 @@ async function submitUpload() {
     });
 
     const result = await response.json();
-
+dashboardEngine = mapEngineToUI(result);
+renderEngineDashboard();
     if (!response.ok) {
       throw new Error(result.error || 'Upload failed');
     }
@@ -1311,7 +1312,7 @@ function formatSnapshotLabel(snapshotDate) {
 function filterBySnapshot() {
   currentSnapshot = document.getElementById('snapshot-filter').value;
   currentPeriod = '';
-  loadRecommendations();
+  loadDashboardFromEngine();
 }
   
 function populatePeriodFilter(data) {
@@ -1765,7 +1766,7 @@ async function handleLogin(e) {
   localStorage.setItem('hotelCode', hotelCode);
 
   showApp(data.session.user.email);
-  loadRecommendations();
+  loadDashboardFromEngine();
 }
 
 async function logout() {
@@ -1780,7 +1781,7 @@ async function logout() {
     const hotelCode = session.user.user_metadata?.hotel || '';
     localStorage.setItem('hotelCode', hotelCode);
     showApp(session.user.email);
-    loadRecommendations();
+    loadDashboardFromEngine();
   } else {
     showLogin();
   }
