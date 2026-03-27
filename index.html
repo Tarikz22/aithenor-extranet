@@ -733,24 +733,23 @@ body {
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
-  <div class="topbar-title">Strategic Findings</div>
+      <div class="topbar-title">Strategic Findings</div>
 
-  <select class="period-select" id="snapshot-filter" onchange="filterBySnapshot()">
-    <option value="">Loading Snapshots...</option>
-  </select>
+      <select class="period-select" id="snapshot-filter" onchange="filterBySnapshot()">
+        <option value="">Loading Snapshots...</option>
+      </select>
 
-  <select class="period-select" id="period-filter" onchange="filterByPeriod()">
-    <option value="">Loading Periods...</option>
-  </select>
-</div>
+      <select class="period-select" id="period-filter" onchange="filterByPeriod()">
+        <option value="">Loading Periods...</option>
+      </select>
+    </div>
     <div class="topbar-right">
-      <button class="refresh-btn" onclick="loadRecommendations()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
       <button class="upload-btn" onclick="openUploadModal()">+ Upload Data</button>
     </div>
   </div>
 
   <div class="content">
-
     <div class="error-state" id="error-state">
       <p id="error-msg">Could not connect to database.</p>
     </div>
@@ -761,7 +760,6 @@ body {
     </div>
 
     <div id="dashboard" style="display:none">
-
       <div class="gop-banner">
         <div class="gop-stat">
           <div class="gop-label">Annual Value at Stake</div>
@@ -808,11 +806,9 @@ body {
         <h3>No findings for this filter</h3>
         <p>Try selecting a different cycle or upload a new hotel file.</p>
       </div>
-
     </div>
   </div>
 </div>
-
 
 <div id="upload-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center;">
   <div style="width:100%; max-width:560px; background:white; border-radius:10px; padding:24px;">
@@ -841,173 +837,590 @@ body {
 </div>
 
 <script>
-let allData = [];
-let allSnapshots = [];
-let actionedIds = new Set();
-let dashboardEngine = null;
-let currentTab = 'all';
 let currentSnapshot = '';
 let currentPeriod = '';
+let currentTab = 'all';
+let actionedIds = new Set();
+let allSnapshots = [];
+let dashboardCards = [];
+let dashboardMeta = null;
 
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function fetchEngineOutput(snapshotId) {
-  const hotelCode = localStorage.getItem('hotelCode') || '';
+const DRIVER_TO_DEPARTMENT = {
+  pricing: 'Revenue',
+  visibility: 'Revenue & Marketing',
+  conversion: 'Revenue & Marketing',
+  mix_strategy: 'Commercial',
+  none: 'Commercial'
+};
 
-  const url = `https://aithenor-api-production.up.railway.app/api/engine-output?hotelCode=${encodeURIComponent(hotelCode)}&snapshot_date=${encodeURIComponent(snapshotId)}`;
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch engine output (${response.status})`);
-  }
-
-  return await response.json();
+function normalize(value) {
+  return (value || '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 }
-function mapEngineToUI(raw) {
+
+function escHtml(str) {
+  if (str === null || str === undefined) return '';
+  return str.toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+}
+
+function formatNumber(n) {
+  const value = Number(n) || 0;
+  if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+  if (value >= 1000) return Math.round(value / 1000) + 'K';
+  return value.toString();
+}
+
+function formatCurrency(value) {
+  const amount = Number(value) || 0;
+  if (!amount) return '—';
+  return 'SAR ' + formatNumber(amount);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function showLoading(show) {
+  document.getElementById('loading-state').style.display = show ? 'flex' : 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-state');
+  document.getElementById('error-msg').textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-state').style.display = 'none';
+}
+
+function isRevenueDepartment(dept) {
+  const d = normalize(dept);
+  return d.includes('revenue') || d.includes('marketing') || d.includes('sales') || d.includes('distribution');
+}
+
+function uniqueBy(array, keyFn) {
+  const map = new Map();
+  array.forEach(item => {
+    const key = keyFn(item);
+    if (!map.has(key)) map.set(key, item);
+  });
+  return Array.from(map.values());
+}
+
+function getDiagnosisMetrics(engineJson) {
+  const metrics = engineJson?.diagnosis?.metrics || {};
   return {
-    detection: raw.detection || '',
-    diagnosis: raw.diagnosis || '',
-    focus: raw.focus || '',
-    driver: raw.driver || '',
-    totalOpportunity: raw.total_opportunity?.adjusted_opportunity?.high || 0,
-
-    actions: (raw.actions || []).map((a, i) => ({
-      id: `action-${i + 1}`,
-      title: a.title || '',
-      description: a.description || '',
-      priority: (a.priority || 'medium').toLowerCase(),
-
-      impactRange:
-  (a.financial_impact &&
-   a.financial_impact.impact_range &&
-   (a.financial_impact.impact_range.low !== null || a.financial_impact.impact_range.high !== null))
-    ? `${a.financial_impact.impact_range.low ?? '—'}–${a.financial_impact.impact_range.high ?? '—'}`
-    : '—',
-
-timeline: (a.financial_impact && a.financial_impact.impact_timeline)
-  ? a.financial_impact.impact_timeline
-  : '—',
-
-confidence: (a.financial_impact && a.financial_impact.confidence)
-  ? a.financial_impact.confidence
-  : '—'
-    }))
+    mpi: metrics.avgMPI,
+    ari: metrics.avgARI,
+    rgi: metrics.avgRGI
   };
 }
 
-async function loadDashboardFromEngine() {
-  showLoading(true);
-  hideError();
+function buildKpiTrigger(engineJson) {
+  const { mpi, ari, rgi } = getDiagnosisMetrics(engineJson);
+  return `MPI ${typeof mpi === 'number' ? mpi.toFixed(1) : '—'} | ARI ${typeof ari === 'number' ? ari.toFixed(1) : '—'} | RGI ${typeof rgi === 'number' ? rgi.toFixed(1) : '—'}`;
+}
 
-  try {
-    const snapshotId = currentSnapshot;
+function buildKeyInsight(engineJson, recommendation, engineAction) {
+  if (recommendation?.finding) return recommendation.finding;
 
-    const raw = await fetchEngineOutput(snapshotId);
-    dashboardEngine = mapEngineToUI(raw);
+  const focusSegment = engineJson?.focus?.focus_segment || 'retail';
+  const driverReason = engineJson?.driver?.driver_reason || '';
+  const trigger = buildKpiTrigger(engineJson);
 
-    renderEngineDashboard();
-
-    showLoading(false);
-    document.getElementById('dashboard').style.display = 'block';
-
-  } catch (err) {
-    showLoading(false);
-    showError('Engine failed: ' + err.message);
-    console.error(err);
+  if (driverReason) {
+    return `${capitalize(focusSegment)} underperformance observed (${trigger}). ${driverReason}`;
   }
+
+  return engineAction?.description || 'Strategic performance gap identified.';
 }
 
-function renderEngineDashboard() {
-  if (!dashboardEngine) return;
-
-  // HEADER
-  document.getElementById('sidebar-hotel').textContent = 'Strategic Analysis';
-  document.getElementById('sidebar-period').textContent = currentSnapshot || '';
-
-  // STATS
-  document.getElementById('stat-findings').textContent = dashboardEngine.actions.length;
-  document.getElementById('stat-critical').textContent =
-    dashboardEngine.actions.filter(a => a.priority === 'high').length;
-
-  document.getElementById('stat-total').textContent =
-    dashboardEngine.totalOpportunity > 0
-      ? 'SAR ' + formatNumber(dashboardEngine.totalOpportunity)
-      : '—';
-
-  document.getElementById('badge-count').textContent = dashboardEngine.actions.length;
-
-  // RESET PROGRESS (for now)
-  document.getElementById('progress-fill').style.width = '0%';
-  document.getElementById('progress-pct').textContent = '0%';
-  document.getElementById('progress-label').textContent = `0 of ${dashboardEngine.actions.length} actions`;
-
-  // RENDER ACTIONS
-  renderEngineActions(dashboardEngine.actions);
+function buildRootCause(engineJson, recommendation, engineAction) {
+  if (recommendation?.root_cause) return recommendation.root_cause;
+  if (engineJson?.driver?.driver_reason) return engineJson.driver.driver_reason;
+  return engineAction?.description || 'Root cause is being structured from the current commercial signal.';
 }
 
-function renderEngineActions(actions) {
+function buildExpectedOutcome(engineJson, recommendation, engineAction) {
+  if (recommendation?.expected_outcome) return recommendation.expected_outcome;
+  if (engineAction?.financial_impact?.executive_summary) return engineAction.financial_impact.executive_summary;
+  return 'Improve commercial performance through targeted action.';
+}
+
+function extractActionLines(actionRows, engineAction) {
+  const lines = [];
+
+  actionRows.forEach(row => {
+    const text = row.action_text || row.action_title || row.action_detail || row.action_plan || row.action || '';
+    if (text) {
+      text
+        .toString()
+        .split(/\n|•|→|\d+\./)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .forEach(s => lines.push(s));
+    }
+  });
+
+  if (!lines.length && engineAction?.description) {
+    lines.push(engineAction.description);
+  }
+
+  return uniqueBy(lines, line => normalize(line));
+}
+
+function buildCardId(snapshotDate, periodLabel, title) {
+  return `${snapshotDate}||${periodLabel}||${normalize(title)}`;
+}
+
+function getOwnerDepartment(recommendation, engineAction) {
+  return recommendation?.owner_department ||
+    recommendation?.department ||
+    DRIVER_TO_DEPARTMENT[engineAction?.driver] ||
+    'Commercial';
+}
+
+function getPriority(engineAction, recommendation) {
+  return normalize(engineAction?.priority || recommendation?.priority || 'medium') || 'medium';
+}
+
+function buildDueDate(actionRows) {
+  const due = actionRows.find(a => a.due_date || a.dueDate);
+  return due?.due_date || due?.dueDate || '—';
+}
+
+function buildUrgency(engineAction, recommendation) {
+  return capitalize(engineAction?.priority || recommendation?.priority || 'medium');
+}
+
+function getCardValue(engineAction, recommendation, actionRows) {
+  const engineImpact = engineAction?.financial_impact?.impact_range?.high;
+  if (typeof engineImpact === 'number' && engineImpact > 0) return engineImpact;
+
+  const recImpact = Number(recommendation?.expected_impact_value) || Number(recommendation?.impact_value) || 0;
+  if (recImpact > 0) return recImpact;
+
+  const actionUpside = actionRows.reduce((sum, row) => sum + (Number(row.estimated_revenue_upside) || 0), 0);
+  return actionUpside || 0;
+}
+
+function buildCardsFromData(engineRow, recommendations, actions) {
+  const engineJson = typeof engineRow.engine_json === 'string'
+    ? JSON.parse(engineRow.engine_json)
+    : (engineRow.engine_json || {});
+
+  const engineActions = Array.isArray(engineJson.actions) ? engineJson.actions : [];
+  const uniqueEngineActions = uniqueBy(
+    engineActions.filter(a => a && (a.title || a.description)),
+    a => `${normalize(a.title)}||${normalize(a.driver)}`
+  );
+
+  const recommendationsByTitle = new Map();
+  recommendations.forEach(rec => {
+    const key = normalize(rec.title || rec.finding_title);
+    if (!recommendationsByTitle.has(key)) recommendationsByTitle.set(key, []);
+    recommendationsByTitle.get(key).push(rec);
+  });
+
+  const actionsByTitle = new Map();
+  actions.forEach(act => {
+    const key = normalize(act.title);
+    if (!actionsByTitle.has(key)) actionsByTitle.set(key, []);
+    actionsByTitle.get(key).push(act);
+  });
+
+  const cards = uniqueEngineActions.map(engineAction => {
+    const titleKey = normalize(engineAction.title);
+    const recommendation = (recommendationsByTitle.get(titleKey) || [])[0] || null;
+    const linkedActions = actionsByTitle.get(titleKey) || [];
+    const valueAtStake = getCardValue(engineAction, recommendation, linkedActions);
+
+    return {
+      id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction.title || 'untitled'),
+      snapshot_date: engineRow.snapshot_date,
+      generated_at: engineRow.generated_at,
+      hotel_name: engineRow.hotel_code,
+      period_label: engineRow.period_label,
+      title: engineAction.title || recommendation?.title || 'Untitled Finding',
+      one_liner: recommendation?.finding || engineAction.description || '',
+      key_insight: buildKeyInsight(engineJson, recommendation, engineAction),
+      root_cause: buildRootCause(engineJson, recommendation, engineAction),
+      execution_owner: getOwnerDepartment(recommendation, engineAction),
+      urgency: buildUrgency(engineAction, recommendation),
+      due_date: buildDueDate(linkedActions),
+      action_lines: extractActionLines(linkedActions, engineAction),
+      expected_outcome: buildExpectedOutcome(engineJson, recommendation, engineAction),
+      value_at_stake: valueAtStake,
+      priority: getPriority(engineAction, recommendation),
+      department: getOwnerDepartment(recommendation, engineAction),
+      trigger_display: buildKpiTrigger(engineJson),
+      timeline: engineAction?.financial_impact?.impact_timeline || '—',
+      confidence: engineAction?.financial_impact?.confidence || '—',
+      driver: engineAction?.driver || recommendation?.driver || '',
+      raw_recommendation: recommendation,
+      raw_engine_action: engineAction
+    };
+  });
+
+  return {
+    cards,
+    meta: {
+      hotel_name: engineRow.hotel_code,
+      snapshot_date: engineRow.snapshot_date,
+      period_label: engineRow.period_label,
+      generated_at: engineRow.generated_at,
+      total_value: engineJson?.total_opportunity?.adjusted_opportunity?.high ||
+        engineJson?.total_opportunity?.gross_opportunity?.high ||
+        cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0),
+      critical_count: cards.filter(c => c.priority === 'high' || c.priority === 'critical').length,
+      findings_count: cards.length,
+      diagnosis_trigger: buildKpiTrigger(engineJson)
+    }
+  };
+}
+
+function populateSnapshotFilter(snapshots) {
+  const select = document.getElementById('snapshot-filter');
+  select.innerHTML = '';
+
+  if (!snapshots.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No Snapshots Available';
+    select.appendChild(opt);
+    currentSnapshot = '';
+    return;
+  }
+
+  snapshots.forEach(snapshot => {
+    const opt = document.createElement('option');
+    opt.value = snapshot.snapshot_date;
+    opt.textContent = `Snapshot · ${formatDate(snapshot.snapshot_date)}${snapshot.period_label ? ' · ' + snapshot.period_label : ''}`;
+    select.appendChild(opt);
+  });
+
+  if (!currentSnapshot) currentSnapshot = snapshots[0].snapshot_date;
+  select.value = currentSnapshot;
+}
+
+function populatePeriodFilter(periods) {
+  const select = document.getElementById('period-filter');
+  select.innerHTML = '';
+
+  if (!periods.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No Period Available';
+    select.appendChild(opt);
+    currentPeriod = '';
+    return;
+  }
+
+  periods.forEach(period => {
+    const opt = document.createElement('option');
+    opt.value = period;
+    opt.textContent = period;
+    select.appendChild(opt);
+  });
+
+  if (!currentPeriod || !periods.includes(currentPeriod)) currentPeriod = periods[0];
+  select.value = currentPeriod;
+}
+
+function filterBySnapshot() {
+  currentSnapshot = document.getElementById('snapshot-filter').value;
+  currentPeriod = '';
+  loadDashboard();
+}
+
+function filterByPeriod() {
+  currentPeriod = document.getElementById('period-filter').value;
+  renderDashboard();
+}
+
+function filterTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderFindings();
+}
+
+function renderDashboard() {
+  const cardsForPeriod = currentPeriod
+    ? dashboardCards.filter(card => card.period_label === currentPeriod)
+    : [...dashboardCards];
+
+  const hotelName = dashboardMeta?.hotel_name || 'Hotel';
+  const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
+  const totalValue = dashboardMeta?.total_value || 0;
+  const criticalCount = cardsForPeriod.filter(c => c.priority === 'high' || c.priority === 'critical').length;
+  const actionedCount = cardsForPeriod.filter(c => actionedIds.has(c.id)).length;
+  const pct = cardsForPeriod.length ? Math.round((actionedCount / cardsForPeriod.length) * 100) : 0;
+
+  document.getElementById('sidebar-hotel').textContent = hotelName;
+  document.getElementById('sidebar-period').textContent = periodLabel;
+  document.getElementById('stat-period-label').textContent = periodLabel;
+
+  document.getElementById('stat-total').textContent = formatCurrency(totalValue);
+  document.getElementById('stat-critical').textContent = criticalCount;
+  document.getElementById('stat-findings').textContent = cardsForPeriod.length;
+  document.getElementById('stat-actioned').textContent = actionedCount;
+  document.getElementById('badge-count').textContent = cardsForPeriod.length;
+
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+  document.getElementById('progress-label').textContent = `${actionedCount} of ${cardsForPeriod.length} findings actioned`;
+
+  document.getElementById('tab-all').textContent = cardsForPeriod.length;
+  document.getElementById('tab-revenue').textContent = cardsForPeriod.filter(c => isRevenueDepartment(c.department)).length;
+  document.getElementById('tab-cost').textContent = cardsForPeriod.filter(c => !isRevenueDepartment(c.department)).length;
+  document.getElementById('tab-critical').textContent = criticalCount;
+  document.getElementById('tab-actioned').textContent = actionedCount;
+
+  renderFindings();
+}
+
+function getFilteredCards() {
+  let cards = currentPeriod
+    ? dashboardCards.filter(card => card.period_label === currentPeriod)
+    : [...dashboardCards];
+
+  if (currentTab === 'revenue') {
+    cards = cards.filter(card => isRevenueDepartment(card.department));
+  } else if (currentTab === 'cost') {
+    cards = cards.filter(card => !isRevenueDepartment(card.department));
+  } else if (currentTab === 'critical') {
+    cards = cards.filter(card => card.priority === 'high' || card.priority === 'critical');
+  } else if (currentTab === 'actioned') {
+    cards = cards.filter(card => actionedIds.has(card.id));
+  }
+
+  return cards;
+}
+
+function renderFindings() {
+  const cards = getFilteredCards();
   const list = document.getElementById('findings-list');
   const empty = document.getElementById('empty-state');
 
-  if (!actions || actions.length === 0) {
+  if (!cards.length) {
     list.innerHTML = '';
     empty.style.display = 'block';
     return;
   }
 
   empty.style.display = 'none';
+  list.innerHTML = cards.map(renderCard).join('');
+}
 
-  list.innerHTML = actions.map(a => `
-    <div class="finding-card" onclick="toggleCard(this)">
+function renderCard(card) {
+  const isActioned = actionedIds.has(card.id);
 
+  return `
+    <div class="finding-card ${isActioned ? 'actioned' : ''}" onclick="toggleCard(this)" data-id="${escHtml(card.id)}">
       <div class="finding-header">
-        <div class="priority-stripe ${a.priority}"></div>
+        <div class="priority-stripe ${escHtml(card.priority)}"></div>
 
         <div class="finding-center">
-          <div class="finding-title">${escHtml(a.title)}</div>
-          <div class="finding-oneliner">${escHtml(a.description)}</div>
+          <div class="finding-title">${escHtml(card.title)}</div>
+          <div class="finding-oneliner">${escHtml(card.one_liner || card.key_insight)}</div>
         </div>
 
         <div class="finding-right">
-          <div class="trigger-metric-value">${escHtml(a.impactRange)}</div>
-          <div class="trigger-metric-label">Financial Impact</div>
+          <div class="trigger-metric-value">${escHtml(card.trigger_display)}</div>
+          <div class="trigger-metric-label">Key Trigger</div>
 
           <div class="badges-row">
-            <span class="priority-badge ${a.priority}">
-              ${capitalize(a.priority)}
-            </span>
+            <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
+            <span class="dept-badge">${escHtml(card.department)}</span>
           </div>
+
+          <span class="chevron">▾</span>
         </div>
       </div>
 
       <div class="finding-body">
         <div class="finding-sections">
-
           <div class="finding-section">
-            <div class="section-label">Timeline</div>
-            <div class="section-text">${escHtml(a.timeline)}</div>
+            <div class="section-label">Key Insight</div>
+            <div class="section-text">${escHtml(card.key_insight)}</div>
           </div>
 
           <div class="finding-section">
-            <div class="section-label">Confidence</div>
-            <div class="section-text">${escHtml(a.confidence)}</div>
+            <div class="section-label">Root Cause</div>
+            <div class="section-text">${escHtml(card.root_cause)}</div>
+          </div>
+
+          <div class="finding-section">
+            <div class="section-label">Execution Owner</div>
+            <div class="section-text">
+              <strong>Owner:</strong> ${escHtml(card.execution_owner)}<br>
+              <strong>Urgency:</strong> ${escHtml(card.urgency)}<br>
+              <strong>Due:</strong> ${escHtml(card.due_date)}
+            </div>
           </div>
 
           <div class="finding-section full-width">
-            <div class="section-label">Execution Detail</div>
-            <div class="section-text">${escHtml(a.description)}</div>
+            <div class="section-label">Action Plan</div>
+            <ul class="action-list">
+              ${card.action_lines.length
+                ? card.action_lines.map(line => `<li>${escHtml(line)}</li>`).join('')
+                : '<li>No actions specified</li>'}
+            </ul>
           </div>
 
+          <div class="finding-section full-width" style="border-top:none;">
+            <div class="section-label">Expected Outcome</div>
+            <div class="section-text">${escHtml(card.expected_outcome)}</div>
+          </div>
+        </div>
+
+        <div class="gop-saving-bar">
+          <div class="gop-saving-left">
+            <div class="gop-saving-value">${formatCurrency(card.value_at_stake)}</div>
+            <div class="gop-saving-desc">Estimated value at stake · Generated ${escHtml(formatDate(card.generated_at))}</div>
+          </div>
+          <button class="action-btn ${isActioned ? 'actioned' : ''}"
+            onclick="event.stopPropagation(); markActioned(this, '${escHtml(card.id)}')">
+            ${isActioned ? '✓ Actioned' : 'Mark as Actioned'}
+          </button>
         </div>
       </div>
-
     </div>
-  `).join('');
+  `;
 }
-  
+
+function toggleCard(card) {
+  card.classList.toggle('expanded');
+}
+
+function markActioned(btn, id) {
+  actionedIds.add(id);
+  btn.textContent = '✓ Actioned';
+  btn.classList.add('actioned');
+  btn.closest('.finding-card').classList.add('actioned');
+  renderDashboard();
+}
+
+async function loadDashboard() {
+  showLoading(true);
+  hideError();
+
+  try {
+    const hotelCode = localStorage.getItem('hotelCode') || '';
+    if (!hotelCode) throw new Error('Missing hotel code on user profile.');
+
+    const { data: snapshotRows, error: snapshotError } = await supabaseClient
+      .from('engine_outputs')
+      .select('hotel_code, snapshot_date, period_label, generated_at')
+      .eq('hotel_code', hotelCode)
+      .not('snapshot_date', 'is', null)
+      .order('generated_at', { ascending: false });
+
+    if (snapshotError) throw snapshotError;
+
+    allSnapshots = uniqueBy(snapshotRows || [], row => row.snapshot_date);
+    populateSnapshotFilter(allSnapshots);
+
+    if (!currentSnapshot && allSnapshots.length) {
+      currentSnapshot = allSnapshots[0].snapshot_date;
+    }
+
+    if (!currentSnapshot) {
+      dashboardCards = [];
+      dashboardMeta = null;
+      populatePeriodFilter([]);
+      renderDashboard();
+      showLoading(false);
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('empty-state').style.display = 'block';
+      return;
+    }
+
+    const { data: engineRows, error: engineError } = await supabaseClient
+      .from('engine_outputs')
+      .select('*')
+      .eq('hotel_code', hotelCode)
+      .eq('snapshot_date', currentSnapshot)
+      .order('generated_at', { ascending: false })
+      .limit(1);
+
+    if (engineError) throw engineError;
+    if (!engineRows || !engineRows.length) throw new Error('No engine output found for selected snapshot.');
+
+    const engineRow = engineRows[0];
+
+    const [{ data: recommendations, error: recError }, { data: actions, error: actError }] = await Promise.all([
+      supabaseClient
+        .from('Recommendations')
+        .select('*')
+        .eq('hotel_name', hotelCode)
+        .eq('snapshot_date', currentSnapshot)
+        .order('created_at', { ascending: false }),
+      supabaseClient
+        .from('actions')
+        .select('*')
+        .eq('hotel_name', hotelCode)
+        .eq('snapshot_date', currentSnapshot)
+        .order('created_at', { ascending: false })
+    ]);
+
+    if (recError) throw recError;
+    if (actError) throw actError;
+
+    const periods = uniqueBy(
+      [engineRow.period_label, ...(recommendations || []).map(r => r.period_label || r.period), ...(actions || []).map(a => a.period_label || a.period)].filter(Boolean),
+      p => p
+    );
+    populatePeriodFilter(periods);
+
+    const recommendationsForPeriod = currentPeriod
+      ? (recommendations || []).filter(r => (r.period_label || r.period) === currentPeriod)
+      : (recommendations || []);
+
+    const actionsForPeriod = currentPeriod
+      ? (actions || []).filter(a => (a.period_label || a.period) === currentPeriod)
+      : (actions || []);
+
+    const built = buildCardsFromData(engineRow, recommendationsForPeriod, actionsForPeriod);
+    dashboardCards = built.cards;
+    dashboardMeta = built.meta;
+
+    renderDashboard();
+    showLoading(false);
+    document.getElementById('dashboard').style.display = 'block';
+  } catch (err) {
+    showLoading(false);
+    showError('Could not load data: ' + err.message);
+    console.error(err);
+  }
+}
+
 function openUploadModal() {
   document.getElementById('upload-modal').style.display = 'flex';
 }
@@ -1071,674 +1484,24 @@ async function submitUpload() {
 
     const result = await response.json();
 
-if (!response.ok) {
-  throw new Error(result.error || 'Upload failed');
-}
-
-dashboardEngine = mapEngineToUI(result);
-renderEngineDashboard();
+    if (!response.ok) {
+      throw new Error(result.error || 'Upload failed');
+    }
 
     statusEl.textContent = 'Upload successful. Refreshing dashboard...';
     statusEl.style.color = '#1A6B3C';
 
-    setTimeout(() => {
+    currentSnapshot = '';
+    currentPeriod = '';
+
+    setTimeout(async () => {
       closeUploadModal();
-      loadRecommendations();
+      await loadDashboard();
     }, 1200);
   } catch (err) {
     statusEl.textContent = err.message;
     statusEl.style.color = '#C0392B';
   }
-}
-
-function normalize(value) {
-  return (value || '')
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
-function extractMetric(text, metricName) {
-  if (!text) return '—';
-  const regex = new RegExp(`${metricName}\\s*(?:is|at)?\\s*([0-9]+(?:\\.[0-9]+)?)`, 'i');
-  const match = text.match(regex);
-  return match ? match[1] : '—';
-}
-
-function buildExpectedOutcome(r) {
-  const text = r.finding || '';
-
-  if (text.includes('RGI') && text.includes('MPI')) {
-    return 'Recover occupancy share and RevPAR index performance by aligning pricing with demand, while protecting ADR integrity.';
-  }
-
-  if (text.includes('ARI') && text.includes('above')) {
-    return 'Reduce pricing gap versus competitors to improve market share capture without unnecessary rate erosion.';
-  }
-
-  if (text.toLowerCase().includes('conversion')) {
-    return 'Increase conversion efficiency across channels to translate existing demand into measurable revenue growth.';
-  }
-
-  return 'Improve commercial performance through targeted pricing and demand optimization strategies.';
-}
-  
-async function loadRecommendations() {
-  showLoading(true);
-  hideError();
-
-  try {
-const hotelCode = localStorage.getItem('hotelCode') || '';
-
-const { data: snapshotRows, error: snapshotError } = await supabaseClient
-  .from('Recommendations')
-  .select('hotel_name, snapshot_date')
-  .eq('hotel_name', hotelCode)
-  .not('snapshot_date', 'is', null)
-  .order('snapshot_date', { ascending: false });
-
-if (snapshotError) throw snapshotError;
-
-const uniqueSnapshotsMap = new Map();
-(snapshotRows || []).forEach(row => {
-  const key = `${row.hotel_name}||${row.snapshot_date}`;
-  if (!uniqueSnapshotsMap.has(key)) {
-    uniqueSnapshotsMap.set(key, {
-      hotel_name: row.hotel_name,
-      snapshot_date: row.snapshot_date
-    });
-  }
-});
-
-allSnapshots = Array.from(uniqueSnapshotsMap.values());
-
-if (!allSnapshots.length) {
-  allData = [];
-  populateSnapshotFilter([]);
-  populatePeriodFilter([]);
-  renderDashboard([]);
-  showLoading(false);
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('empty-state').style.display = 'block';
-  return;
-}
-
-if (!currentSnapshot) {
-  currentSnapshot = allSnapshots[0].snapshot_date;
-}
-
-populateSnapshotFilter(allSnapshots);
-
-const selectedSnapshotRow =
-  allSnapshots.find(item => item.snapshot_date === currentSnapshot) || allSnapshots[0];
-
-currentSnapshot = selectedSnapshotRow.snapshot_date;
-
-const recommendationsQuery = supabaseClient
-  .from('Recommendations')
-  .select('*')
-  .eq('hotel_name', selectedSnapshotRow.hotel_name)
-  .eq('snapshot_date', selectedSnapshotRow.snapshot_date)
-  .order('created_at', { ascending: false })
-  .limit(200);
-
-const actionsQuery = supabaseClient
-  .from('actions')
-  .select('*')
-  .eq('hotel_name', selectedSnapshotRow.hotel_name)
-  .eq('snapshot_date', selectedSnapshotRow.snapshot_date)
-  .order('created_at', { ascending: false })
-  .limit(500);
-
-    const [
-      { data: findings, error: findingsError },
-      { data: actions, error: actionsError }
-    ] = await Promise.all([recommendationsQuery, actionsQuery]);
-
-    if (findingsError) throw findingsError;
-    if (actionsError) throw actionsError;
-
-const cleanFindings = (findings || []).filter(r => {
-  const t = (r.finding_title || r.title || '').toString().trim();
-  return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
-});
-
-// Keep only the most recent recommendation per unique issue
-// Important: do NOT dedupe by title, because AI wording can change the title
-// while still referring to the same issue.
-function buildIssueKey(record) {
-  return [
-    normalize(record.hotel_name),
-    normalize(record.period),
-    normalize(record.department || record.category),
-    normalize(record.finding || record.root_cause || record.title)
-  ].join('||');
-}
-
-const dedupedFindingsMap = new Map();
-cleanFindings.forEach(finding => {
-  const key = buildIssueKey(finding);
-
-  const existing = dedupedFindingsMap.get(key);
-  if (!existing || new Date(finding.created_at) > new Date(existing.created_at)) {
-    dedupedFindingsMap.set(key, finding);
-  }
-});
-
-const dedupedFindings = Array.from(dedupedFindingsMap.values());
-
-// Keep only the most recent version of each action per hotel + period + title + action text
-const dedupedActionsMap = new Map();
-(actions || []).forEach(action => {
-  const key = [
-    normalize(action.hotel_name),
-    normalize(action.period),
-    normalize(action.title),
-    normalize(action.action_text || action.action_title || action.action_detail || action.action_plan || action.recommended_action || action.action)
-  ].join('||');
-
-  const existing = dedupedActionsMap.get(key);
-  if (!existing || new Date(action.created_at) > new Date(existing.created_at)) {
-    dedupedActionsMap.set(key, action);
-  }
-});
-
-const dedupedActions = Array.from(dedupedActionsMap.values());
-
-allData = dedupedFindings.map(finding => {
-  // Link only actions matching the latest kept recommendation title.
-  // This hides older fallback actions when a newer AI-written version exists.
-  const linkedActions = dedupedActions.filter(action =>
-    normalize(action.hotel_name) === normalize(finding.hotel_name) &&
-    normalize(action.period) === normalize(finding.period) &&
-    normalize(action.title) === normalize(finding.finding_title || finding.title)
-  );
-
-  return {
-    ...finding,
-    linked_actions: linkedActions
-  };
-});
-
-    if (allData.length === 0) {
-      showLoading(false);
-      document.getElementById('dashboard').style.display = 'block';
-      document.getElementById('empty-state').style.display = 'block';
-      return;
-    }
-
-    populatePeriodFilter(allData);
-    renderDashboard(allData);
-    showLoading(false);
-    document.getElementById('dashboard').style.display = 'block';
-
-  } catch (err) {
-    showLoading(false);
-    showError('Could not load data: ' + err.message);
-    console.error(err);
-  }
-}
-
-  function populateSnapshotFilter(snapshots) {
-  const select = document.getElementById('snapshot-filter');
-  select.innerHTML = '';
-
-  if (!snapshots || snapshots.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'No Snapshots Available';
-    select.appendChild(opt);
-    currentSnapshot = '';
-    select.value = '';
-    return;
-  }
-
-  snapshots.forEach(snapshot => {
-    const opt = document.createElement('option');
-    opt.value = snapshot.snapshot_date;
-    opt.textContent = formatSnapshotLabel(snapshot.snapshot_date);
-    select.appendChild(opt);
-  });
-
-  if (!currentSnapshot) {
-    currentSnapshot = snapshots[0].snapshot_date;
-  }
-
-  select.value = currentSnapshot;
-}
-
-function formatSnapshotLabel(snapshotDate) {
-  if (!snapshotDate) return 'Unknown Snapshot';
-
-  try {
-    const date = new Date(snapshotDate);
-    return `Snapshot · ${date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    })}`;
-  } catch {
-    return `Snapshot · ${snapshotDate}`;
-  }
-}
-
-function filterBySnapshot() {
-  currentSnapshot = document.getElementById('snapshot-filter').value;
-  currentPeriod = '';
-  loadRecommendations();
-}
-  
-function populatePeriodFilter(data) {
-  const periods = [...new Set(data.map(r => r.period_label || r.period).filter(Boolean))];
-  const select = document.getElementById('period-filter');
-  select.innerHTML = '';
-
-  periods.forEach((p, index) => {
-    const opt = document.createElement('option');
-    opt.value = p;
-    opt.textContent = p;
-    select.appendChild(opt);
-
-    if (index === 0) {
-      currentPeriod = p;
-    }
-  });
-
-  if (periods.length > 0) {
-    select.value = currentPeriod;
-  } else {
-    currentPeriod = '';
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'No Period Available';
-    select.appendChild(opt);
-    select.value = '';
-  }
-}
-
-function filterByPeriod() {
-  currentPeriod = document.getElementById('period-filter').value;
-  renderDashboard(allData);
-}
-
-function renderDashboard(data) {
-  const periodFiltered = !currentPeriod
-  ? data
-  : data.filter(r => (r.period_label || r.period) === currentPeriod);
-
-  if (periodFiltered.length > 0) {
-    const hotel = periodFiltered[0].hotel_name || 'Hotel';
-    const period = periodFiltered[0].period || '';
-    document.getElementById('sidebar-hotel').textContent = hotel;
-    document.getElementById('sidebar-period').textContent = period;
-    document.getElementById('stat-period-label').textContent = period;
-  } else {
-    document.getElementById('sidebar-hotel').textContent = 'No Hotel Selected';
-    document.getElementById('sidebar-period').textContent = 'No Period';
-    document.getElementById('stat-period-label').textContent = 'No Period';
-  }
-
-  const criticalCount = periodFiltered.filter(r => {
-  const p = (r.priority || '').toLowerCase();
-  return p === 'critical' || p === 'high';
-}).length;
-  const revenueCount = periodFiltered.filter(r => isRevenue(r)).length;
-  const costCount = periodFiltered.filter(r => !isRevenue(r)).length;
-  const actionedCount = periodFiltered.filter(r => actionedIds.has(r.id)).length;
-
-  const totalRevenueUpside = periodFiltered.reduce((sum, r) => {
-    const linked = r.linked_actions || [];
-    const linkedTotal = linked.reduce((rowSum, a) => rowSum + (Number(a.estimated_revenue_upside) || 0), 0);
-    const fallback = Number(r.impact_value) || Number(r.expected_impact_value) || 0;
-    return sum + (linkedTotal || fallback);
-  }, 0);
-
-  document.getElementById('stat-findings').textContent = periodFiltered.length;
-  document.getElementById('stat-critical').textContent = criticalCount;
-  document.getElementById('badge-count').textContent = periodFiltered.length;
-  document.getElementById('stat-total').textContent = totalRevenueUpside > 0
-    ? '€' + formatNumber(totalRevenueUpside)
-    : '—';
-
-  document.getElementById('tab-all').textContent = periodFiltered.length;
-  document.getElementById('tab-revenue').textContent = revenueCount;
-  document.getElementById('tab-cost').textContent = costCount;
-  document.getElementById('tab-critical').textContent = criticalCount;
-  document.getElementById('tab-actioned').textContent = actionedCount;
-
-  const pct = periodFiltered.length > 0
-    ? Math.round((actionedCount / periodFiltered.length) * 100)
-    : 0;
-
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('progress-pct').textContent = pct + '%';
-  document.getElementById('progress-label').textContent = `${actionedCount} of ${periodFiltered.length} findings actioned`;
-  document.getElementById('stat-actioned').textContent = actionedCount;
-
-  renderFindings(periodFiltered);
-}
-
-function renderFindings(data) {
-  let filtered = data;
-
-  if (currentTab === 'revenue') filtered = data.filter(r => isRevenue(r));
-  else if (currentTab === 'cost') filtered = data.filter(r => !isRevenue(r));
-  else if (currentTab === 'critical') filtered = data.filter(r => {
-  const p = (r.priority || '').toLowerCase();
-  return p === 'critical' || p === 'high';
-});
-  else if (currentTab === 'actioned') filtered = data.filter(r => actionedIds.has(r.id));
-
-  const list = document.getElementById('findings-list');
-  const empty = document.getElementById('empty-state');
-
-  if (filtered.length === 0) {
-    list.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-
-  empty.style.display = 'none';
-  list.innerHTML = filtered.map(r => renderCard(r)).join('');
-}
-
-function getGeneratedDate(r) {
-  const linkedActions = r.linked_actions || [];
-  const candidates = [];
-
-  linkedActions.forEach(a => {
-    [a.date_generated, a.generated_at, a.updated_at, a.created_at].forEach(v => {
-      if (v) candidates.push(v);
-    });
-  });
-
-  [r.date_generated, r.generated_at, r.updated_at, r.created_at].forEach(v => {
-    if (v) candidates.push(v);
-  });
-
-  const validDates = candidates
-    .map(v => new Date(v))
-    .filter(d => !Number.isNaN(d.getTime()))
-    .sort((a, b) => b.getTime() - a.getTime());
-
-  return validDates.length ? formatDate(validDates[0].toISOString()) : '—';
-}
-
-function buildRootCause(r, linkedActions = []) {
-  if (r.root_cause || r.cause) return r.root_cause || r.cause;
-
-  const title = normalize(r.finding_title || r.title || '');
-
-  if (title.includes('retail')) {
-    return 'Underperformance is most likely concentrated in transient retail demand and should be validated across pricing, visibility, conversion, and channel mix.';
-  }
-  if (title.includes('negotiated')) {
-    return 'Underperformance is most likely linked to negotiated base demand, including account production, contracted pricing, and structural account mix.';
-  }
-  if (title.includes('groups')) {
-    return 'Performance appears closely linked to group demand contribution, pipeline strength, and conversion quality across upcoming need periods.';
-  }
-
-  const firstActionText = linkedActions
-    .map(a => a.action_text || a.action_title || a.action_detail || a.action_plan || a.recommended_action || a.action)
-    .find(Boolean);
-
-  return firstActionText
-    ? `Primary validation should begin with: ${firstActionText.toString().trim().replace(/[.\s]+$/, '')}.`
-    : 'Root-cause validation is still being structured for this finding.';
-}
-
-function buildExpectedOutcome(r, linkedActions = []) {
-  const explicitOutcome = linkedActions.map(a => a.expected_outcome).find(Boolean) || r.expected_outcome;
-  if (explicitOutcome) return explicitOutcome;
-
-  const title = normalize(r.finding_title || r.title || '');
-  const impactValue = Number(r.expected_impact_value) || Number(r.impact_value) || 0;
-  const impactText = impactValue > 0 ? ` and unlock approximately €${formatNumber(impactValue)} of upside` : '';
-
-  if (title.includes('retail')) {
-    return `Addressing retail performance gaps should improve occupancy penetration, strengthen market share${impactText}.`;
-  }
-  if (title.includes('negotiated')) {
-    return `Restoring negotiated base demand should improve occupancy stability, reinforce account contribution${impactText}.`;
-  }
-  if (title.includes('groups')) {
-    return `Improving group contribution and conversion should support base occupancy, protect need periods${impactText}.`;
-  }
-
-  return `Addressing this finding should improve commercial performance${impactText}.`;
-}
-
-function renderCard(r) {
-  const priority = (r.priority || 'medium').toLowerCase();
-  const isActioned = actionedIds.has(r.id);
-  const dept = r.owner_department || r.department || r.category || '—';
-  const linkedActions = r.linked_actions || [];
-  console.log('CARD CHECK', {
-  title: r.finding_title || r.title,
-  priority: r.priority,
-  fullRecord: r,
-  linkedActions
-});
-  const oneLiner = ((r.situation || r.finding || '')).split(/[.!?]/)[0].trim();
-
-  const totalRevenueUpside = linkedActions.reduce((sum, a) => {
-    return sum + (Number(a.estimated_revenue_upside) || 0);
-  }, 0);
-
-const firstOwner = r.owner_department || r.department || '—';
-  const firstUrgency =
-  linkedActions.find(a => a?.urgency)?.urgency ||
-  linkedActions.find(a => a?.priority)?.priority ||
-  capitalize(priority);
-  const firstDueDate =
-  linkedActions.find(a => a?.due_date)?.due_date ||
-  linkedActions.find(a => a?.dueDate)?.dueDate ||
-  '—';
-  const firstOutcome =
-  r.expected_outcome ||
-  buildExpectedOutcome(r);
-  const triggerDisplay =
-  r.trigger_metric ||
-  (r.finding
-    ? `MPI ${extractMetric(r.finding, 'MPI')} | ARI ${extractMetric(r.finding, 'ARI')} | RGI ${extractMetric(r.finding, 'RGI')}`
-    : (r.impact_value ? `€${formatNumber(r.impact_value)}` : '—'));
-  const actionListHtml = formatActionDetails(linkedActions, r);
-  const rootCause = buildRootCause(r, linkedActions);
-  const generatedDate = getGeneratedDate(r);
-
-  return `
-    <div class="finding-card ${isActioned ? 'actioned' : ''}" onclick="toggleCard(this)" data-id="${r.id}">
-      <div class="finding-header">
-        <div class="priority-stripe ${priority}"></div>
-        <div class="finding-center">
-          <div class="finding-title">${escHtml(r.finding_title || r.title || 'Untitled Finding')}</div>
-          ${oneLiner ? `<div class="finding-oneliner">${escHtml(oneLiner)}.</div>` : ''}
-        </div>
-        <div class="finding-right">
-          <div class="trigger-metric-value">${escHtml(triggerDisplay)}</div>
-          <div class="trigger-metric-label">Key Trigger</div>
-          <div class="badges-row">
-            <span class="priority-badge ${priority}">${capitalize(priority)}</span>
-            <span class="dept-badge">${escHtml(dept)}</span>
-          </div>
-          <span class="chevron">▾</span>
-        </div>
-      </div>
-
-      <div class="finding-body">
-        <div class="finding-sections">
-          <div class="finding-section">
-            <div class="section-label">Key Insight</div>
-            <div class="section-text">${escHtml(r.finding || r.title || r.root_cause || '-')}</div>
-          </div>
-
-          <div class="finding-section">
-            <div class="section-label">Root Cause</div>
-            <div class="section-text">${escHtml(rootCause)}</div>
-          </div>
-
-          <div class="finding-section">
-            <div class="section-label">Execution Owner</div>
-            <div class="section-text">
-              <strong>Owner:</strong> ${escHtml(firstOwner)}<br>
-              <strong>Urgency:</strong> ${escHtml(firstUrgency)}<br>
-              <strong>Due:</strong> ${escHtml(firstDueDate)}
-            </div>
-          </div>
-
-          <div class="finding-section full-width">
-            <div class="section-label">Action Plan</div>
-            <ul class="action-list">${actionListHtml}</ul>
-          </div>
-
-          <div class="finding-section full-width" style="border-top:none;">
-            <div class="section-label">Expected Outcome</div>
-            <div class="section-text">${escHtml(firstOutcome)}</div>
-          </div>
-        </div>
-
-        <div class="gop-saving-bar">
-          <div class="gop-saving-left">
-            <div class="gop-saving-value">
-              ${totalRevenueUpside > 0 ? '€' + formatNumber(totalRevenueUpside) : '—'}
-            </div>
-            <div class="gop-saving-desc">Estimated revenue upside · Generated ${generatedDate}</div>
-          </div>
-          <button class="action-btn ${isActioned ? 'actioned' : ''}"
-            onclick="event.stopPropagation(); markActioned(this, '${r.id}')">
-            ${isActioned ? '✓ Actioned' : 'Mark as Actioned'}
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function toggleCard(card) {
-  card.classList.toggle('expanded');
-}
-
-function markActioned(btn, id) {
-  actionedIds.add(id);
-  btn.textContent = '✓ Actioned';
-  btn.classList.add('actioned');
-  btn.closest('.finding-card').classList.add('actioned');
-  renderDashboard(allData);
-}
-
-function filterTab(tab, el) {
-  currentTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  const filtered = !currentPeriod
-  ? allData
-  : allData.filter(r => (r.period_label || r.period) === currentPeriod);
-  renderFindings(filtered);
-}
-
-function isRevenue(r) {
-  const revDepts = ['revenue', 'sales', 'marketing', 'distribution'];
-  const dept = (r.owner_department || r.department || '').toLowerCase();
-  return revDepts.some(d => dept.includes(d));
-}
-
-function formatActionDetails(actions, finding = {}) {
-  if (!actions || actions.length === 0) {
-    const fallback = finding.action_plan || finding.action || '';
-    return fallback ? `<li>${escHtml(fallback)}</li>` : '<li>No actions specified</li>';
-  }
-
-  const lines = [];
-
-  actions.forEach(action => {
-    const pieces = [];
-
-    if (action.action_title) pieces.push(action.action_title);
-    if (action.action_detail) pieces.push(action.action_detail);
-    if (action.action_text) {
-  let text = action.action_text;
-
-  // Make actions more operational
-  if (text.toLowerCase().includes('recalibrate')) {
-    text = `Review and adjust rate positioning by segment and booking window, ensuring alignment with comp set pricing dynamics.`;
-  }
-
-  if (text.toLowerCase().includes('optimize')) {
-    text = `Restructure pricing hierarchy across room categories to reinforce upsell logic and maximize revenue contribution.`;
-  }
-
-  if (text.toLowerCase().includes('adjust pricing corridors')) {
-    text = `Implement dynamic pricing adjustments between need and compression periods to improve occupancy capture without diluting ADR.`;
-  }
-
-  pieces.push(text);
-}
-
-    if (pieces.length === 0) {
-      [action.action_plan, action.recommended_action, action.action].forEach(v => {
-        if (v) pieces.push(v);
-      });
-    }
-
-    pieces.forEach(piece => {
-      piece
-        .toString()
-        .split(/\n|•|→|\d+\.|—/)
-        .map(s => s.replace(/^[\s\-*•→]+/, '').trim())
-        .filter(s => s.length > 3)
-        .forEach(s => lines.push(s));
-    });
-  });
-
-  if (lines.length === 0) {
-    const fallback = finding.action_plan || finding.action || '';
-    return fallback ? `<li>${escHtml(fallback)}</li>` : '<li>No actions specified</li>';
-  }
-
-  return lines.map(line => `<li>${escHtml(line)}</li>`).join('');
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  try {
-    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch {
-    return dateStr;
-  }
-}
-
-function formatNumber(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return Math.round(n / 1000) + 'K';
-  return n.toString();
-}
-
-function capitalize(str) {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-}
-
-function escHtml(str) {
-  if (!str) return '';
-  return str.toString()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function showLoading(show) {
-  document.getElementById('loading-state').style.display = show ? 'flex' : 'none';
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-state');
-  document.getElementById('error-msg').textContent = msg;
-  el.style.display = 'block';
-}
-
-function hideError() {
-  document.getElementById('error-state').style.display = 'none';
 }
 
 function showLogin() {
@@ -1779,7 +1542,7 @@ async function handleLogin(e) {
   localStorage.setItem('hotelCode', hotelCode);
 
   showApp(data.session.user.email);
-  loadRecommendations();
+  loadDashboard();
 }
 
 async function logout() {
@@ -1794,14 +1557,11 @@ async function logout() {
     const hotelCode = session.user.user_metadata?.hotel || '';
     localStorage.setItem('hotelCode', hotelCode);
     showApp(session.user.email);
-    loadRecommendations();
+    loadDashboard();
   } else {
     showLogin();
   }
 })();
-  document.addEventListener('DOMContentLoaded', () => {
- loadRecommendations();
-});
 </script>
 
 </div>
