@@ -846,7 +846,7 @@ let dashboardCards = [];
 let dashboardMeta = null;
 
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const SUPABASE_KEY = 'YOUR_ANON_KEY_HERE';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DRIVER_TO_DEPARTMENT = {
@@ -946,29 +946,111 @@ function buildKpiTrigger(engineJson) {
   return `MPI ${typeof mpi === 'number' ? mpi.toFixed(1) : '—'} | ARI ${typeof ari === 'number' ? ari.toFixed(1) : '—'} | RGI ${typeof rgi === 'number' ? rgi.toFixed(1) : '—'}`;
 }
 
-function buildKeyInsight(engineJson, recommendation, engineAction) {
-  if (recommendation?.finding) return recommendation.finding;
+function getFocusSegment(engineJson) {
+  return engineJson?.focus?.focus_segment || 'retail';
+}
 
-  const focusSegment = engineJson?.focus?.focus_segment || 'retail';
-  const driverReason = engineJson?.driver?.driver_reason || '';
-  const trigger = buildKpiTrigger(engineJson);
+function buildDriverLabel(driver) {
+  const d = normalize(driver);
+  if (d === 'pricing') return 'pricing';
+  if (d === 'visibility') return 'visibility';
+  if (d === 'conversion') return 'conversion';
+  if (d === 'mix_strategy') return 'commercial mix';
+  return 'commercial';
+}
 
-  if (driverReason) {
-    return `${capitalize(focusSegment)} underperformance observed (${trigger}). ${driverReason}`;
+function buildCardSpecificInsight(engineJson, recommendation, engineAction) {
+  const segment = getFocusSegment(engineJson);
+  const driver = normalize(engineAction?.driver || recommendation?.driver || '');
+  const title = normalize(engineAction?.title || recommendation?.title || '');
+
+  if (driver === 'pricing') {
+    if (title.includes('bar premium')) {
+      return `${capitalize(segment)} pricing is carrying a premium that is not translating into sufficient share capture.`;
+    }
+    if (title.includes('tactical offers')) {
+      return `${capitalize(segment)} demand needs a more tactical pricing response in softer booking windows.`;
+    }
+    return `${capitalize(segment)} performance shows a pricing-positioning gap versus market demand conditions.`;
   }
 
-  return engineAction?.description || 'Strategic performance gap identified.';
+  if (driver === 'visibility') {
+    return `${capitalize(segment)} demand capture is constrained by insufficient market visibility and channel exposure.`;
+  }
+
+  if (driver === 'conversion') {
+    if (title.includes('website conversion')) {
+      return `${capitalize(segment)} demand is reaching the funnel but not converting efficiently into booked revenue.`;
+    }
+    if (title.includes('parity')) {
+      return `${capitalize(segment)} conversion efficiency is being weakened by content quality or rate parity friction.`;
+    }
+    return `${capitalize(segment)} revenue capture is being limited by conversion inefficiencies across key channels.`;
+  }
+
+  if (driver === 'mix_strategy') {
+    return `${capitalize(segment)} revenue quality can be improved through stronger business-mix alignment.`;
+  }
+
+  return recommendation?.finding || engineAction?.description || 'Strategic performance gap identified.';
 }
 
 function buildRootCause(engineJson, recommendation, engineAction) {
   if (recommendation?.root_cause) return recommendation.root_cause;
   if (engineJson?.driver?.driver_reason) return engineJson.driver.driver_reason;
+
+  const driver = normalize(engineAction?.driver || recommendation?.driver || '');
+  if (driver === 'pricing') {
+    return 'The hotel is carrying a price premium that demand is not fully accepting, limiting share capture.';
+  }
+  if (driver === 'visibility') {
+    return 'Available market demand is not being captured effectively enough across visible demand channels.';
+  }
+  if (driver === 'conversion') {
+    return 'Existing demand is not converting efficiently into booked revenue, indicating friction in the commercial path.';
+  }
+  if (driver === 'mix_strategy') {
+    return 'Current business mix is not fully aligned with the most profitable demand opportunities.';
+  }
+
   return engineAction?.description || 'Root cause is being structured from the current commercial signal.';
 }
 
 function buildExpectedOutcome(engineJson, recommendation, engineAction) {
   if (recommendation?.expected_outcome) return recommendation.expected_outcome;
-  if (engineAction?.financial_impact?.executive_summary) return engineAction.financial_impact.executive_summary;
+
+  const driver = normalize(engineAction?.driver || recommendation?.driver || '');
+  const segment = getFocusSegment(engineJson);
+  const impact = engineAction?.financial_impact?.impact_range?.high || null;
+
+  if (impact) {
+    if (driver === 'pricing') {
+      return `Recover ${segment} share and unlock pricing upside of up to SAR ${formatNumber(impact)} through better rate acceptance.`;
+    }
+    if (driver === 'conversion') {
+      return `Improve ${segment} booking efficiency and capture up to SAR ${formatNumber(impact)} of incremental revenue.`;
+    }
+    if (driver === 'visibility') {
+      return `Strengthen ${segment} demand capture and support revenue growth of up to SAR ${formatNumber(impact)}.`;
+    }
+    if (driver === 'mix_strategy') {
+      return `Improve business-mix quality and support up to SAR ${formatNumber(impact)} of value creation.`;
+    }
+  }
+
+  if (driver === 'pricing') {
+    return `Recover ${segment} share and improve price acceptance in short booking windows.`;
+  }
+  if (driver === 'conversion') {
+    return `Improve ${segment} conversion efficiency and reduce revenue leakage across key channels.`;
+  }
+  if (driver === 'visibility') {
+    return `Increase qualified demand capture and strengthen ${segment} market penetration.`;
+  }
+  if (driver === 'mix_strategy') {
+    return `Improve revenue quality through stronger commercial mix alignment.`;
+  }
+
   return 'Improve commercial performance through targeted action.';
 }
 
@@ -989,6 +1071,14 @@ function extractActionLines(actionRows, engineAction) {
 
   if (!lines.length && engineAction?.description) {
     lines.push(engineAction.description);
+  }
+
+  if (engineAction?.financial_impact?.impact_timeline) {
+    lines.push(`Execution horizon: ${engineAction.financial_impact.impact_timeline.replace(/_/g, ' ')}.`);
+  }
+
+  if (engineAction?.financial_impact?.confidence) {
+    lines.push(`Confidence level: ${engineAction.financial_impact.confidence}.`);
   }
 
   return uniqueBy(lines, line => normalize(line));
@@ -1018,7 +1108,7 @@ function buildUrgency(engineAction, recommendation) {
   return capitalize(engineAction?.priority || recommendation?.priority || 'medium');
 }
 
-function getCardValue(engineAction, recommendation, actionRows) {
+function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 0, cardCount = 1) {
   const engineImpact = engineAction?.financial_impact?.impact_range?.high;
   if (typeof engineImpact === 'number' && engineImpact > 0) return engineImpact;
 
@@ -1026,7 +1116,21 @@ function getCardValue(engineAction, recommendation, actionRows) {
   if (recImpact > 0) return recImpact;
 
   const actionUpside = actionRows.reduce((sum, row) => sum + (Number(row.estimated_revenue_upside) || 0), 0);
-  return actionUpside || 0;
+  if (actionUpside > 0) return actionUpside;
+
+  if (fallbackTotal > 0 && cardCount > 0) {
+    return Math.round(fallbackTotal / cardCount);
+  }
+
+  return 0;
+}
+
+function buildOneLiner(cardSpecificInsight, rootCause) {
+  const first = cardSpecificInsight || '';
+  const second = rootCause || '';
+  if (!first && !second) return '';
+  if (!second || normalize(first) === normalize(second)) return first;
+  return `${first} ${second}`;
 }
 
 function buildCardsFromData(engineRow, recommendations, actions) {
@@ -1039,6 +1143,11 @@ function buildCardsFromData(engineRow, recommendations, actions) {
     engineActions.filter(a => a && (a.title || a.description)),
     a => `${normalize(a.title)}||${normalize(a.driver)}`
   );
+
+  const engineTotal =
+    engineJson?.total_opportunity?.adjusted_opportunity?.high ||
+    engineJson?.total_opportunity?.gross_opportunity?.high ||
+    0;
 
   const recommendationsByTitle = new Map();
   recommendations.forEach(rec => {
@@ -1058,7 +1167,9 @@ function buildCardsFromData(engineRow, recommendations, actions) {
     const titleKey = normalize(engineAction.title);
     const recommendation = (recommendationsByTitle.get(titleKey) || [])[0] || null;
     const linkedActions = actionsByTitle.get(titleKey) || [];
-    const valueAtStake = getCardValue(engineAction, recommendation, linkedActions);
+    const keyInsight = buildCardSpecificInsight(engineJson, recommendation, engineAction);
+    const rootCause = buildRootCause(engineJson, recommendation, engineAction);
+    const valueAtStake = getCardValue(engineAction, recommendation, linkedActions, engineTotal, uniqueEngineActions.length);
 
     return {
       id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction.title || 'untitled'),
@@ -1067,9 +1178,9 @@ function buildCardsFromData(engineRow, recommendations, actions) {
       hotel_name: engineRow.hotel_code,
       period_label: engineRow.period_label,
       title: engineAction.title || recommendation?.title || 'Untitled Finding',
-      one_liner: recommendation?.finding || engineAction.description || '',
-      key_insight: buildKeyInsight(engineJson, recommendation, engineAction),
-      root_cause: buildRootCause(engineJson, recommendation, engineAction),
+      one_liner: buildOneLiner(keyInsight, rootCause),
+      key_insight: keyInsight,
+      root_cause: rootCause,
       execution_owner: getOwnerDepartment(recommendation, engineAction),
       urgency: buildUrgency(engineAction, recommendation),
       due_date: buildDueDate(linkedActions),
@@ -1094,9 +1205,7 @@ function buildCardsFromData(engineRow, recommendations, actions) {
       snapshot_date: engineRow.snapshot_date,
       period_label: engineRow.period_label,
       generated_at: engineRow.generated_at,
-      total_value: engineJson?.total_opportunity?.adjusted_opportunity?.high ||
-        engineJson?.total_opportunity?.gross_opportunity?.high ||
-        cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0),
+      total_value: engineTotal || cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0),
       critical_count: cards.filter(c => c.priority === 'high' || c.priority === 'critical').length,
       findings_count: cards.length,
       diagnosis_trigger: buildKpiTrigger(engineJson)
@@ -1177,7 +1286,7 @@ function renderDashboard() {
 
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
-  const totalValue = dashboardMeta?.total_value || 0;
+  const totalValue = cardsForPeriod.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0) || dashboardMeta?.total_value || 0;
   const criticalCount = cardsForPeriod.filter(c => c.priority === 'high' || c.priority === 'critical').length;
   const actionedCount = cardsForPeriod.filter(c => actionedIds.has(c.id)).length;
   const pct = cardsForPeriod.length ? Math.round((actionedCount / cardsForPeriod.length) * 100) : 0;
@@ -1248,7 +1357,7 @@ function renderCard(card) {
 
         <div class="finding-center">
           <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${escHtml(card.one_liner || card.key_insight)}</div>
+          <div class="finding-oneliner">${escHtml(card.one_liner)}</div>
         </div>
 
         <div class="finding-right">
