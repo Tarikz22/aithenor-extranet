@@ -1116,8 +1116,18 @@ function getCardValue(engineAction, recommendation, actionRows, fallbackTotal = 
   return 0;
 }
 
-function buildCardId(snapshotDate, periodLabel, title) {
-  return `${snapshotDate}||${periodLabel}||${normalize(title)}`;
+/** Stable card id: prefer finding_key / action_id so "Mark as Actioned" survives title edits; else legacy title hash. */
+function buildCardId(snapshotDate, periodLabel, engineAction) {
+  const stable = (engineAction?.finding_key || engineAction?.action_id || '').toString().trim();
+  const tail = stable || normalize((engineAction && engineAction.title) || 'untitled');
+  return `${snapshotDate}||${periodLabel}||${tail}`;
+}
+
+function getEngineJoinKey(engineAction) {
+  const k = engineAction?.finding_key || engineAction?.action_id;
+  if (k === null || k === undefined) return '';
+  const s = String(k).trim();
+  return s;
 }
 
 function getOwnerDepartment(engineAction, recommendation) {
@@ -1187,30 +1197,55 @@ function buildCardsFromData(engineRow, recommendations, actions) {
     engineJson?.total_opportunity?.gross_opportunity?.high ||
     0;
 
+  const recommendationsByFindingKey = new Map();
   const recommendationsByTitle = new Map();
   recommendations.forEach(rec => {
+    const fk = rec.finding_key != null && String(rec.finding_key).trim();
+    if (fk) {
+      if (!recommendationsByFindingKey.has(fk)) recommendationsByFindingKey.set(fk, []);
+      recommendationsByFindingKey.get(fk).push(rec);
+    }
     const key = normalize(rec.title || rec.finding_title);
     if (!recommendationsByTitle.has(key)) recommendationsByTitle.set(key, []);
     recommendationsByTitle.get(key).push(rec);
   });
 
+  const actionsByFindingKey = new Map();
   const actionsByTitle = new Map();
   actions.forEach(act => {
+    const fk = act.finding_key != null && String(act.finding_key).trim();
+    if (fk) {
+      if (!actionsByFindingKey.has(fk)) actionsByFindingKey.set(fk, []);
+      actionsByFindingKey.get(fk).push(act);
+    }
     const key = normalize(act.title);
     if (!actionsByTitle.has(key)) actionsByTitle.set(key, []);
     actionsByTitle.get(key).push(act);
   });
 
   const cards = uniqueEngineActions.map(engineAction => {
+    const joinKey = getEngineJoinKey(engineAction);
     const titleKey = normalize(engineAction.title);
-    const recommendation = (recommendationsByTitle.get(titleKey) || [])[0] || null;
-    const linkedActions = actionsByTitle.get(titleKey) || [];
+
+    let recommendation =
+      joinKey && recommendationsByFindingKey.has(joinKey)
+        ? (recommendationsByFindingKey.get(joinKey) || [])[0] || null
+        : null;
+    let linkedActions =
+      joinKey && actionsByFindingKey.has(joinKey) ? actionsByFindingKey.get(joinKey) || [] : [];
+
+    if (!recommendation) {
+      recommendation = (recommendationsByTitle.get(titleKey) || [])[0] || null;
+    }
+    if (!linkedActions.length) {
+      linkedActions = actionsByTitle.get(titleKey) || [];
+    }
     const keyInsight = buildCardSpecificInsight(engineJson, recommendation, engineAction);
     const rootCause = buildRootCause(engineJson, recommendation, engineAction);
     const valueAtStake = getCardValue(engineAction, recommendation, linkedActions, engineTotal, uniqueEngineActions.length);
 
     return {
-      id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction.title || 'untitled'),
+      id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction),
       snapshot_date: engineRow.snapshot_date,
       generated_at: engineRow.generated_at,
       hotel_name: engineRow.hotel_code,
