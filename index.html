@@ -941,8 +941,33 @@ function getDiagnosisMetrics(engineJson) {
   };
 }
 
-function buildKpiTrigger(engineJson) {
-  const { mpi, ari, rgi } = getDiagnosisMetrics(engineJson);
+/**
+ * Per-card KPI values: prefer issue.card_metrics (aligned with issue finding text) when present.
+ * Old engine_json without card_metrics keeps global diagnosis (backward compatible).
+ */
+function getMetricsForKpiTrigger(engineJson, issue) {
+  const cm = issue?.card_metrics;
+  if (cm && typeof cm === 'object') {
+    const mpi = cm.avgMPI;
+    const ari = cm.avgARI;
+    const rgi = cm.avgRGI;
+    const hasAny =
+      (typeof mpi === 'number' && Number.isFinite(mpi)) ||
+      (typeof ari === 'number' && Number.isFinite(ari)) ||
+      (typeof rgi === 'number' && Number.isFinite(rgi));
+    if (hasAny) {
+      return {
+        mpi: typeof mpi === 'number' && Number.isFinite(mpi) ? mpi : undefined,
+        ari: typeof ari === 'number' && Number.isFinite(ari) ? ari : undefined,
+        rgi: typeof rgi === 'number' && Number.isFinite(rgi) ? rgi : undefined
+      };
+    }
+  }
+  return getDiagnosisMetrics(engineJson);
+}
+
+function buildKpiTrigger(engineJson, issue) {
+  const { mpi, ari, rgi } = getMetricsForKpiTrigger(engineJson, issue);
   return `MPI ${typeof mpi === 'number' ? mpi.toFixed(1) : '—'} | ARI ${typeof ari === 'number' ? ari.toFixed(1) : '—'} | RGI ${typeof rgi === 'number' ? rgi.toFixed(1) : '—'}`;
 }
 
@@ -1291,7 +1316,7 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       value_at_stake: valueAtStake,
       priority: getPriority(engineAction, recommendation),
       department: getOwnerDepartment(recommendation, engineAction),
-      trigger_display: buildKpiTrigger(engineJson),
+      trigger_display: buildKpiTrigger(engineJson, issue),
       timeline: engineAction?.financial_impact?.impact_timeline || '—',
       confidence: engineAction?.financial_impact?.confidence || '—',
       driver: issue.driver || recommendation?.driver || '',
