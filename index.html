@@ -1180,11 +1180,149 @@ function getPriority(engineAction, recommendation) {
   if (priority === 'low') return 'low';
   return 'medium';
 }
-  
+
+/** Phase 4 issue-led engine: one card per issue; DB rows keyed by issue finding_key. */
+function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
+  const issues = Array.isArray(engineJson.issues) ? engineJson.issues : [];
+
+  const engineTotal =
+    engineJson?.total_opportunity?.adjusted_opportunity?.high ||
+    engineJson?.total_opportunity?.gross_opportunity?.high ||
+    0;
+
+  const recommendationsByFindingKey = new Map();
+  const recommendationsByTitle = new Map();
+  recommendations.forEach(rec => {
+    const fk = rec.finding_key != null && String(rec.finding_key).trim();
+    if (fk) {
+      if (!recommendationsByFindingKey.has(fk)) recommendationsByFindingKey.set(fk, []);
+      recommendationsByFindingKey.get(fk).push(rec);
+    }
+    const key = normalize(rec.title || rec.finding_title);
+    if (!recommendationsByTitle.has(key)) recommendationsByTitle.set(key, []);
+    recommendationsByTitle.get(key).push(rec);
+  });
+
+  const actionsByFindingKey = new Map();
+  const actionsByTitle = new Map();
+  actions.forEach(act => {
+    const fk = act.finding_key != null && String(act.finding_key).trim();
+    if (fk) {
+      if (!actionsByFindingKey.has(fk)) actionsByFindingKey.set(fk, []);
+      actionsByFindingKey.get(fk).push(act);
+    }
+    const key = normalize(act.title);
+    if (!actionsByTitle.has(key)) actionsByTitle.set(key, []);
+    actionsByTitle.get(key).push(act);
+  });
+
+  const cards = issues.map(issue => {
+    const joinKey = issue.finding_key != null ? String(issue.finding_key).trim() : '';
+    const titleKey = normalize(issue.title);
+
+    let recommendation =
+      joinKey && recommendationsByFindingKey.has(joinKey)
+        ? (recommendationsByFindingKey.get(joinKey) || [])[0] || null
+        : null;
+    let linkedActions =
+      joinKey && actionsByFindingKey.has(joinKey) ? actionsByFindingKey.get(joinKey) || [] : [];
+
+    if (!recommendation) {
+      recommendation = (recommendationsByTitle.get(titleKey) || [])[0] || null;
+    }
+    if (!linkedActions.length) {
+      linkedActions = actionsByTitle.get(titleKey) || [];
+    }
+
+    const issueActions = Array.isArray(issue.actions) ? issue.actions : [];
+    const primaryAct = issueActions[0] || {};
+    let maxHigh = 0;
+    issueActions.forEach(a => {
+      const h = a.financial_impact?.impact_range?.high;
+      if (typeof h === 'number' && h > maxHigh) maxHigh = h;
+    });
+
+    const engineAction = {
+      driver: issue.driver,
+      title: issue.title,
+      description: primaryAct.description || '',
+      priority: issue.priority,
+      finding_key: issue.finding_key,
+      action_id: primaryAct.action_id,
+      financial_impact: {
+        impact_range: { high: maxHigh || null },
+        impact_timeline: primaryAct.financial_impact?.impact_timeline || '—',
+        confidence: primaryAct.financial_impact?.confidence || '—',
+        executive_summary: recommendation?.expected_outcome || issue.expected_outcome
+      }
+    };
+
+    const keyInsight =
+      (recommendation?.finding && String(recommendation.finding).trim()) ||
+      buildCardSpecificInsight(engineJson, recommendation, engineAction);
+    const rootCause = (
+      recommendation?.root_cause ||
+      issue.root_cause ||
+      buildRootCause(engineJson, recommendation, engineAction)
+    ).trim();
+    const expectedOutcome = (
+      recommendation?.expected_outcome ||
+      issue.expected_outcome ||
+      buildExpectedOutcome(engineJson, recommendation, engineAction)
+    ).trim();
+
+    const valueAtStake = getCardValue(engineAction, recommendation, linkedActions, engineTotal, issues.length);
+
+    return {
+      id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction),
+      snapshot_date: engineRow.snapshot_date,
+      generated_at: engineRow.generated_at,
+      hotel_name: engineRow.hotel_code,
+      period_label: engineRow.period_label,
+      title: issue.title || recommendation?.title || 'Untitled Finding',
+      one_liner: buildOneLiner(keyInsight, rootCause),
+      key_insight: keyInsight,
+      root_cause: rootCause,
+      execution_owner: getOwnerDepartment(recommendation, engineAction),
+      urgency: buildUrgency(engineAction, recommendation),
+      due_date: buildDueDate(linkedActions),
+      action_lines: extractActionLines(linkedActions, engineAction),
+      expected_outcome: expectedOutcome,
+      value_at_stake: valueAtStake,
+      priority: getPriority(engineAction, recommendation),
+      department: getOwnerDepartment(recommendation, engineAction),
+      trigger_display: buildKpiTrigger(engineJson),
+      timeline: engineAction?.financial_impact?.impact_timeline || '—',
+      confidence: engineAction?.financial_impact?.confidence || '—',
+      driver: issue.driver || recommendation?.driver || '',
+      raw_recommendation: recommendation,
+      raw_engine_action: engineAction
+    };
+  });
+
+  return {
+    cards,
+    meta: {
+      hotel_name: engineRow.hotel_code,
+      snapshot_date: engineRow.snapshot_date,
+      period_label: engineRow.period_label,
+      generated_at: engineRow.generated_at,
+      total_value: engineTotal || cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0),
+      critical_count: cards.filter(c => c.priority === 'high' || c.priority === 'critical').length,
+      findings_count: cards.length,
+      diagnosis_trigger: buildKpiTrigger(engineJson)
+    }
+  };
+}
+
 function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
     ? JSON.parse(engineRow.engine_json)
     : (engineRow.engine_json || {});
+
+  if (Array.isArray(engineJson.issues) && engineJson.issues.length > 0) {
+    return buildCardsFromIssues(engineRow, engineJson, recommendations, actions);
+  }
 
   const engineActions = Array.isArray(engineJson.actions) ? engineJson.actions : [];
   const uniqueEngineActions = uniqueBy(
