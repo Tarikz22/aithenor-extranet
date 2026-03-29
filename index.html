@@ -491,6 +491,25 @@ body {
   border: 1px solid var(--gray-200);
 }
 
+.temporal-badge {
+  font-size: 10px;
+  color: var(--navy-mid);
+  background: var(--gold-pale);
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-weight: 600;
+  border: 1px solid rgba(201,168,76,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.finding-temporal-line {
+  font-size: 11px;
+  color: var(--gray-400);
+  line-height: 1.3;
+  margin-top: 1px;
+}
+
 .chevron {
   font-size: 11px;
   color: var(--gray-400);
@@ -1206,6 +1225,48 @@ function getPriority(engineAction, recommendation) {
   return 'medium';
 }
 
+function normalizeRecurrenceType(value) {
+  const normalized = normalize(value);
+  if (!normalized) return '';
+  if (normalized === 'persistent') return 'persistent';
+  if (normalized === 'recurring') return 'recurring';
+  if (normalized === 'isolated') return 'isolated';
+  if (normalized === 'regime shift' || normalized === 'regime_shift') return 'recurring';
+  return '';
+}
+
+function buildTemporalCue(issue) {
+  if (!issue || typeof issue !== 'object') return null;
+
+  const recurrence = normalizeRecurrenceType(issue.recurrence_type);
+  const weekCount = Number(issue.contributing_week_count);
+  const hasWeekCount = Number.isFinite(weekCount) && weekCount > 0;
+  const ongoingMost = issue.ongoing_across_most_uploaded_period === true;
+
+  if (!recurrence && !hasWeekCount && !ongoingMost) return null;
+
+  let badge = recurrence ? capitalize(recurrence) : '';
+  let line = '';
+
+  if (ongoingMost || recurrence === 'persistent') {
+    badge = 'Persistent';
+    line = 'Persistent through most of the uploaded window';
+  } else if (recurrence === 'recurring') {
+    line = hasWeekCount ? `Observed across ${weekCount} weeks` : 'Recurring across the period';
+  } else if (recurrence === 'isolated') {
+    line = hasWeekCount ? `Observed across ${weekCount} week${weekCount === 1 ? '' : 's'}` : 'Isolated in the period';
+  } else if (hasWeekCount) {
+    line = `Observed across ${weekCount} weeks`;
+  }
+
+  if (!badge && line) {
+    badge = 'Recurring';
+  }
+
+  if (!badge && !line) return null;
+  return { badge, line };
+}
+
 /** Phase 4 issue-led engine: one card per issue; DB rows keyed by issue finding_key. */
 function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
   const issues = Array.isArray(engineJson.issues) ? engineJson.issues : [];
@@ -1297,6 +1358,7 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
     ).trim();
 
     const valueAtStake = getCardValue(engineAction, recommendation, linkedActions, engineTotal, issues.length);
+    const temporalCue = buildTemporalCue(issue);
 
     return {
       id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction),
@@ -1320,6 +1382,8 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       timeline: engineAction?.financial_impact?.impact_timeline || '—',
       confidence: engineAction?.financial_impact?.confidence || '—',
       driver: issue.driver || recommendation?.driver || '',
+      temporal_badge: temporalCue?.badge || '',
+      temporal_line: temporalCue?.line || '',
       raw_recommendation: recommendation,
       raw_engine_action: engineAction
     };
@@ -1594,6 +1658,7 @@ function renderCard(card) {
         <div class="finding-center">
           <div class="finding-title">${escHtml(card.title)}</div>
           <div class="finding-oneliner">${escHtml(card.one_liner)}</div>
+          ${card.temporal_line ? `<div class="finding-temporal-line">${escHtml(card.temporal_line)}</div>` : ''}
         </div>
 
         <div class="finding-right">
@@ -1601,6 +1666,7 @@ function renderCard(card) {
           <div class="trigger-metric-label">Key Trigger</div>
 
           <div class="badges-row">
+            ${card.temporal_badge ? `<span class="temporal-badge">${escHtml(card.temporal_badge)}</span>` : ''}
             <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
             <span class="dept-badge">${escHtml(card.department)}</span>
           </div>
