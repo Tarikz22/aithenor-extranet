@@ -1039,6 +1039,23 @@ function buildCardSpecificInsight(engineJson, recommendation, engineAction) {
   return recommendation?.finding || engineAction?.description || 'Strategic performance gap identified.';
 }
 
+/**
+ * UI-only cleanup: hide internal taxonomy prefixes from visible copy.
+ * Example: "retail: premium-without-share — MPI ..."" -> "MPI ..."
+ */
+function stripInternalTaxonomyPrefix(text) {
+  if (text === null || text === undefined) return '';
+  const raw = String(text).trim();
+  if (!raw) return '';
+
+  return raw
+    .replace(
+      /^[a-z][a-z\s/&]*:\s*[a-z0-9_]+(?:-[a-z0-9_]+){1,8}\s*[—-]\s*/i,
+      ''
+    )
+    .trim();
+}
+
 function buildRootCause(engineJson, recommendation, engineAction) {
   const driver = normalize(engineAction?.driver || recommendation?.driver || '');
   const title = normalize(engineAction?.title || recommendation?.title || '');
@@ -1346,6 +1363,7 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
     const keyInsight =
       (recommendation?.finding && String(recommendation.finding).trim()) ||
       buildCardSpecificInsight(engineJson, recommendation, engineAction);
+    const cleanKeyInsight = stripInternalTaxonomyPrefix(keyInsight);
     const rootCause = (
       recommendation?.root_cause ||
       issue.root_cause ||
@@ -1367,8 +1385,8 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       hotel_name: engineRow.hotel_code,
       period_label: engineRow.period_label,
       title: issue.title || recommendation?.title || 'Untitled Finding',
-      one_liner: buildOneLiner(keyInsight, rootCause),
-      key_insight: keyInsight,
+      one_liner: buildOneLiner(cleanKeyInsight, rootCause),
+      key_insight: cleanKeyInsight,
       root_cause: rootCause,
       execution_owner: getOwnerDepartment(recommendation, engineAction),
       urgency: buildUrgency(engineAction, recommendation),
