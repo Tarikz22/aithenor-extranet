@@ -989,7 +989,7 @@ function buildCardSpecificInsight(engineJson, recommendation, engineAction) {
   }
 
   if (driver === 'mix_strategy') {
-    return `${capitalize(segment)} revenue quality can be improved through stronger business-mix alignment.`;
+    return `${capitalize(segment)} revenue quality strengthens through tighter business-mix alignment.`;
   }
 
   return recommendation?.finding || engineAction?.description || 'Strategic performance gap identified.';
@@ -1110,7 +1110,7 @@ function buildOneLiner(cardSpecificInsight, rootCause) {
   if (cardSpecificInsight) return cardSpecificInsight;
 
   if (rootCause) {
-    return rootCause.replace('is', 'appears to be');
+    return rootCause;
   }
 
   return '';
@@ -1265,6 +1265,11 @@ function formatRiskRange(minValue, maxValue) {
   const min = parseAmount(minValue);
   const max = parseAmount(maxValue);
   if (Number.isFinite(min) && Number.isFinite(max) && max > 0) {
+    const gapRatio = min > 0 ? Math.abs(max - min) / min : 1;
+    if (Math.abs(max - min) < 1 || gapRatio < 0.2) {
+      const midpoint = Math.round((min + max) / 2);
+      return `€${formatNumber(midpoint)} revenue at risk`;
+    }
     if (Math.abs(max - min) < 1) {
       return `€${formatNumber(max)} revenue at risk`;
     }
@@ -1343,6 +1348,22 @@ function parseTriggerMetrics(triggerDisplay) {
   return { mpi: read('MPI'), ari: read('ARI'), rgi: read('RGI') };
 }
 
+function getConfidenceLevel(card) {
+  const c = normalize(card.confidence);
+  if (c.includes('high')) return 'high';
+  if (c.includes('low')) return 'low';
+  return 'medium';
+}
+
+function getSegmentContext(card) {
+  const driver = normalize(card.driver);
+  const title = normalize(card.title);
+  if (driver.includes('pricing') || driver.includes('discount')) return 'transient retail demand';
+  if (driver.includes('visibility') || driver.includes('conversion')) return 'direct channel demand';
+  if (title.includes('discount') || title.includes('promo') || title.includes('ota')) return 'OTA-driven demand';
+  return 'core transient demand';
+}
+
 function getCardTimeframe(card) {
   const temporal = (card.temporal_line || card.temporal_badge || '').trim();
   if (temporal) return temporal.toLowerCase();
@@ -1353,16 +1374,18 @@ function getCardTimeframe(card) {
 
 function getInterpretationFromMetrics(card) {
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const confidence = getConfidenceLevel(card);
+  const tone = confidence === 'high' ? 'clearly indicating' : (confidence === 'low' ? 'pointing to' : 'indicating');
   if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
-    return 'pricing resistance on shoulder demand';
+    return `${tone} pricing resistance`;
   }
   if (mpi !== null && ari !== null && mpi < 95 && ari < 100) {
-    return 'weak demand and conversion friction';
+    return `${tone} weak demand and conversion friction`;
   }
   if (rgi !== null && rgi < 100) {
-    return 'share underperformance versus comp set';
+    return `${tone} share underperformance versus comp set`;
   }
-  return 'share underperformance in current 14-day booking window';
+  return `${tone} share underperformance`;
 }
 
 function getPersistenceSignal(card) {
@@ -1384,29 +1407,34 @@ function buildInsightLine(card) {
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
   const timeframe = getCardTimeframe(card);
   const interpretation = getInterpretationFromMetrics(card);
+  const segment = getSegmentContext(card);
   const timeframePart = timeframe.includes('week') || timeframe.includes('day')
     ? `over ${timeframe}`
     : `during ${timeframe}`;
   if (mpi !== null && ari !== null) {
     const rgiPart = rgi !== null ? ` while RGI ${rgi.toFixed(1)}` : '';
-    return `ARI ${ari.toFixed(1)} vs comp while MPI ${mpi.toFixed(1)}${rgiPart} ${timeframePart}, indicating ${interpretation}`;
+    return `ARI ${ari.toFixed(1)} vs comp while MPI ${mpi.toFixed(1)}${rgiPart} ${timeframePart}, ${interpretation} on ${segment}`;
   }
   if (ari !== null && rgi !== null) {
-    return `ARI ${ari.toFixed(1)} with RGI ${rgi.toFixed(1)} ${timeframePart}, indicating ${interpretation}`;
+    return `ARI ${ari.toFixed(1)} with RGI ${rgi.toFixed(1)} ${timeframePart}, ${interpretation} on ${segment}`;
   }
-  return `MPI/ARI signal mix ${timeframePart}, indicating ${interpretation}`;
+  return `MPI/ARI signal mix ${timeframePart}, ${interpretation} on ${segment}`;
 }
 
 function buildWhyLine(card, insightText) {
   const financial = getQuantifiedFinancialLabel(card);
   const timeframe = getCardTimeframe(card);
-  const interpretation = getInterpretationFromMetrics(card);
+  const segment = getSegmentContext(card);
   const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
+  const confidence = getConfidenceLevel(card);
+  const cause = confidence === 'high'
+    ? 'current pricing is actively rejecting available demand'
+    : (confidence === 'low' ? 'current pricing is filtering demand in key windows' : 'current pricing is rejecting available demand');
   const fallback = card.value_at_stake > 0
-    ? `€${formatNumber(card.value_at_stake)} revenue at risk as ${interpretation} is reducing pickup, with continued share loss expected over next 2-3 weeks`
-    : `MPI ${mpi !== null ? mpi.toFixed(1) : '95'} and ARI ${ari !== null ? ari.toFixed(1) : '100'} indicate ${interpretation}, with continued share loss expected over next 2-3 weeks`;
+    ? `€${formatNumber(card.value_at_stake)} revenue at risk as ${cause} on ${segment}, leading to continued share loss over next 2-3 weeks`
+    : `MPI ${mpi !== null ? mpi.toFixed(1) : '95'} and ARI ${ari !== null ? ari.toFixed(1) : '100'} show demand rejection on ${segment}, leading to continued share loss over next 2-3 weeks`;
   const base = financial
-    ? `${financial} as ${interpretation} is reducing pickup in ${timeframe}, with continued share loss expected over next 2-3 weeks`
+    ? `${financial} as ${cause} on ${segment} in ${timeframe}, leading to continued share loss over next 2-3 weeks`
     : fallback;
   const similar = normalize(base) === normalize(insightText) || normalize(base).includes(normalize(insightText));
   return similar ? `${financial || fallback}` : base;
@@ -1849,23 +1877,24 @@ function deriveMarketContext(cards) {
 function buildDecisionLine(card) {
   const decision = card.phase5_decision || {};
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const segment = getSegmentContext(card);
   const timeframe = 'over next 14 days';
   const condition = (ari !== null && mpi !== null)
-    ? `where ARI ${ari.toFixed(1)} >105 and MPI ${mpi.toFixed(1)} <95`
+    ? `where ARI ${ari.toFixed(1)} > 105 and MPI ${mpi.toFixed(1)} < 95`
     : (rgi !== null ? `where RGI ${rgi.toFixed(1)} <100` : 'where pickup is below weekday target');
 
   if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
-    return `Reduce BAR premium by 5-8% on Tue-Thu ${timeframe} ${condition}`;
+    return `Reduce BAR by ~6% on ${segment} for Tue-Thu ${timeframe} ${condition}`;
   }
   if (ari !== null && mpi !== null && mpi < 95 && ari < 100) {
-    return `Increase discount depth by 3-5 points ${timeframe} where MPI ${mpi.toFixed(1)} <95 and ARI ${ari.toFixed(1)} <100`;
+    return `Increase discount depth by ~4 points on ${segment} ${timeframe} where MPI ${mpi.toFixed(1)} < 95 and ARI ${ari.toFixed(1)} < 100`;
   }
 
   const intent = (decision.decision_intent || '').toString().trim();
-  if (intent) return `${toSentence(intent).replace(/[.!?]$/, '')} ${timeframe} ${condition}`;
+  if (intent) return `${toSentence(intent).replace(/[.!?]$/, '')} on ${segment} ${timeframe} ${condition}`;
   const decisionTypeLabel = mapDecisionTypeToExecutiveText(decision.decision_type);
-  if (decisionTypeLabel) return `${decisionTypeLabel} ${timeframe} ${condition}`;
-  return `Adjust pricing and offer controls ${timeframe} ${condition}`;
+  if (decisionTypeLabel) return `${decisionTypeLabel} on ${segment} ${timeframe} ${condition}`;
+  return `Adjust pricing and offer controls on ${segment} ${timeframe} ${condition}`;
 }
 
 function buildActionLine(card) {
@@ -1876,14 +1905,15 @@ function buildActionLine(card) {
     actionSummary.recommended_direction ||
     actionSummary.action_summary ||
     '';
-  if (phase5Direction) return `${toSentence(phase5Direction).replace(/[.!?]$/, '')} with CRS updates within 72 hours`;
+  const segment = getSegmentContext(card);
+  if (phase5Direction) return `${toSentence(phase5Direction).replace(/[.!?]$/, '')} in CRS and RMS within 72 hours where pickup remains below pace on ${segment}`;
   const first = (card.action_lines || []).find(Boolean) || '';
-  if (first) return `${toSentence(first).replace(/[.!?]$/, '')} with RMS and channel rules updated within 72 hours`;
+  if (first) return `${toSentence(first).replace(/[.!?]$/, '')} in RMS and channel manager within 72 hours where pickup remains below pace on ${segment}`;
   const driver = normalize(card.driver);
-  if (driver.includes('pricing')) return 'Load 8-12% mobile-only discount on Tue-Thu and remove public BAR parity for those dates';
-  if (driver.includes('conversion')) return 'Set LOS minimum to 1 night on low-demand dates and re-sequence checkout steps for paid traffic';
-  if (driver.includes('discount')) return 'Rebuild discount tiers by channel and cap open discounts above booked pace threshold';
-  return 'Adjust LOS controls by weekday and push fenced offers in low-demand windows through channel manager';
+  if (driver.includes('pricing')) return 'Load 10% mobile-only discount in CRS and remove OTA parity on Tue-Thu where pickup remains below pace';
+  if (driver.includes('conversion')) return 'Push direct-website rate plan in channel manager and set LOS minimum to 1 night where checkout conversion remains below pace';
+  if (driver.includes('discount')) return 'Load OTA promo ladder in RMS and cap public discounts above pace threshold where OTA pickup remains below pace';
+  return 'Adjust LOS controls in RMS and push fenced offers through channel manager where pickup remains below pace';
 }
 
 function synthesizeCoreProblem(cards) {
@@ -1898,9 +1928,9 @@ function synthesizeCoreProblem(cards) {
   const totalRisk = cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
   if (ranked.length === 0) return `€${formatNumber(totalRisk)} revenue at risk over next 21 days with share pressure on key weekdays`;
   const phrase = {
-    pricing: 'pricing resistance on shoulder days',
-    discount: 'weak discount conversion',
-    conversion: 'conversion drag on direct channels'
+    pricing: 'pricing resistance on transient retail demand',
+    discount: 'ineffective OTA discounting',
+    conversion: 'conversion drag on direct channel demand'
   };
   return `€${formatNumber(totalRisk)} revenue at risk driven by ${ranked.map(k => phrase[k]).join(' and ')} over next 21 days`;
 }
@@ -1910,7 +1940,7 @@ function synthesizeImmediateFocus(cards) {
   if (!top) return 'Immediate: tighten pricing and discount controls on Tue-Thu over next 7-14 days';
   const decision = buildDecisionLine(top);
   const action = buildActionLine(top);
-  return `Immediate: ${decision}; ${action}`;
+  return `Immediate: ${decision}; ${action} over next 7-14 days`;
 }
 
 function renderDashboard() {
@@ -2051,6 +2081,7 @@ function renderCard(card) {
           <div class="badges-row">
             <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
             ${card.execution_owner ? `<span class="dept-badge">${escHtml(card.execution_owner)}</span>` : ''}
+            <span class="dept-badge">${escHtml(capitalize(getConfidenceLevel(card)))} confidence</span>
           </div>
         </div>
       </div>
