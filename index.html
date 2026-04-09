@@ -1337,6 +1337,19 @@ function getQuantifiedFinancialLabel(card) {
   return null;
 }
 
+function estimateFallbackImpact(card) {
+  const q = getQuantificationNode(card);
+  const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
+  if (Number.isFinite(roomNights) && roomNights > 0) {
+    return `~${Math.round(roomNights)} room nights at risk`;
+  }
+  const confidence = getConfidenceLevel(card);
+  if (card.priority === 'high' || card.priority === 'critical' || confidence === 'high') {
+    return 'High revenue exposure';
+  }
+  return 'Moderate revenue exposure';
+}
+
 function parseTriggerMetrics(triggerDisplay) {
   const txt = (triggerDisplay || '').toString();
   const read = (name) => {
@@ -1420,39 +1433,38 @@ function getPersistenceSignal(card) {
 
 function buildInsightLine(card) {
   const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
-  const timeframe = getCardTimeframe(card);
   const family = getIssueFamily(card);
   if (family === 'pricing') {
     const metricTail = (ari !== null && mpi !== null) ? ` (ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)})` : '';
-    return `Transient retail pricing stayed above market while occupancy share lagged over ${timeframe}.${metricTail}`;
+    return `Rate premium persisted while share underperformed${metricTail}`;
   }
   if (family === 'discount') {
-    return `Discount support stayed active, but occupancy share did not recover over ${timeframe}.`;
+    return 'Discounting increased but occupancy share did not recover';
   }
   if (family === 'direct') {
-    return `Direct demand capture stayed weak across the booking path over ${timeframe}.`;
+    return 'Direct-demand capture stayed weak across the booking path';
   }
-  return `Share performance stayed below target over ${timeframe}.`;
+  return 'Share performance stayed below target across key demand windows';
 }
 
 function buildWhyLine(card, insightText) {
   const financial = getQuantifiedFinancialLabel(card);
   const family = getIssueFamily(card);
   if (financial) {
-    if (family === 'pricing') return `${financial} on shoulder nights if current pricing holds.`;
-    if (family === 'discount') return `${financial} while discounting fails to recover enough occupancy share.`;
-    if (family === 'direct') return `${financial} from missed direct demand capture over the observed window.`;
-    return `${financial} over the observed window if current pattern continues.`;
+    if (family === 'pricing') return `${financial} on shoulder nights`;
+    if (family === 'discount') return `${financial} while discounting fails to recover share`;
+    if (family === 'direct') return `${financial} from missed direct-demand capture`;
+    return `${financial} across current priority windows`;
   }
   const q = getQuantificationNode(card);
   const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
   if (Number.isFinite(roomNights) && roomNights > 0) {
-    return `${Math.round(roomNights)} room nights at risk if current pattern continues.`;
+    return `~${Math.round(roomNights)} room nights at risk`;
   }
-  if (family === 'pricing') return 'Demand is being rejected at current rates, and occupancy share is being lost.';
-  if (family === 'discount') return 'Margin is being diluted without recovering enough occupancy share.';
-  if (family === 'direct') return 'Direct demand is leaking to other channels, and share is slipping.';
-  return 'Material share loss continues if current pattern holds.';
+  if (family === 'pricing') return 'Current pricing is rejecting demand and share is slipping';
+  if (family === 'discount') return 'Margin is being diluted without volume recovery';
+  if (family === 'direct') return 'Direct share is slipping despite available demand';
+  return estimateFallbackImpact(card);
 }
 
 function getObservedWindow(card) {
@@ -1496,6 +1508,40 @@ function buildTimingAwareExecution(card) {
     return `Adjust website direct-offer logic now and reassess ${timing}.`;
   }
   return `Apply channel controls now and reassess ${timing}.`;
+}
+
+function buildExecutionActions(card) {
+  const timing = getActionTimingBasis(card);
+  const family = getIssueFamily(card);
+  if (family === 'pricing') {
+    return [
+      'Adjust CRS/RMS pricing on Tue-Thu immediately',
+      'Remove weak public discounts and keep offers fenced',
+      `Monitor pickup ${timing}`,
+      'Reassess rate positioning from pickup response'
+    ];
+  }
+  if (family === 'discount') {
+    return [
+      'Tighten public discount depth immediately',
+      'Relaunch fenced OTA and direct offers',
+      `Review promo response ${timing}`,
+      'Cut offers that fail to lift share'
+    ];
+  }
+  if (family === 'direct') {
+    return [
+      'Fix website offer hierarchy immediately',
+      'Align direct rates in channel manager',
+      `Review direct bookings ${timing}`,
+      'Hold broad price support until direct pickup stabilizes'
+    ];
+  }
+  return [
+    'Adjust RMS controls immediately',
+    'Apply fenced offers on weak-demand windows',
+    `Review pickup ${timing}`
+  ];
 }
 
 function getPriority(engineAction, recommendation) {
@@ -1998,7 +2044,7 @@ function renderDashboard() {
   const criticalCount = visibleCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
   const actionedCount = visibleCards.filter(c => actionedIds.has(c.id)).length;
   const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
-  let summaryRevenueRiskLabel = 'Impact under review';
+  let summaryRevenueRiskLabel = visibleCards.length ? 'High revenue exposure' : 'Impact under review';
   if (summaryRangeTotals.max > 0) {
     if (summaryRangeTotals.min > 0 && Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) / summaryRangeTotals.min < 0.2) {
       summaryRevenueRiskLabel = `€${formatNumber(Math.round((summaryRangeTotals.min + summaryRangeTotals.max) / 2))} at risk`;
@@ -2080,10 +2126,11 @@ function renderCard(card) {
   const impactLine = buildWhyLine(card, signalLine);
   const persistenceSignal = getPersistenceSignal(card);
   const decisionLine = buildDecisionLine(card);
-  const actionLine = buildActionLine(card);
+  const executionActions = buildExecutionActions(card).slice(0, 4);
   const confidence = getConfidenceLevel(card);
   const confidenceBadge = confidence === 'low' ? '' : `<span class="dept-badge">${escHtml(capitalize(confidence))} confidence</span>`;
   const evidenceSubline = `Observed window: ${escHtml(getCardTimeframe(card))}`;
+  const executionList = executionActions.map(item => `<li>${escHtml(item)}</li>`).join('');
 
   return `
     <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
@@ -2123,7 +2170,7 @@ function renderCard(card) {
         </div>
         <div class="finding-section">
           <div class="section-label">EXECUTION</div>
-          <div class="action-line">${escHtml(actionLine)}</div>
+          <ul class="action-line" style="margin-left:16px; display:flex; flex-direction:column; gap:4px;">${executionList}</ul>
           <div style="margin-top:10px; text-align:right;">
             <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
               ${isActioned ? '✓ Actioned' : 'Mark as actioned'}
