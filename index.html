@@ -1190,6 +1190,76 @@ function buildDueDate(actionRows) {
   return due?.due_date || due?.dueDate || '—';
 }
 
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+}
+
+function getFindingJoinKey(obj = {}) {
+  const key = obj.finding_key ?? obj.issue_finding_key ?? obj.issue_key ?? obj.key ?? obj.action_id;
+  if (key === null || key === undefined) return '';
+  return String(key).trim();
+}
+
+function buildSummaryIndex(rows = []) {
+  const byKey = new Map();
+  const byTitle = new Map();
+  toArray(rows).forEach(row => {
+    if (!row || typeof row !== 'object') return;
+    const key = getFindingJoinKey(row);
+    const title = normalize(row.finding_title || row.title || row.issue_title || '');
+    if (key && !byKey.has(key)) byKey.set(key, row);
+    if (title && !byTitle.has(title)) byTitle.set(title, row);
+  });
+  return { byKey, byTitle };
+}
+
+function getFromSummary(index, findingKey, title) {
+  if (findingKey && index.byKey.has(findingKey)) return index.byKey.get(findingKey);
+  const normalizedTitle = normalize(title || '');
+  if (normalizedTitle && index.byTitle.has(normalizedTitle)) return index.byTitle.get(normalizedTitle);
+  return null;
+}
+
+function parseAmount(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value == null || value === '') return NaN;
+  const match = String(value).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : NaN;
+}
+
+function toSentence(value, fallback = '') {
+  const raw = (value || fallback || '').toString().trim();
+  if (!raw) return '';
+  const clean = raw.replace(/\s+/g, ' ').replace(/^[\-\u2022•\s]+/, '');
+  return /[.!?]$/.test(clean) ? clean : `${clean}.`;
+}
+
+function getQuantifiedFinancialLabel(card) {
+  const q = card.phase5_quantification || {};
+  const rr = q.revenue_range || q.revenueAtRiskRange || null;
+  if (rr) {
+    const minRaw = rr.min ?? rr.low ?? rr.from;
+    const maxRaw = rr.max ?? rr.high ?? rr.to;
+    const min = parseAmount(minRaw);
+    const max = parseAmount(maxRaw);
+    if (Number.isFinite(min) && Number.isFinite(max) && max > 0) {
+      return `SAR ${formatNumber(min)} - ${formatNumber(max)} at risk`;
+    }
+  }
+
+  const roomNights = q.room_nights_at_risk ?? q.roomNightsAtRisk;
+  if (Number.isFinite(Number(roomNights)) && Number(roomNights) > 0) {
+    return `${Math.round(Number(roomNights))} room nights at risk`;
+  }
+
+  if (card.value_at_stake > 0) {
+    return `SAR ${formatNumber(card.value_at_stake)} at risk`;
+  }
+  return 'Room nights at risk: not available';
+}
+
 function getPriority(engineAction, recommendation) {
   const priority = normalize(engineAction?.priority || recommendation?.priority || 'medium');
 
@@ -1243,6 +1313,10 @@ function buildTemporalCue(issue) {
 /** Phase 4 issue-led engine: one card per issue; DB rows keyed by issue finding_key. */
 function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
   const issues = Array.isArray(engineJson.issues) ? engineJson.issues : [];
+  const decisionIndex = buildSummaryIndex(engineJson?.decision_framing_summary?.issue_level_decisions || []);
+  const actionIntelIndex = buildSummaryIndex(engineJson?.action_intelligence_summary?.issue_level_actions || []);
+  const quantIndex = buildSummaryIndex(engineJson?.financial_quantification_summary?.issue_level_quantification || []);
+  const overallMarketContext = engineJson?.commercial_context_summary?.overall_market_context || '';
 
   const engineTotal =
     engineJson?.total_opportunity?.adjusted_opportunity?.high ||
@@ -1333,6 +1407,17 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
 
     const valueAtStake = getCardValue(engineAction, recommendation, linkedActions, engineTotal, issues.length);
     const temporalCue = buildTemporalCue(issue);
+    const phase5Decision = getFromSummary(decisionIndex, joinKey, issue.title) || {};
+    const phase5Action = getFromSummary(actionIntelIndex, joinKey, issue.title) || {};
+    const phase5Quant = getFromSummary(quantIndex, joinKey, issue.title) || {};
+    const issueControlledAction = (Array.isArray(issue.actions) ? issue.actions : []).find(a => a && (a.recommended_direction || a.action_summary)) || {};
+    const mappedPriority = normalize(
+      phase5Decision.decision_urgency ||
+      phase5Quant.impact_band ||
+      issue.priority ||
+      recommendation?.priority ||
+      'medium'
+    );
 
     return {
       id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction),
@@ -1350,7 +1435,9 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       action_lines: extractActionLines(linkedActions, engineAction),
       expected_outcome: expectedOutcome,
       value_at_stake: valueAtStake,
-      priority: getPriority(engineAction, recommendation),
+      priority: mappedPriority === 'critical' || mappedPriority === 'high'
+        ? 'high'
+        : (mappedPriority === 'low' ? 'low' : 'medium'),
       department: getOwnerDepartment(recommendation, engineAction),
       trigger_display: buildKpiTrigger(engineJson, issue),
       timeline: engineAction?.financial_impact?.impact_timeline || '—',
@@ -1358,6 +1445,11 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       driver: issue.driver || recommendation?.driver || '',
       temporal_badge: temporalCue?.badge || '',
       temporal_line: temporalCue?.line || '',
+      phase5_decision: phase5Decision,
+      phase5_action: phase5Action,
+      phase5_controlled_action: issueControlledAction,
+      phase5_quantification: phase5Quant,
+      market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
       raw_engine_action: engineAction
     };
@@ -1373,7 +1465,8 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       total_value: engineTotal || cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0),
       critical_count: cards.filter(c => c.priority === 'high' || c.priority === 'critical').length,
       findings_count: cards.length,
-      diagnosis_trigger: buildKpiTrigger(engineJson)
+      diagnosis_trigger: buildKpiTrigger(engineJson),
+      market_context: overallMarketContext
     }
   };
 }
@@ -1382,6 +1475,10 @@ function buildCardsFromData(engineRow, recommendations, actions) {
   const engineJson = typeof engineRow.engine_json === 'string'
     ? JSON.parse(engineRow.engine_json)
     : (engineRow.engine_json || {});
+  const decisionIndex = buildSummaryIndex(engineJson?.decision_framing_summary?.issue_level_decisions || []);
+  const actionIntelIndex = buildSummaryIndex(engineJson?.action_intelligence_summary?.issue_level_actions || []);
+  const quantIndex = buildSummaryIndex(engineJson?.financial_quantification_summary?.issue_level_quantification || []);
+  const overallMarketContext = engineJson?.commercial_context_summary?.overall_market_context || '';
 
   if (Array.isArray(engineJson.issues) && engineJson.issues.length > 0) {
     return buildCardsFromIssues(engineRow, engineJson, recommendations, actions);
@@ -1444,6 +1541,16 @@ function buildCardsFromData(engineRow, recommendations, actions) {
     const keyInsight = buildCardSpecificInsight(engineJson, recommendation, engineAction);
     const rootCause = buildRootCause(engineJson, recommendation, engineAction);
     const valueAtStake = getCardValue(engineAction, recommendation, linkedActions, engineTotal, uniqueEngineActions.length);
+    const phase5Decision = getFromSummary(decisionIndex, joinKey, engineAction.title) || {};
+    const phase5Action = getFromSummary(actionIntelIndex, joinKey, engineAction.title) || {};
+    const phase5Quant = getFromSummary(quantIndex, joinKey, engineAction.title) || {};
+    const mappedPriority = normalize(
+      phase5Decision.decision_urgency ||
+      phase5Quant.impact_band ||
+      engineAction.priority ||
+      recommendation?.priority ||
+      'medium'
+    );
 
     return {
       id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction),
@@ -1461,12 +1568,18 @@ function buildCardsFromData(engineRow, recommendations, actions) {
       action_lines: extractActionLines(linkedActions, engineAction),
       expected_outcome: buildExpectedOutcome(engineJson, recommendation, engineAction),
       value_at_stake: valueAtStake,
-      priority: getPriority(engineAction, recommendation),
+      priority: mappedPriority === 'critical' || mappedPriority === 'high'
+        ? 'high'
+        : (mappedPriority === 'low' ? 'low' : 'medium'),
       department: getOwnerDepartment(recommendation, engineAction),
       trigger_display: buildKpiTrigger(engineJson),
       timeline: engineAction?.financial_impact?.impact_timeline || '—',
       confidence: engineAction?.financial_impact?.confidence || '—',
       driver: engineAction?.driver || recommendation?.driver || '',
+      phase5_decision: phase5Decision,
+      phase5_action: phase5Action,
+      phase5_quantification: phase5Quant,
+      market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
       raw_engine_action: engineAction
     };
@@ -1482,7 +1595,8 @@ function buildCardsFromData(engineRow, recommendations, actions) {
       total_value: engineTotal || cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0),
       critical_count: cards.filter(c => c.priority === 'high' || c.priority === 'critical').length,
       findings_count: cards.length,
-      diagnosis_trigger: buildKpiTrigger(engineJson)
+      diagnosis_trigger: buildKpiTrigger(engineJson),
+      market_context: overallMarketContext
     }
   };
 }
@@ -1570,12 +1684,8 @@ function sortByPriorityAndRisk(cards) {
 }
 
 function deriveMarketContext(cards) {
-  const contexts = cards.map(card => {
-    const rec = card.raw_recommendation || {};
-    const eng = card.raw_engine_action || {};
-    return rec.market_context || rec.context || eng.market_context || '';
-  }).filter(Boolean);
-  if (contexts.length) return contexts[0];
+  const explicit = cards.map(card => card.market_context || '').filter(Boolean);
+  if (explicit.length) return explicit[0];
 
   const hasPricing = cards.some(c => normalize(c.driver).includes('pricing'));
   const hasVisibility = cards.some(c => normalize(c.driver).includes('visibility'));
@@ -1585,18 +1695,29 @@ function deriveMarketContext(cards) {
 }
 
 function buildDecisionLine(card) {
+  const decision = card.phase5_decision || {};
+  const phase5Label = decision.decision_type || decision.decision_intent || '';
+  if (phase5Label) return `Decision: ${toSentence(phase5Label).replace(/[.!?]$/, '')}`;
   const outcome = (card.expected_outcome || '').trim();
-  if (outcome) return `Decision required: ${outcome.charAt(0).toLowerCase()}${outcome.slice(1)}`;
+  if (outcome) return `Decision: ${toSentence(outcome).replace(/[.!?]$/, '')}`;
   const driver = normalize(card.driver);
-  if (driver.includes('pricing')) return 'Decision required: adjust pricing posture';
-  if (driver.includes('visibility')) return 'Decision required: increase market visibility';
-  if (driver.includes('conversion')) return 'Decision required: improve conversion posture';
-  return 'Decision required: confirm commercial response';
+  if (driver.includes('pricing')) return 'Decision: Reassess pricing posture';
+  if (driver.includes('visibility')) return 'Decision: Strengthen visibility strategy';
+  if (driver.includes('conversion')) return 'Decision: Improve conversion strategy';
+  return 'Decision: Confirm commercial response';
 }
 
 function buildActionLine(card) {
+  const controlled = card.phase5_controlled_action || {};
+  const actionSummary = card.phase5_action || {};
+  const phase5Direction =
+    controlled.recommended_direction ||
+    actionSummary.recommended_direction ||
+    actionSummary.action_summary ||
+    '';
+  if (phase5Direction) return toSentence(phase5Direction);
   const first = (card.action_lines || []).find(Boolean) || '';
-  if (first) return first.replace(/\.$/, '') + '.';
+  if (first) return toSentence(first);
   return 'Refine commercial execution to better align with demand conditions.';
 }
 
@@ -1607,7 +1728,7 @@ function renderDashboard() {
   const rankedCards = sortByPriorityAndRisk(cardsForPeriod).slice(0, 3);
   const summaryRevenueRisk = rankedCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
   const primary = rankedCards[0];
-  const marketContext = deriveMarketContext(rankedCards);
+  const marketContext = dashboardMeta?.market_context || deriveMarketContext(rankedCards);
 
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
@@ -1677,9 +1798,7 @@ function renderFindings() {
 
 function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
-  const impactRange = card.value_at_stake > 0
-    ? `${formatCurrency(Math.round(card.value_at_stake * 0.85))} - ${formatCurrency(card.value_at_stake)}`
-    : 'Room nights at risk: not available';
+  const impactRange = getQuantifiedFinancialLabel(card);
   const whyItMatters = card.key_insight || card.one_liner || 'Commercial momentum is exposed without intervention.';
   const decisionLine = buildDecisionLine(card);
   const actionLine = buildActionLine(card);
