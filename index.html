@@ -763,11 +763,11 @@ body {
           <div class="summary-value" id="summary-revenue-risk">€—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Executive Readout</div>
+          <div class="summary-label">Critical Priorities</div>
           <div class="summary-value" id="summary-primary-focus">—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Immediate Priority</div>
+          <div class="summary-label">Execution Progress</div>
           <div class="summary-value" id="summary-market-context">—</div>
         </div>
       </div>
@@ -1378,6 +1378,15 @@ function getObservedEvidence(card) {
   return { type: 'generic', mpi, ari, rgi };
 }
 
+function getIssueFamily(card) {
+  const d = normalize(card.driver);
+  const t = normalize(card.title);
+  if (d.includes('pricing') || t.includes('bar') || t.includes('rate')) return 'pricing';
+  if (d.includes('discount') || t.includes('discount') || t.includes('promo')) return 'discount';
+  if (d.includes('conversion') || d.includes('visibility') || t.includes('website') || t.includes('direct')) return 'direct';
+  return 'generic';
+}
+
 function getInterpretationFromMetrics(card) {
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
   const confidence = getConfidenceLevel(card);
@@ -1410,35 +1419,83 @@ function getPersistenceSignal(card) {
 }
 
 function buildInsightLine(card) {
-  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
   const timeframe = getCardTimeframe(card);
-  const segment = getSegmentContext(card).replace(' demand', '');
-  const evidence = getObservedEvidence(card);
-  const timeframePart = timeframe.includes('week') || timeframe.includes('day')
-    ? `over ${timeframe}`
-    : `during ${timeframe}`;
-  if (mpi !== null && ari !== null && evidence.type === 'pricing_resistance') {
-    return `ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)} ${timeframePart} on ${segment}.`;
+  const family = getIssueFamily(card);
+  if (family === 'pricing') {
+    const metricTail = (ari !== null && mpi !== null) ? ` (ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)})` : '';
+    return `Transient retail pricing stayed above market while occupancy share lagged over ${timeframe}.${metricTail}`;
   }
-  if (mpi !== null && ari !== null) {
-    return `MPI ${mpi.toFixed(1)} with ARI ${ari.toFixed(1)} ${timeframePart} on ${segment}.`;
+  if (family === 'discount') {
+    return `Discount support stayed active, but occupancy share did not recover over ${timeframe}.`;
   }
-  if (ari !== null && rgi !== null) {
-    return `ARI ${ari.toFixed(1)} with RGI ${rgi.toFixed(1)} ${timeframePart} on ${segment}.`;
+  if (family === 'direct') {
+    return `Direct demand capture stayed weak across the booking path over ${timeframe}.`;
   }
-  return `Pickup remains weak ${timeframePart} on ${segment}.`;
+  return `Share performance stayed below target over ${timeframe}.`;
 }
 
 function buildWhyLine(card, insightText) {
   const financial = getQuantifiedFinancialLabel(card);
-  const segment = getSegmentContext(card).replace(' demand', '');
-  if (financial) return `${financial} from continued demand rejection on ${segment}.`;
+  const family = getIssueFamily(card);
+  if (financial) {
+    if (family === 'pricing') return `${financial} on shoulder nights if current pricing holds.`;
+    if (family === 'discount') return `${financial} while discounting fails to recover enough occupancy share.`;
+    if (family === 'direct') return `${financial} from missed direct demand capture over the observed window.`;
+    return `${financial} over the observed window if current pattern continues.`;
+  }
   const q = getQuantificationNode(card);
   const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
   if (Number.isFinite(roomNights) && roomNights > 0) {
     return `${Math.round(roomNights)} room nights at risk if current pattern continues.`;
   }
-  return 'Material share loss continues if pricing holds.';
+  if (family === 'pricing') return 'Demand is being rejected at current rates, and occupancy share is being lost.';
+  if (family === 'discount') return 'Margin is being diluted without recovering enough occupancy share.';
+  if (family === 'direct') return 'Direct demand is leaking to other channels, and share is slipping.';
+  return 'Material share loss continues if current pattern holds.';
+}
+
+function getObservedWindow(card) {
+  const tf = getCardTimeframe(card);
+  if (tf.includes('week') || tf.includes('day')) return tf;
+  return 'the observed window';
+}
+
+function getActionTimingBasis(card) {
+  const text = `${normalize(card.title)} ${normalize(card.temporal_line)} ${normalize(card.temporal_badge)}`;
+  if (text.includes('tue') || text.includes('thu') || text.includes('shoulder')) {
+    return 'after the next shoulder-night pickup cycle';
+  }
+  if (text.includes('direct') || text.includes('website')) {
+    return 'after the next direct-booking response window';
+  }
+  if (text.includes('week') || text.includes('persistent') || text.includes('recurring')) {
+    return 'after the next pickup cycle';
+  }
+  return 'after the next pickup cycle';
+}
+
+function buildTimingAwareDecision(card) {
+  const family = getIssueFamily(card);
+  if (family === 'pricing') return 'Lower transient BAR on shoulder nights.';
+  if (family === 'discount') return 'Tighten public discounting and keep support fenced.';
+  if (family === 'direct') return 'Fix direct-path conversion before widening price support.';
+  return 'Correct price and offer posture on weak-demand windows.';
+}
+
+function buildTimingAwareExecution(card) {
+  const family = getIssueFamily(card);
+  const timing = getActionTimingBasis(card);
+  if (family === 'pricing') {
+    return `Update CRS/RMS pricing now and reassess ${timing}.`;
+  }
+  if (family === 'discount') {
+    return `Remove weak public promos now and reassess ${timing}.`;
+  }
+  if (family === 'direct') {
+    return `Adjust website direct-offer logic now and reassess ${timing}.`;
+  }
+  return `Apply channel controls now and reassess ${timing}.`;
 }
 
 function getPriority(engineAction, recommendation) {
@@ -1876,37 +1933,11 @@ function deriveMarketContext(cards) {
 }
 
 function buildDecisionLine(card) {
-  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
-  const segment = getSegmentContext(card).replace(' demand', '');
-  if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
-    return `Lower BAR on shoulder nights over next 14 days on ${segment}, based on observed pricing resistance.`;
-  }
-  if (mpi !== null && ari !== null && mpi < 95 && ari < 100) {
-    return `Tighten discount depth this week on ${segment}, based on observed weak demand response.`;
-  }
-  if (rgi !== null && rgi < 100) {
-    return `Hold rate floor and correct channel mix over next 10 days on ${segment}.`;
-  }
-  return `Reprice low-pickup nights over next 14 days on ${segment}.`;
+  return buildTimingAwareDecision(card);
 }
 
 function buildActionLine(card) {
-  const controlled = card.phase5_controlled_action || {};
-  const actionSummary = card.phase5_action || {};
-  const phase5Direction =
-    controlled.recommended_direction ||
-    actionSummary.recommended_direction ||
-    actionSummary.action_summary ||
-    '';
-  const segment = getSegmentContext(card).replace(' demand', '');
-  if (phase5Direction) return `Update CRS and RMS pricing for Tue-Thu and review pickup in 72 hours on ${segment}.`;
-  const first = (card.action_lines || []).find(Boolean) || '';
-  if (first) return `Apply ${toSentence(first).replace(/[.!?]$/, '')} in RMS and verify pickup daily on ${segment}.`;
-  const driver = normalize(card.driver);
-  if (driver.includes('pricing')) return 'Update CRS and RMS pricing for Tue-Thu and check pickup within 72 hours.';
-  if (driver.includes('conversion')) return 'Hold BAR, update website offer hierarchy, and monitor checkout pickup daily.';
-  if (driver.includes('discount')) return 'Remove public discount leakage and relaunch fenced OTA offers with daily pickup checks.';
-  return 'Adjust RMS rate controls and monitor channel pickup every day this week.';
+  return buildTimingAwareExecution(card);
 }
 
 function synthesizeCoreProblem(cards) {
@@ -1930,11 +1961,11 @@ function synthesizeCoreProblem(cards) {
 
 function synthesizeImmediateFocus(cards) {
   const top = cards[0];
-  if (!top) return 'Reprice shoulder nights and tighten discount structure this week.';
+  if (!top) return 'Reprice shoulder nights and tighten discount structure on the next pickup cycle.';
   const d = normalize(top.driver);
-  if (d.includes('pricing') || d.includes('discount')) return 'Reprice shoulder nights and tighten discount structure this week.';
-  if (d.includes('conversion') || d.includes('visibility')) return 'Correct transient pricing first, then fix direct-channel conversion this week.';
-  return 'Correct price and discount controls first, then verify pickup in 72 hours.';
+  if (d.includes('pricing') || d.includes('discount')) return 'Reprice shoulder nights and tighten discount structure on the next pickup cycle.';
+  if (d.includes('conversion') || d.includes('visibility')) return 'Correct transient pricing first, then fix direct-channel conversion before the next direct-booking window.';
+  return 'Correct price and discount controls first, then reassess after the next pickup cycle.';
 }
 
 function renderDashboard() {
@@ -1961,21 +1992,18 @@ function renderDashboard() {
   }, 0);
   const summaryLegacyValue = visibleCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
   const strongestVisibleValue = visibleCards.reduce((max, card) => Math.max(max, Number(card.value_at_stake) || 0), 0);
-  const coreProblem = synthesizeCoreProblem(visibleCards);
-  const immediateFocus = synthesizeImmediateFocus(visibleCards);
-
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
   const totalValue = summaryLegacyValue || dashboardMeta?.total_value || 0;
-  const criticalCount = rankedCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
-  const actionedCount = rankedCards.filter(c => actionedIds.has(c.id)).length;
+  const criticalCount = visibleCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
+  const actionedCount = visibleCards.filter(c => actionedIds.has(c.id)).length;
   const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
   let summaryRevenueRiskLabel = 'Impact under review';
   if (summaryRangeTotals.max > 0) {
     if (summaryRangeTotals.min > 0 && Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) / summaryRangeTotals.min < 0.2) {
       summaryRevenueRiskLabel = `€${formatNumber(Math.round((summaryRangeTotals.min + summaryRangeTotals.max) / 2))} at risk`;
     } else if (Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) < 1) {
-      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.max)} at risk (next 21 days)`;
+      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.max)} at risk`;
     } else {
       summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.min)}-€${formatNumber(summaryRangeTotals.max)} at risk`;
     }
@@ -1997,8 +2025,8 @@ function renderDashboard() {
   document.getElementById('stat-actioned').textContent = actionedCount;
   document.getElementById('badge-count').textContent = rankedCards.length;
   document.getElementById('summary-revenue-risk').textContent = summaryRevenueRiskLabel;
-  document.getElementById('summary-primary-focus').textContent = coreProblem;
-  document.getElementById('summary-market-context').textContent = immediateFocus;
+  document.getElementById('summary-primary-focus').textContent = String(criticalCount);
+  document.getElementById('summary-market-context').textContent = String(actionedCount);
 
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-pct').textContent = pct + '%';
