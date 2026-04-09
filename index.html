@@ -730,7 +730,7 @@ body {
         <div class="gop-stat">
           <div class="gop-label">Critical Priorities</div>
           <div class="gop-value" id="stat-critical">—</div>
-          <div class="gop-sub">Require immediate executive focus</div>
+          <div class="gop-sub">Executive priorities</div>
         </div>
         <div class="gop-stat">
           <div class="gop-label">Findings This Cycle</div>
@@ -740,7 +740,7 @@ body {
         <div class="gop-stat">
           <div class="gop-label">Execution Progress</div>
           <div class="gop-value" id="stat-actioned">0</div>
-          <div class="gop-sub">Findings marked actioned</div>
+          <div class="gop-sub">Actioned findings</div>
         </div>
       </div>
 
@@ -769,7 +769,7 @@ body {
           <div class="summary-value" id="summary-primary-focus">—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Market מצב</div>
+          <div class="summary-label">Market Context</div>
           <div class="summary-value" id="summary-market-context">—</div>
         </div>
       </div>
@@ -1197,26 +1197,31 @@ function toArray(value) {
 }
 
 function getFindingJoinKey(obj = {}) {
-  const key = obj.finding_key ?? obj.issue_finding_key ?? obj.issue_key ?? obj.key ?? obj.action_id;
+  const key = obj.finding_key ?? obj.issue_finding_key ?? obj.issue_key ?? obj.key ?? obj.action_id ?? obj.findingId ?? obj.finding_id;
   if (key === null || key === undefined) return '';
   return String(key).trim();
 }
 
 function buildSummaryIndex(rows = []) {
   const byKey = new Map();
+  const byNormalizedKey = new Map();
   const byTitle = new Map();
   toArray(rows).forEach(row => {
     if (!row || typeof row !== 'object') return;
     const key = getFindingJoinKey(row);
+    const normalizedKey = normalizeJoinKeyForLookup(key);
     const title = normalize(row.finding_title || row.title || row.issue_title || '');
     if (key && !byKey.has(key)) byKey.set(key, row);
+    if (normalizedKey && !byNormalizedKey.has(normalizedKey)) byNormalizedKey.set(normalizedKey, row);
     if (title && !byTitle.has(title)) byTitle.set(title, row);
   });
-  return { byKey, byTitle };
+  return { byKey, byNormalizedKey, byTitle };
 }
 
 function getFromSummary(index, findingKey, title) {
   if (findingKey && index.byKey.has(findingKey)) return index.byKey.get(findingKey);
+  const normalizedKey = normalizeJoinKeyForLookup(findingKey);
+  if (normalizedKey && index.byNormalizedKey.has(normalizedKey)) return index.byNormalizedKey.get(normalizedKey);
   const normalizedTitle = normalize(title || '');
   if (normalizedTitle && index.byTitle.has(normalizedTitle)) return index.byTitle.get(normalizedTitle);
   return null;
@@ -1236,23 +1241,89 @@ function toSentence(value, fallback = '') {
   return /[.!?]$/.test(clean) ? clean : `${clean}.`;
 }
 
-function getQuantifiedFinancialLabel(card) {
-  const q = card.phase5_quantification || {};
-  const rr = q.revenue_range || q.revenueAtRiskRange || null;
-  if (rr) {
-    const minRaw = rr.min ?? rr.low ?? rr.from;
-    const maxRaw = rr.max ?? rr.high ?? rr.to;
-    const min = parseAmount(minRaw);
-    const max = parseAmount(maxRaw);
-    if (Number.isFinite(min) && Number.isFinite(max) && max > 0) {
-      return `SAR ${formatNumber(min)} - ${formatNumber(max)} at risk`;
-    }
+function humanizeEnumLabel(value, suffixToTrim = '') {
+  const raw = (value || '').toString().trim();
+  if (!raw) return '';
+  let cleaned = raw.toLowerCase();
+  if (suffixToTrim && cleaned.endsWith(suffixToTrim.toLowerCase())) {
+    cleaned = cleaned.slice(0, -suffixToTrim.length);
   }
+  cleaned = cleaned.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
-  const roomNights = q.room_nights_at_risk ?? q.roomNightsAtRisk;
-  if (Number.isFinite(Number(roomNights)) && Number(roomNights) > 0) {
-    return `${Math.round(Number(roomNights))} room nights at risk`;
+function normalizeJoinKeyForLookup(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function formatRiskRange(minValue, maxValue) {
+  const min = parseAmount(minValue);
+  const max = parseAmount(maxValue);
+  if (Number.isFinite(min) && Number.isFinite(max) && max > 0) {
+    return `SAR ${formatNumber(min)}-${formatNumber(max)} at risk`;
   }
+  return '';
+}
+
+function formatRoomNightsRisk(value) {
+  const roomNights = Number(value);
+  if (Number.isFinite(roomNights) && roomNights > 0) {
+    return `${Math.round(roomNights)} room nights at risk`;
+  }
+  return '';
+}
+
+function humanizeMarketContext(context) {
+  const raw = normalize(context);
+  const mapping = {
+    demand_or_share_softness_context: 'Soft demand / share pressure',
+    pricing_friction_context: 'Pricing friction',
+    discount_inefficiency_context: 'Discount inefficiency',
+    constrained_inventory_context: 'Constrained inventory',
+    mixed_context: 'Mixed commercial signals',
+    unclear_context: 'Unclear commercial context'
+  };
+  if (!raw) return '';
+  if (mapping[raw]) return mapping[raw];
+  return humanizeEnumLabel(raw, '_context') || context;
+}
+
+function mapDecisionTypeToExecutiveText(value) {
+  const raw = normalize(value);
+  const mapping = {
+    pricing_adjustment: 'Reassess pricing posture',
+    discount_strategy_review: 'Review discount strategy',
+    conversion_optimization: 'Strengthen conversion efficiency',
+    demand_generation: 'Stimulate demand',
+    mix_rebalancing: 'Rebalance mix',
+    monitoring_only: 'Monitor before acting'
+  };
+  if (!raw) return '';
+  if (mapping[raw]) return mapping[raw];
+  return humanizeEnumLabel(raw);
+}
+
+function getQuantificationNode(card) {
+  const q = card.phase5_quantification || {};
+  const nested = q.financial_quantification || q.quantification || q;
+  return nested && typeof nested === 'object' ? nested : {};
+}
+
+function getQuantifiedFinancialLabel(card) {
+  const q = getQuantificationNode(card);
+  const rr = q.revenue_range || q.revenueAtRiskRange || q.revenue_at_risk_range || null;
+  const rangeLabel = rr
+    ? formatRiskRange(rr.min ?? rr.low ?? rr.from, rr.max ?? rr.high ?? rr.to)
+    : '';
+  if (rangeLabel) return rangeLabel;
+
+  const roomNightsLabel = formatRoomNightsRisk(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
+  if (roomNightsLabel) return roomNightsLabel;
 
   if (card.value_at_stake > 0) {
     return `SAR ${formatNumber(card.value_at_stake)} at risk`;
@@ -1685,19 +1756,21 @@ function sortByPriorityAndRisk(cards) {
 
 function deriveMarketContext(cards) {
   const explicit = cards.map(card => card.market_context || '').filter(Boolean);
-  if (explicit.length) return explicit[0];
+  if (explicit.length) return humanizeMarketContext(explicit[0]);
 
   const hasPricing = cards.some(c => normalize(c.driver).includes('pricing'));
   const hasVisibility = cards.some(c => normalize(c.driver).includes('visibility'));
-  if (hasPricing && hasVisibility) return 'Soft demand';
-  if (hasPricing) return 'Price-sensitive demand';
+  if (hasPricing && hasVisibility) return 'Soft demand / share pressure';
+  if (hasPricing) return 'Pricing friction';
   return 'Soft demand';
 }
 
 function buildDecisionLine(card) {
   const decision = card.phase5_decision || {};
-  const phase5Label = decision.decision_type || decision.decision_intent || '';
-  if (phase5Label) return `Decision: ${toSentence(phase5Label).replace(/[.!?]$/, '')}`;
+  const intent = (decision.decision_intent || '').toString().trim();
+  if (intent) return `Decision: ${toSentence(intent).replace(/[.!?]$/, '')}`;
+  const decisionTypeLabel = mapDecisionTypeToExecutiveText(decision.decision_type);
+  if (decisionTypeLabel) return `Decision: ${decisionTypeLabel}`;
   const outcome = (card.expected_outcome || '').trim();
   if (outcome) return `Decision: ${toSentence(outcome).replace(/[.!?]$/, '')}`;
   const driver = normalize(card.driver);
@@ -1726,16 +1799,41 @@ function renderDashboard() {
     ? dashboardCards.filter(card => card.period_label === currentPeriod)
     : [...dashboardCards];
   const rankedCards = sortByPriorityAndRisk(cardsForPeriod).slice(0, 3);
-  const summaryRevenueRisk = rankedCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
+  const visibleCards = getFilteredCards();
+  const summaryRangeTotals = visibleCards.reduce((acc, card) => {
+    const q = getQuantificationNode(card);
+    const rr = q.revenue_range || q.revenueAtRiskRange || q.revenue_at_risk_range || null;
+    if (rr) {
+      const min = parseAmount(rr.min ?? rr.low ?? rr.from);
+      const max = parseAmount(rr.max ?? rr.high ?? rr.to);
+      if (Number.isFinite(min)) acc.min += min;
+      if (Number.isFinite(max)) acc.max += max;
+    }
+    return acc;
+  }, { min: 0, max: 0 });
+  const summaryRoomNights = visibleCards.reduce((sum, card) => {
+    const q = getQuantificationNode(card);
+    const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
+    return Number.isFinite(roomNights) && roomNights > 0 ? sum + roomNights : sum;
+  }, 0);
+  const summaryLegacyValue = visibleCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
   const primary = rankedCards[0];
-  const marketContext = dashboardMeta?.market_context || deriveMarketContext(rankedCards);
+  const marketContext = humanizeMarketContext(dashboardMeta?.market_context || deriveMarketContext(rankedCards));
 
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
-  const totalValue = summaryRevenueRisk || dashboardMeta?.total_value || 0;
+  const totalValue = summaryLegacyValue || dashboardMeta?.total_value || 0;
   const criticalCount = rankedCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
   const actionedCount = rankedCards.filter(c => actionedIds.has(c.id)).length;
   const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
+  let summaryRevenueRiskLabel = 'SAR —';
+  if (summaryRangeTotals.max > 0) {
+    summaryRevenueRiskLabel = `SAR ${formatNumber(summaryRangeTotals.min)}-${formatNumber(summaryRangeTotals.max)} at risk`;
+  } else if (summaryRoomNights > 0) {
+    summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
+  } else if (summaryLegacyValue > 0) {
+    summaryRevenueRiskLabel = `SAR ${formatNumber(summaryLegacyValue)} at risk`;
+  }
 
   document.getElementById('sidebar-hotel').textContent = hotelName;
   document.getElementById('sidebar-period').textContent = periodLabel;
@@ -1746,7 +1844,7 @@ function renderDashboard() {
   document.getElementById('stat-findings').textContent = rankedCards.length;
   document.getElementById('stat-actioned').textContent = actionedCount;
   document.getElementById('badge-count').textContent = rankedCards.length;
-  document.getElementById('summary-revenue-risk').textContent = formatCurrency(summaryRevenueRisk);
+  document.getElementById('summary-revenue-risk').textContent = summaryRevenueRiskLabel;
   document.getElementById('summary-primary-focus').textContent = primary?.title || '—';
   document.getElementById('summary-market-context').textContent = marketContext;
 
@@ -1800,6 +1898,12 @@ function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
   const impactRange = getQuantifiedFinancialLabel(card);
   const whyItMatters = card.key_insight || card.one_liner || 'Commercial momentum is exposed without intervention.';
+  const normalizedTitle = normalize(card.title);
+  const normalizedInsight = normalize(whyItMatters);
+  const hasDuplicatedInsight = normalizedTitle && normalizedInsight && (normalizedInsight === normalizedTitle || normalizedInsight.includes(normalizedTitle) || normalizedTitle.includes(normalizedInsight));
+  const insightText = hasDuplicatedInsight
+    ? toSentence(card.one_liner || card.expected_outcome || 'Commercial pressure detected').replace(/[.!?]$/, '')
+    : (card.one_liner || whyItMatters);
   const decisionLine = buildDecisionLine(card);
   const actionLine = buildActionLine(card);
 
@@ -1827,7 +1931,7 @@ function renderCard(card) {
       <div class="finding-body">
         <div class="finding-section">
           <div class="section-label">Insight</div>
-          <div class="section-text">${escHtml(card.title)}</div>
+          <div class="section-text">${escHtml(insightText)}</div>
         </div>
         <div class="finding-section">
           <div class="section-label">Why It Matters</div>
