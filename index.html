@@ -1337,17 +1337,43 @@ function getQuantifiedFinancialLabel(card) {
   return null;
 }
 
+function estimateFallbackImpactValue(card) {
+  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const family = getIssueFamily(card);
+  const confidence = getConfidenceLevel(card);
+  const priority = normalize(card.priority);
+  let base = 0;
+
+  if (family === 'pricing') base = 40000;
+  else if (family === 'discount') base = 25000;
+  else if (family === 'direct') base = 30000;
+  else base = 20000;
+
+  if (priority === 'high' || priority === 'critical') base *= 1.35;
+  if (confidence === 'high') base *= 1.2;
+  if (confidence === 'low') base *= 0.8;
+
+  if (ari !== null && mpi !== null) {
+    const gap = Math.max(0, ari - mpi);
+    base += gap * 450;
+  } else if (rgi !== null && rgi < 100) {
+    base += (100 - rgi) * 500;
+  }
+
+  const rounded = Math.round(base / 5000) * 5000;
+  return rounded > 0 ? rounded : 0;
+}
+
 function estimateFallbackImpact(card) {
   const q = getQuantificationNode(card);
   const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
   if (Number.isFinite(roomNights) && roomNights > 0) {
     return `~${Math.round(roomNights)} room nights at risk`;
   }
+  const estimated = estimateFallbackImpactValue(card);
+  if (estimated > 0) return `€${formatNumber(estimated)}+ estimated revenue at risk`;
   const confidence = getConfidenceLevel(card);
-  if (card.priority === 'high' || card.priority === 'critical' || confidence === 'high') {
-    return 'High revenue exposure';
-  }
-  return 'Moderate revenue exposure';
+  return confidence === 'high' ? 'High revenue exposure' : 'Moderate revenue exposure';
 }
 
 function parseTriggerMetrics(triggerDisplay) {
@@ -1435,35 +1461,38 @@ function buildInsightLine(card) {
   const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
   const family = getIssueFamily(card);
   if (family === 'pricing') {
-    const metricTail = (ari !== null && mpi !== null) ? ` (ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)})` : '';
-    return `Rate premium persisted while share underperformed${metricTail}`;
+    const metricTail = (ari !== null && mpi !== null) ? ` (ARI ${ari.toFixed(1)} / MPI ${mpi.toFixed(1)})` : '';
+    return `Rate premium held while share dropped${metricTail}.`;
   }
   if (family === 'discount') {
-    return 'Discounting increased but occupancy share did not recover';
+    return 'Discounting increased, but occupancy share did not recover.';
   }
   if (family === 'direct') {
-    return 'Direct-demand capture stayed weak across the booking path';
+    return 'Direct demand weakened despite visible rate support.';
   }
-  return 'Share performance stayed below target across key demand windows';
+  return 'Share stayed below target across core demand windows.';
 }
 
 function buildWhyLine(card, insightText) {
   const financial = getQuantifiedFinancialLabel(card);
   const family = getIssueFamily(card);
+  const scope = inferScopeReference(card);
   if (financial) {
-    if (family === 'pricing') return `${financial} on shoulder nights`;
-    if (family === 'discount') return `${financial} while discounting fails to recover share`;
-    if (family === 'direct') return `${financial} from missed direct-demand capture`;
-    return `${financial} across current priority windows`;
+    if (family === 'pricing') return `${financial} on ${scope}.`;
+    if (family === 'discount') return `${financial} while discounting fails to recover share.`;
+    if (family === 'direct') return `${financial} from missed direct-demand capture.`;
+    return `${financial} across current priority windows.`;
   }
   const q = getQuantificationNode(card);
   const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
   if (Number.isFinite(roomNights) && roomNights > 0) {
-    return `~${Math.round(roomNights)} room nights at risk`;
+    return `~${Math.round(roomNights)} room nights at risk on ${scope}.`;
   }
-  if (family === 'pricing') return 'Current pricing is rejecting demand and share is slipping';
-  if (family === 'discount') return 'Margin is being diluted without volume recovery';
-  if (family === 'direct') return 'Direct share is slipping despite available demand';
+  const estimated = estimateFallbackImpact(card);
+  if (estimated && estimated.includes('estimated')) return `${estimated} on ${scope}.`;
+  if (family === 'pricing') return 'Current pricing is rejecting demand and share is slipping.';
+  if (family === 'discount') return 'Margin is being diluted without enough share recovery.';
+  if (family === 'direct') return 'Direct share is slipping despite available demand.';
   return estimateFallbackImpact(card);
 }
 
@@ -1475,6 +1504,9 @@ function getObservedWindow(card) {
 
 function getActionTimingBasis(card) {
   const text = `${normalize(card.title)} ${normalize(card.temporal_line)} ${normalize(card.temporal_badge)}`;
+  if (text.includes('sunday')) return 'after next Sunday booking peak';
+  if (text.includes('weekend')) return 'before next weekend demand window';
+  if (text.includes('tue') || text.includes('thu')) return 'after next Sunday booking peak';
   if (text.includes('tue') || text.includes('thu') || text.includes('shoulder')) {
     return 'after the next shoulder-night pickup cycle';
   }
@@ -1487,10 +1519,22 @@ function getActionTimingBasis(card) {
   return 'after the next pickup cycle';
 }
 
+function inferScopeReference(card) {
+  const text = `${normalize(card.title)} ${normalize(card.temporal_line)} ${normalize(card.period_label)}`;
+  if (text.includes('tue') || text.includes('thu')) return 'Tue-Thu';
+  if (text.includes('weekend')) return 'weekend demand windows';
+  if (text.includes('shoulder')) return 'shoulder nights';
+  const family = getIssueFamily(card);
+  if (family === 'direct') return 'direct channel';
+  if (family === 'discount') return 'OTA promotions';
+  return 'shoulder nights';
+}
+
 function buildTimingAwareDecision(card) {
   const family = getIssueFamily(card);
-  if (family === 'pricing') return 'Lower transient BAR on shoulder nights.';
-  if (family === 'discount') return 'Tighten public discounting and keep support fenced.';
+  const scope = inferScopeReference(card);
+  if (family === 'pricing') return `Lower BAR on ${scope}.`;
+  if (family === 'discount') return 'Tighten public discounting and fence remaining offers.';
   if (family === 'direct') return 'Fix direct-path conversion before widening price support.';
   return 'Correct price and offer posture on weak-demand windows.';
 }
@@ -1513,28 +1557,29 @@ function buildTimingAwareExecution(card) {
 function buildExecutionActions(card) {
   const timing = getActionTimingBasis(card);
   const family = getIssueFamily(card);
+  const scope = inferScopeReference(card);
   if (family === 'pricing') {
     return [
-      'Adjust CRS/RMS pricing on Tue-Thu immediately',
-      'Remove weak public discounts and keep offers fenced',
-      `Monitor pickup ${timing}`,
-      'Reassess rate positioning from pickup response'
+      `Lower CRS/RMS pricing on ${scope} immediately`,
+      'Remove unnecessary BAR premium on those nights',
+      'Keep any discount support fenced rather than public',
+      `Check pickup again ${timing}`
     ];
   }
   if (family === 'discount') {
     return [
-      'Tighten public discount depth immediately',
-      'Relaunch fenced OTA and direct offers',
-      `Review promo response ${timing}`,
-      'Cut offers that fail to lift share'
+      'Pull weak public discounts on underperforming nights',
+      'Keep remaining support behind fenced offers only',
+      'Cut promotions that dilute rate without lifting share',
+      `Review response ${timing}`
     ];
   }
   if (family === 'direct') {
     return [
-      'Fix website offer hierarchy immediately',
-      'Align direct rates in channel manager',
-      `Review direct bookings ${timing}`,
-      'Hold broad price support until direct pickup stabilizes'
+      'Correct direct-offer logic before widening price support',
+      'Align website, CRS, and channel-manager offer setup',
+      'Hold broad price moves until direct demand response stabilizes',
+      `Review response ${timing}`
     ];
   }
   return [
@@ -2038,6 +2083,10 @@ function renderDashboard() {
   }, 0);
   const summaryLegacyValue = visibleCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
   const strongestVisibleValue = visibleCards.reduce((max, card) => Math.max(max, Number(card.value_at_stake) || 0), 0);
+  const estimatedExposureTotal = visibleCards.reduce((sum, card) => {
+    const est = estimateFallbackImpactValue(card);
+    return est > 0 ? sum + est : sum;
+  }, 0);
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
   const totalValue = summaryLegacyValue || dashboardMeta?.total_value || 0;
@@ -2055,6 +2104,8 @@ function renderDashboard() {
     }
   } else if (strongestVisibleValue > 0) {
     summaryRevenueRiskLabel = `€${formatNumber(strongestVisibleValue)} at risk`;
+  } else if (estimatedExposureTotal > 0) {
+    summaryRevenueRiskLabel = `€${formatNumber(estimatedExposureTotal)}+ estimated at risk`;
   } else if (summaryRoomNights > 0) {
     summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
   } else if (summaryLegacyValue > 0 && visibleCards.length === 0) {
