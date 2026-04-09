@@ -355,6 +355,31 @@ body {
   border-bottom: 1px solid var(--gray-200);
   padding-bottom: 0;
 }
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.summary-pill {
+  background: linear-gradient(135deg, rgba(15,31,61,0.97) 0%, rgba(27,58,107,0.94) 100%);
+  border: 1px solid rgba(201,168,76,0.22);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.summary-label {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 6px;
+}
+.summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold-light);
+  line-height: 1.3;
+}
 
 .tab {
   padding: 10px 18px;
@@ -391,19 +416,12 @@ body {
   border-radius: 10px;
   overflow: hidden;
   transition: box-shadow 0.2s, border-color 0.2s;
-  cursor: pointer;
 }
 
 .finding-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
-.finding-card.expanded { border-color: rgba(201,168,76,0.35); box-shadow: 0 4px 20px rgba(201,168,76,0.08); }
 .finding-card.actioned { opacity: 0.58; }
 
-.finding-header {
-  display: grid;
-  grid-template-columns: 6px 1fr auto;
-  align-items: stretch;
-  min-height: 82px;
-}
+.finding-header { display: grid; grid-template-columns: 6px 1fr auto; align-items: stretch; min-height: 82px; }
 
 .priority-stripe { width: 6px; flex-shrink: 0; }
 .priority-stripe.critical { background: var(--red); }
@@ -420,8 +438,8 @@ body {
 }
 
 .finding-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
   color: var(--navy);
   line-height: 1.3;
 }
@@ -444,26 +462,8 @@ body {
   background: linear-gradient(to bottom, #fafaf8, #f5f5f2);
 }
 
-.trigger-metric-value {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 28px;
-  font-weight: 500;
-  color: var(--navy);
-  line-height: 1;
-  text-align: right;
-  letter-spacing: -0.3px;
-}
-
-.trigger-metric-label {
-  font-size: 9px;
-  color: var(--gray-400);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  text-align: right;
-  margin-top: 2px;
-  margin-bottom: 6px;
-  font-weight: 600;
-}
+.trigger-metric-value { font-size: 11px; color: var(--gray-600); text-align: right; line-height: 1.4; font-weight: 500; }
+.trigger-metric-label { font-size: 9px; color: var(--gray-400); letter-spacing: 2px; text-transform: uppercase; text-align: right; margin-top: 2px; margin-bottom: 6px; font-weight: 600; }
 
 .badges-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
 
@@ -510,36 +510,9 @@ body {
   margin-top: 1px;
 }
 
-.chevron {
-  font-size: 11px;
-  color: var(--gray-400);
-  transition: transform 0.2s;
-  margin-top: 2px;
-}
-
-.finding-card.expanded .chevron { transform: rotate(180deg); }
-
-/* ── FINDING BODY ─────────────────────────────────────── */
-.finding-body { display: none; border-top: 1px solid var(--gray-100); }
-.finding-card.expanded .finding-body { display: block; }
-
-.finding-sections {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-}
-
-.finding-section {
-  padding: 16px 20px;
-  border-right: 1px solid var(--gray-100);
-}
-
-.finding-section:nth-child(3n) { border-right: none; }
-
-.finding-section.full-width {
-  grid-column: 1/-1;
-  border-right: none;
-  border-top: 1px solid var(--gray-100);
-}
+.finding-body { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--gray-100); }
+.finding-section { padding: 16px 18px; border-right: 1px solid var(--gray-100); }
+.finding-section:last-child { border-right: none; }
 
 .section-label {
   font-size: 9px;
@@ -550,51 +523,22 @@ body {
   margin-bottom: 8px;
 }
 
-.section-text { font-size: 13px; line-height: 1.6; color: var(--gray-900); }
-
-.action-list { list-style: none; display: flex; flex-direction: column; gap: 5px; padding: 0; }
-.action-list li { font-size: 12px; color: var(--gray-900); padding-left: 14px; position: relative; line-height: 1.5; }
-.action-list li::before { content: '→'; position: absolute; left: 0; color: var(--gold); font-size: 11px; }
-
-.gop-saving-bar {
-  padding: 14px 20px;
-  background: var(--navy);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+.section-text { font-size: 13px; line-height: 1.55; color: var(--gray-900); }
+.impact-block {
+  background: var(--gold-pale);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 8px;
+  padding: 10px 10px;
 }
-
-.gop-saving-left { display: flex; align-items: baseline; gap: 14px; }
-
-.gop-saving-value {
+.impact-value {
   font-family: 'Cormorant Garamond', serif;
   font-size: 24px;
-  color: var(--gold);
-  font-weight: 500;
+  color: var(--navy);
   line-height: 1;
 }
-
-.gop-saving-desc { font-size: 12px; color: rgba(255,255,255,0.35); }
-
-.action-btn {
-  background: var(--gold);
-  color: var(--navy);
-  border: none;
-  padding: 9px 22px;
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: background 0.15s;
-  white-space: nowrap;
-  flex-shrink: 0;
-  letter-spacing: 0.3px;
-}
-
-.action-btn:hover { background: var(--gold-light); }
-.action-btn.actioned { background: var(--green); color: white; }
+.impact-meta { margin-top: 5px; font-size: 11px; color: var(--gray-600); }
+.decision-line { font-size: 13px; font-weight: 600; color: var(--navy); line-height: 1.5; }
+.action-line { font-size: 13px; color: var(--gray-900); line-height: 1.55; }
 
 /* ── EMPTY STATE ──────────────────────────────────────── */
 .empty-state { text-align: center; padding: 60px 20px; display: none; }
@@ -604,12 +548,11 @@ body {
 
 /* ── RESPONSIVE ───────────────────────────────────────── */
 @media (max-width: 1200px) {
-  .finding-sections {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .finding-section:nth-child(3n) { border-right: 1px solid var(--gray-100); }
+  .finding-body { grid-template-columns: 1fr 1fr; }
+  .finding-section { border-right: 1px solid var(--gray-100); border-bottom: 1px solid var(--gray-100); }
   .finding-section:nth-child(2n) { border-right: none; }
+  .finding-section:nth-last-child(-n + 2) { border-bottom: none; }
+  .summary-strip { grid-template-columns: 1fr; }
 
   .gop-banner {
     grid-template-columns: 1fr 1fr;
@@ -624,9 +567,7 @@ body {
   .main { margin-left: 0; }
   .content { padding: 20px; }
   .topbar { padding: 0 20px; }
-  .finding-header {
-    grid-template-columns: 6px 1fr;
-  }
+  .finding-header { grid-template-columns: 6px 1fr; }
   .finding-right {
     grid-column: 2;
     align-items: flex-start;
@@ -636,8 +577,9 @@ body {
   }
   .badges-row { justify-content: flex-start; }
   .trigger-metric-label, .trigger-metric-value { text-align: left; }
-  .finding-sections { grid-template-columns: 1fr; }
-  .finding-section { border-right: none !important; }
+  .finding-body { grid-template-columns: 1fr; }
+  .finding-section { border-right: none !important; border-bottom: 1px solid var(--gray-100); }
+  .finding-section:last-child { border-bottom: none; }
   .gop-banner { grid-template-columns: 1fr; }
   .gop-stat { border-right: none !important; padding-left: 0; }
 }
@@ -816,6 +758,20 @@ body {
         <div class="tab" onclick="filterTab('cost', this)">Cost <span class="tab-count" id="tab-cost">0</span></div>
         <div class="tab" onclick="filterTab('critical', this)">Critical <span class="tab-count" id="tab-critical">0</span></div>
         <div class="tab" onclick="filterTab('actioned', this)">Actioned <span class="tab-count" id="tab-actioned">0</span></div>
+      </div>
+      <div class="summary-strip">
+        <div class="summary-pill">
+          <div class="summary-label">Revenue at Risk</div>
+          <div class="summary-value" id="summary-revenue-risk">SAR —</div>
+        </div>
+        <div class="summary-pill">
+          <div class="summary-label">Primary Focus</div>
+          <div class="summary-value" id="summary-primary-focus">—</div>
+        </div>
+        <div class="summary-pill">
+          <div class="summary-label">Market מצב</div>
+          <div class="summary-value" id="summary-market-context">—</div>
+        </div>
       </div>
 
       <div class="findings-list" id="findings-list"></div>
@@ -1597,17 +1553,68 @@ function filterTab(tab, el) {
   renderFindings();
 }
 
+function priorityRank(priority) {
+  const p = normalize(priority);
+  if (p === 'critical') return 4;
+  if (p === 'high') return 3;
+  if (p === 'medium') return 2;
+  return 1;
+}
+
+function sortByPriorityAndRisk(cards) {
+  return [...cards].sort((a, b) => {
+    const prioDiff = priorityRank(b.priority) - priorityRank(a.priority);
+    if (prioDiff !== 0) return prioDiff;
+    return (Number(b.value_at_stake) || 0) - (Number(a.value_at_stake) || 0);
+  });
+}
+
+function deriveMarketContext(cards) {
+  const contexts = cards.map(card => {
+    const rec = card.raw_recommendation || {};
+    const eng = card.raw_engine_action || {};
+    return rec.market_context || rec.context || eng.market_context || '';
+  }).filter(Boolean);
+  if (contexts.length) return contexts[0];
+
+  const hasPricing = cards.some(c => normalize(c.driver).includes('pricing'));
+  const hasVisibility = cards.some(c => normalize(c.driver).includes('visibility'));
+  if (hasPricing && hasVisibility) return 'Soft demand';
+  if (hasPricing) return 'Price-sensitive demand';
+  return 'Soft demand';
+}
+
+function buildDecisionLine(card) {
+  const outcome = (card.expected_outcome || '').trim();
+  if (outcome) return `Decision required: ${outcome.charAt(0).toLowerCase()}${outcome.slice(1)}`;
+  const driver = normalize(card.driver);
+  if (driver.includes('pricing')) return 'Decision required: adjust pricing posture';
+  if (driver.includes('visibility')) return 'Decision required: increase market visibility';
+  if (driver.includes('conversion')) return 'Decision required: improve conversion posture';
+  return 'Decision required: confirm commercial response';
+}
+
+function buildActionLine(card) {
+  const first = (card.action_lines || []).find(Boolean) || '';
+  if (first) return first.replace(/\.$/, '') + '.';
+  return 'Refine commercial execution to better align with demand conditions.';
+}
+
 function renderDashboard() {
   const cardsForPeriod = currentPeriod
     ? dashboardCards.filter(card => card.period_label === currentPeriod)
     : [...dashboardCards];
+  const rankedCards = sortByPriorityAndRisk(cardsForPeriod).slice(0, 3);
+  const summaryRevenueRisk = rankedCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
+  const primary = rankedCards[0];
+  const marketContext = deriveMarketContext(rankedCards);
 
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
-  const totalValue = cardsForPeriod.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0) || dashboardMeta?.total_value || 0;
-  const criticalCount = cardsForPeriod.filter(c => c.priority === 'high' || c.priority === 'critical').length;
-  const actionedCount = cardsForPeriod.filter(c => actionedIds.has(c.id)).length;
-  const pct = cardsForPeriod.length ? Math.round((actionedCount / cardsForPeriod.length) * 100) : 0;
+  const totalValue = summaryRevenueRisk || dashboardMeta?.total_value || 0;
+  const criticalCount = rankedCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
+  const actionedCount = rankedCards.filter(c => actionedIds.has(c.id)).length;
+  const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
 
   document.getElementById('sidebar-hotel').textContent = hotelName;
   document.getElementById('sidebar-period').textContent = periodLabel;
@@ -1615,17 +1622,20 @@ function renderDashboard() {
 
   document.getElementById('stat-total').textContent = formatCurrency(totalValue);
   document.getElementById('stat-critical').textContent = criticalCount;
-  document.getElementById('stat-findings').textContent = cardsForPeriod.length;
+  document.getElementById('stat-findings').textContent = rankedCards.length;
   document.getElementById('stat-actioned').textContent = actionedCount;
-  document.getElementById('badge-count').textContent = cardsForPeriod.length;
+  document.getElementById('badge-count').textContent = rankedCards.length;
+  document.getElementById('summary-revenue-risk').textContent = formatCurrency(summaryRevenueRisk);
+  document.getElementById('summary-primary-focus').textContent = primary?.title || '—';
+  document.getElementById('summary-market-context').textContent = marketContext;
 
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-pct').textContent = pct + '%';
-  document.getElementById('progress-label').textContent = `${actionedCount} of ${cardsForPeriod.length} findings actioned`;
+  document.getElementById('progress-label').textContent = `${actionedCount} of ${rankedCards.length} findings actioned`;
 
-  document.getElementById('tab-all').textContent = cardsForPeriod.length;
-  document.getElementById('tab-revenue').textContent = cardsForPeriod.filter(c => isRevenueDepartment(c.department)).length;
-  document.getElementById('tab-cost').textContent = cardsForPeriod.filter(c => !isRevenueDepartment(c.department)).length;
+  document.getElementById('tab-all').textContent = rankedCards.length;
+  document.getElementById('tab-revenue').textContent = rankedCards.filter(c => isRevenueDepartment(c.department)).length;
+  document.getElementById('tab-cost').textContent = rankedCards.filter(c => !isRevenueDepartment(c.department)).length;
   document.getElementById('tab-critical').textContent = criticalCount;
   document.getElementById('tab-actioned').textContent = actionedCount;
 
@@ -1647,7 +1657,7 @@ function getFilteredCards() {
     cards = cards.filter(card => actionedIds.has(card.id));
   }
 
-  return cards;
+  return sortByPriorityAndRisk(cards).slice(0, 3);
 }
 
 function renderFindings() {
@@ -1667,85 +1677,61 @@ function renderFindings() {
 
 function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
+  const impactRange = card.value_at_stake > 0
+    ? `${formatCurrency(Math.round(card.value_at_stake * 0.85))} - ${formatCurrency(card.value_at_stake)}`
+    : 'Room nights at risk: not available';
+  const whyItMatters = card.key_insight || card.one_liner || 'Commercial momentum is exposed without intervention.';
+  const decisionLine = buildDecisionLine(card);
+  const actionLine = buildActionLine(card);
 
   return `
-    <div class="finding-card ${isActioned ? 'actioned' : ''}" onclick="toggleCard(this)" data-id="${escHtml(card.id)}">
+    <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
       <div class="finding-header">
         <div class="priority-stripe ${escHtml(card.priority)}"></div>
 
         <div class="finding-center">
           <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${escHtml(card.one_liner)}</div>
-          ${card.temporal_line ? `<div class="finding-temporal-line">${escHtml(card.temporal_line)}</div>` : ''}
+          <div class="finding-oneliner">${escHtml(whyItMatters)}</div>
         </div>
 
         <div class="finding-right">
           <div class="trigger-metric-value">${escHtml(card.trigger_display)}</div>
-          <div class="trigger-metric-label">Key Trigger</div>
+          <div class="trigger-metric-label">MPI / ARI / RGI</div>
 
           <div class="badges-row">
-            ${card.temporal_badge ? `<span class="temporal-badge">${escHtml(card.temporal_badge)}</span>` : ''}
             <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
-            <span class="dept-badge">${escHtml(card.department)}</span>
+            ${card.execution_owner ? `<span class="dept-badge">${escHtml(card.execution_owner)}</span>` : ''}
           </div>
-
-          <span class="chevron">▾</span>
         </div>
       </div>
 
       <div class="finding-body">
-        <div class="finding-sections">
-          <div class="finding-section">
-            <div class="section-label">Key Insight</div>
-            <div class="section-text">${escHtml(card.key_insight)}</div>
-          </div>
-
-          <div class="finding-section">
-            <div class="section-label">Root Cause</div>
-            <div class="section-text">${escHtml(card.root_cause)}</div>
-          </div>
-
-          <div class="finding-section">
-            <div class="section-label">Execution Owner</div>
-            <div class="section-text">
-              <strong>Owner:</strong> ${escHtml(card.execution_owner)}<br>
-              <strong>Urgency:</strong> ${escHtml(card.urgency)}<br>
-              <strong>Due:</strong> ${escHtml(card.due_date)}
-            </div>
-          </div>
-
-          <div class="finding-section full-width">
-            <div class="section-label">Action Plan</div>
-            <ul class="action-list">
-              ${card.action_lines.length
-                ? card.action_lines.map(line => `<li>${escHtml(line)}</li>`).join('')
-                : '<li>No actions specified</li>'}
-            </ul>
-          </div>
-
-          <div class="finding-section full-width" style="border-top:none;">
-            <div class="section-label">Expected Outcome</div>
-            <div class="section-text">${escHtml(card.expected_outcome)}</div>
+        <div class="finding-section">
+          <div class="section-label">Insight</div>
+          <div class="section-text">${escHtml(card.title)}</div>
+        </div>
+        <div class="finding-section">
+          <div class="section-label">Why It Matters</div>
+          <div class="section-text">${escHtml(whyItMatters)}</div>
+        </div>
+        <div class="finding-section">
+          <div class="section-label">Financial Impact</div>
+          <div class="impact-block">
+            <div class="impact-value">${escHtml(impactRange)}</div>
+            <div class="impact-meta">Generated ${escHtml(formatDate(card.generated_at))}</div>
           </div>
         </div>
-
-        <div class="gop-saving-bar">
-          <div class="gop-saving-left">
-            <div class="gop-saving-value">${formatCurrency(card.value_at_stake)}</div>
-            <div class="gop-saving-desc">Estimated value at stake · Generated ${escHtml(formatDate(card.generated_at))}</div>
-          </div>
-          <button class="action-btn ${isActioned ? 'actioned' : ''}"
-            onclick="event.stopPropagation(); markActioned(this, '${escHtml(card.id)}')">
-            ${isActioned ? '✓ Actioned' : 'Mark as Actioned'}
-          </button>
+        <div class="finding-section">
+          <div class="section-label">Decision</div>
+          <div class="decision-line">${escHtml(decisionLine)}</div>
+        </div>
+        <div class="finding-section">
+          <div class="section-label">Action</div>
+          <div class="action-line">${escHtml(actionLine)}</div>
         </div>
       </div>
     </div>
   `;
-}
-
-function toggleCard(card) {
-  card.classList.toggle('expanded');
 }
 
 function markActioned(btn, id) {
