@@ -762,14 +762,14 @@ body {
       <div class="summary-strip">
         <div class="summary-pill">
           <div class="summary-label">Revenue at Risk</div>
-          <div class="summary-value" id="summary-revenue-risk">SAR —</div>
+          <div class="summary-value" id="summary-revenue-risk">€—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Primary Focus</div>
+          <div class="summary-label">Core Commercial Problem</div>
           <div class="summary-value" id="summary-primary-focus">—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Market Context</div>
+          <div class="summary-label">Immediate Focus</div>
           <div class="summary-value" id="summary-market-context">—</div>
         </div>
       </div>
@@ -863,7 +863,7 @@ function formatNumber(n) {
 function formatCurrency(value) {
   const amount = Number(value) || 0;
   if (!amount) return '—';
-  return 'SAR ' + formatNumber(amount);
+  return '€' + formatNumber(amount);
 }
 
 function formatDate(dateStr) {
@@ -1265,7 +1265,10 @@ function formatRiskRange(minValue, maxValue) {
   const min = parseAmount(minValue);
   const max = parseAmount(maxValue);
   if (Number.isFinite(min) && Number.isFinite(max) && max > 0) {
-    return `SAR ${formatNumber(min)}-${formatNumber(max)} at risk`;
+    if (Math.abs(max - min) < 1) {
+      return `€${formatNumber(max)} revenue at risk`;
+    }
+    return `€${formatNumber(min)}-€${formatNumber(max)} revenue at risk`;
   }
   return '';
 }
@@ -1323,12 +1326,58 @@ function getQuantifiedFinancialLabel(card) {
   if (rangeLabel) return rangeLabel;
 
   const roomNightsLabel = formatRoomNightsRisk(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
-  if (roomNightsLabel) return roomNightsLabel;
+  if (roomNightsLabel) return `~${roomNightsLabel}`;
 
   if (card.value_at_stake > 0) {
-    return `SAR ${formatNumber(card.value_at_stake)} at risk`;
+    return `€${formatNumber(card.value_at_stake)} revenue at risk`;
   }
-  return 'Room nights at risk: not available';
+  return null;
+}
+
+function parseTriggerMetrics(triggerDisplay) {
+  const txt = (triggerDisplay || '').toString();
+  const read = (name) => {
+    const m = txt.match(new RegExp(`${name}\\s+(-?\\d+(?:\\.\\d+)?)`, 'i'));
+    return m ? Number(m[1]) : null;
+  };
+  return { mpi: read('MPI'), ari: read('ARI'), rgi: read('RGI') };
+}
+
+function getCardTimeframe(card) {
+  const temporal = (card.temporal_line || card.temporal_badge || '').trim();
+  if (temporal) return temporal.toLowerCase();
+  const period = (card.period_label || '').trim();
+  if (period) return `period ${period}`;
+  return 'last 14 days';
+}
+
+function buildInsightLine(card) {
+  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const timeframe = getCardTimeframe(card);
+  if (mpi !== null && ari !== null) {
+    const rgiPart = rgi !== null ? ` and RGI ${rgi.toFixed(1)}` : '';
+    return `ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)}${rgiPart} during ${timeframe}`;
+  }
+  if (ari !== null && rgi !== null) {
+    return `ARI ${ari.toFixed(1)} and RGI ${rgi.toFixed(1)} during ${timeframe}`;
+  }
+  return `MPI/ARI signals tracked during ${timeframe} with pricing condition under review`;
+}
+
+function buildWhyLine(card, insightText) {
+  const financial = getQuantifiedFinancialLabel(card);
+  const timeframe = getCardTimeframe(card);
+  const driver = normalize(card.driver);
+  const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
+  const pressure = driver.includes('pricing')
+    ? 'pricing resistance'
+    : (driver.includes('discount') ? 'discount leakage' : (driver.includes('conversion') ? 'conversion drag' : 'demand pressure'));
+  const fallback = card.value_at_stake > 0
+    ? `€${formatNumber(card.value_at_stake)} revenue at risk during ${timeframe}`
+    : `MPI ${mpi !== null ? mpi.toFixed(1) : 'below 100'} and ARI ${ari !== null ? ari.toFixed(1) : 'below 100'} indicate share pressure during ${timeframe}`;
+  const base = financial ? `${financial} driven by ${pressure} during ${timeframe}` : fallback;
+  const similar = normalize(base) === normalize(insightText) || normalize(base).includes(normalize(insightText));
+  return similar ? `${financial || fallback}` : base;
 }
 
 function getPriority(engineAction, recommendation) {
@@ -1767,17 +1816,23 @@ function deriveMarketContext(cards) {
 
 function buildDecisionLine(card) {
   const decision = card.phase5_decision || {};
+  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const condition = (ari !== null && mpi !== null)
+    ? `where ARI ${ari.toFixed(1)} and MPI ${mpi.toFixed(1)}`
+    : (rgi !== null ? `where RGI ${rgi.toFixed(1)}` : 'where booking pace is below target this week');
+
+  if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
+    return `Reduce BAR premium by 5-8% ${condition}`;
+  }
+  if (ari !== null && mpi !== null && mpi < 95 && ari < 100) {
+    return `Increase discount depth by 3-5 points ${condition}`;
+  }
+
   const intent = (decision.decision_intent || '').toString().trim();
-  if (intent) return `Decision: ${toSentence(intent).replace(/[.!?]$/, '')}`;
+  if (intent) return `${toSentence(intent).replace(/[.!?]$/, '')} ${condition}`;
   const decisionTypeLabel = mapDecisionTypeToExecutiveText(decision.decision_type);
-  if (decisionTypeLabel) return `Decision: ${decisionTypeLabel}`;
-  const outcome = (card.expected_outcome || '').trim();
-  if (outcome) return `Decision: ${toSentence(outcome).replace(/[.!?]$/, '')}`;
-  const driver = normalize(card.driver);
-  if (driver.includes('pricing')) return 'Decision: Reassess pricing posture';
-  if (driver.includes('visibility')) return 'Decision: Strengthen visibility strategy';
-  if (driver.includes('conversion')) return 'Decision: Improve conversion strategy';
-  return 'Decision: Confirm commercial response';
+  if (decisionTypeLabel) return `${decisionTypeLabel} ${condition}`;
+  return `Tighten commercial controls ${condition}`;
 }
 
 function buildActionLine(card) {
@@ -1788,10 +1843,40 @@ function buildActionLine(card) {
     actionSummary.recommended_direction ||
     actionSummary.action_summary ||
     '';
-  if (phase5Direction) return toSentence(phase5Direction);
+  if (phase5Direction) return `${toSentence(phase5Direction).replace(/[.!?]$/, '')} during this week`;
   const first = (card.action_lines || []).find(Boolean) || '';
-  if (first) return toSentence(first);
-  return 'Refine commercial execution to better align with demand conditions.';
+  if (first) return `${toSentence(first).replace(/[.!?]$/, '')} during this week`;
+  const driver = normalize(card.driver);
+  if (driver.includes('pricing')) return 'Deploy fenced mobile and geo offers on Tue-Thu with closed user groups this week';
+  if (driver.includes('conversion')) return 'Re-sequence landing flow and shorten checkout steps for paid traffic this week';
+  if (driver.includes('discount')) return 'Adjust discount tiers by channel and cap open discounts on peak pickup days this week';
+  return 'Shift inventory controls to low-demand windows and align offer timing by weekday this week';
+}
+
+function synthesizeCoreProblem(cards) {
+  const counts = { pricing: 0, discount: 0, conversion: 0 };
+  cards.forEach(card => {
+    const d = normalize(card.driver);
+    if (d.includes('pricing')) counts.pricing += 1;
+    if (d.includes('discount')) counts.discount += 1;
+    if (d.includes('conversion') || d.includes('visibility')) counts.conversion += 1;
+  });
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).filter(([, c]) => c > 0).slice(0, 2).map(([k]) => k);
+  if (ranked.length === 0) return 'Demand volatility across current period with share pressure on key weekdays';
+  const phrase = {
+    pricing: 'pricing resistance on shoulder days',
+    discount: 'weak discount conversion',
+    conversion: 'conversion drag on direct channels'
+  };
+  return ranked.map(k => phrase[k]).join(' and ');
+}
+
+function synthesizeImmediateFocus(cards) {
+  const top = cards[0];
+  if (!top) return 'Re-sequence pricing and discount controls for Tue-Thu execution this week';
+  const decision = buildDecisionLine(top);
+  const action = buildActionLine(top);
+  return `${decision}; ${action}`;
 }
 
 function renderDashboard() {
@@ -1817,8 +1902,8 @@ function renderDashboard() {
     return Number.isFinite(roomNights) && roomNights > 0 ? sum + roomNights : sum;
   }, 0);
   const summaryLegacyValue = visibleCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
-  const primary = rankedCards[0];
-  const marketContext = humanizeMarketContext(dashboardMeta?.market_context || deriveMarketContext(rankedCards));
+  const coreProblem = synthesizeCoreProblem(visibleCards);
+  const immediateFocus = synthesizeImmediateFocus(visibleCards);
 
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
@@ -1826,13 +1911,17 @@ function renderDashboard() {
   const criticalCount = rankedCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
   const actionedCount = rankedCards.filter(c => actionedIds.has(c.id)).length;
   const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
-  let summaryRevenueRiskLabel = 'SAR —';
+  let summaryRevenueRiskLabel = '€0 at risk';
   if (summaryRangeTotals.max > 0) {
-    summaryRevenueRiskLabel = `SAR ${formatNumber(summaryRangeTotals.min)}-${formatNumber(summaryRangeTotals.max)} at risk`;
+    if (Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) < 1) {
+      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.max)} at risk (next 21 days)`;
+    } else {
+      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.min)}-€${formatNumber(summaryRangeTotals.max)} at risk (next 21 days)`;
+    }
   } else if (summaryRoomNights > 0) {
-    summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
+    summaryRevenueRiskLabel = `~${Math.round(summaryRoomNights)} room nights at risk (next 21 days)`;
   } else if (summaryLegacyValue > 0) {
-    summaryRevenueRiskLabel = `SAR ${formatNumber(summaryLegacyValue)} at risk`;
+    summaryRevenueRiskLabel = `€${formatNumber(summaryLegacyValue)} at risk (next 21 days)`;
   }
 
   document.getElementById('sidebar-hotel').textContent = hotelName;
@@ -1845,8 +1934,8 @@ function renderDashboard() {
   document.getElementById('stat-actioned').textContent = actionedCount;
   document.getElementById('badge-count').textContent = rankedCards.length;
   document.getElementById('summary-revenue-risk').textContent = summaryRevenueRiskLabel;
-  document.getElementById('summary-primary-focus').textContent = primary?.title || '—';
-  document.getElementById('summary-market-context').textContent = marketContext;
+  document.getElementById('summary-primary-focus').textContent = coreProblem;
+  document.getElementById('summary-market-context').textContent = immediateFocus;
 
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-pct').textContent = pct + '%';
@@ -1897,15 +1986,18 @@ function renderFindings() {
 function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
   const impactRange = getQuantifiedFinancialLabel(card);
-  const whyItMatters = card.key_insight || card.one_liner || 'Commercial momentum is exposed without intervention.';
-  const normalizedTitle = normalize(card.title);
-  const normalizedInsight = normalize(whyItMatters);
-  const hasDuplicatedInsight = normalizedTitle && normalizedInsight && (normalizedInsight === normalizedTitle || normalizedInsight.includes(normalizedTitle) || normalizedTitle.includes(normalizedInsight));
-  const insightText = hasDuplicatedInsight
-    ? toSentence(card.one_liner || card.expected_outcome || 'Commercial pressure detected').replace(/[.!?]$/, '')
-    : (card.one_liner || whyItMatters);
+  const insightText = buildInsightLine(card);
+  const whyItMatters = buildWhyLine(card, insightText);
   const decisionLine = buildDecisionLine(card);
   const actionLine = buildActionLine(card);
+  const financialSection = impactRange ? `
+        <div class="finding-section">
+          <div class="section-label">Financial Impact</div>
+          <div class="impact-block">
+            <div class="impact-value">${escHtml(impactRange)}</div>
+            <div class="impact-meta">Generated ${escHtml(formatDate(card.generated_at))}</div>
+          </div>
+        </div>` : '';
 
   return `
     <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
@@ -1914,7 +2006,7 @@ function renderCard(card) {
 
         <div class="finding-center">
           <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${escHtml(whyItMatters)}</div>
+          <div class="finding-oneliner">${escHtml(insightText)}</div>
         </div>
 
         <div class="finding-right">
@@ -1937,13 +2029,7 @@ function renderCard(card) {
           <div class="section-label">Why It Matters</div>
           <div class="section-text">${escHtml(whyItMatters)}</div>
         </div>
-        <div class="finding-section">
-          <div class="section-label">Financial Impact</div>
-          <div class="impact-block">
-            <div class="impact-value">${escHtml(impactRange)}</div>
-            <div class="impact-meta">Generated ${escHtml(formatDate(card.generated_at))}</div>
-          </div>
-        </div>
+        ${financialSection}
         <div class="finding-section">
           <div class="section-label">Decision</div>
           <div class="decision-line">${escHtml(decisionLine)}</div>
@@ -1951,6 +2037,11 @@ function renderCard(card) {
         <div class="finding-section">
           <div class="section-label">Action</div>
           <div class="action-line">${escHtml(actionLine)}</div>
+          <div style="margin-top:10px; text-align:right;">
+            <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
+              ${isActioned ? '✓ Actioned' : 'Mark as actioned'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
