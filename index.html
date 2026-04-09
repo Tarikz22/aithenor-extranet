@@ -510,9 +510,9 @@ body {
   margin-top: 1px;
 }
 
-.finding-body { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--gray-100); }
-.finding-section { padding: 16px 18px; border-right: 1px solid var(--gray-100); }
-.finding-section:last-child { border-right: none; }
+.finding-body { display: flex; flex-direction: column; border-top: 1px solid var(--gray-100); }
+.finding-section { padding: 12px 18px; border-bottom: 1px solid var(--gray-100); }
+.finding-section:last-child { border-bottom: none; }
 
 .section-label {
   font-size: 9px;
@@ -548,10 +548,8 @@ body {
 
 /* ── RESPONSIVE ───────────────────────────────────────── */
 @media (max-width: 1200px) {
-  .finding-body { grid-template-columns: 1fr 1fr; }
-  .finding-section { border-right: 1px solid var(--gray-100); border-bottom: 1px solid var(--gray-100); }
-  .finding-section:nth-child(2n) { border-right: none; }
-  .finding-section:nth-last-child(-n + 2) { border-bottom: none; }
+  .finding-body { display: flex; flex-direction: column; }
+  .finding-section { border-bottom: 1px solid var(--gray-100); }
   .summary-strip { grid-template-columns: 1fr; }
 
   .gop-banner {
@@ -577,7 +575,7 @@ body {
   }
   .badges-row { justify-content: flex-start; }
   .trigger-metric-label, .trigger-metric-value { text-align: left; }
-  .finding-body { grid-template-columns: 1fr; }
+  .finding-body { display: flex; flex-direction: column; }
   .finding-section { border-right: none !important; border-bottom: 1px solid var(--gray-100); }
   .finding-section:last-child { border-bottom: none; }
   .gop-banner { grid-template-columns: 1fr; }
@@ -765,11 +763,11 @@ body {
           <div class="summary-value" id="summary-revenue-risk">€—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Core Commercial Problem</div>
+          <div class="summary-label">Executive Readout</div>
           <div class="summary-value" id="summary-primary-focus">—</div>
         </div>
         <div class="summary-pill">
-          <div class="summary-label">Immediate Focus</div>
+          <div class="summary-label">Immediate Priority</div>
           <div class="summary-value" id="summary-market-context">—</div>
         </div>
       </div>
@@ -1372,6 +1370,14 @@ function getCardTimeframe(card) {
   return 'last 14 days';
 }
 
+function getObservedEvidence(card) {
+  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  if (ari !== null && mpi !== null) return { type: 'pricing_resistance', mpi, ari, rgi };
+  if (mpi !== null && ari !== null) return { type: 'demand_softness', mpi, ari, rgi };
+  if (rgi !== null) return { type: 'share_slip', mpi, ari, rgi };
+  return { type: 'generic', mpi, ari, rgi };
+}
+
 function getInterpretationFromMetrics(card) {
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
   const confidence = getConfidenceLevel(card);
@@ -1406,38 +1412,33 @@ function getPersistenceSignal(card) {
 function buildInsightLine(card) {
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
   const timeframe = getCardTimeframe(card);
-  const interpretation = getInterpretationFromMetrics(card);
-  const segment = getSegmentContext(card);
+  const segment = getSegmentContext(card).replace(' demand', '');
+  const evidence = getObservedEvidence(card);
   const timeframePart = timeframe.includes('week') || timeframe.includes('day')
     ? `over ${timeframe}`
     : `during ${timeframe}`;
+  if (mpi !== null && ari !== null && evidence.type === 'pricing_resistance') {
+    return `ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)} ${timeframePart} on ${segment}.`;
+  }
   if (mpi !== null && ari !== null) {
-    const rgiPart = rgi !== null ? ` while RGI ${rgi.toFixed(1)}` : '';
-    return `ARI ${ari.toFixed(1)} vs comp while MPI ${mpi.toFixed(1)}${rgiPart} ${timeframePart}, ${interpretation} on ${segment}`;
+    return `MPI ${mpi.toFixed(1)} with ARI ${ari.toFixed(1)} ${timeframePart} on ${segment}.`;
   }
   if (ari !== null && rgi !== null) {
-    return `ARI ${ari.toFixed(1)} with RGI ${rgi.toFixed(1)} ${timeframePart}, ${interpretation} on ${segment}`;
+    return `ARI ${ari.toFixed(1)} with RGI ${rgi.toFixed(1)} ${timeframePart} on ${segment}.`;
   }
-  return `MPI/ARI signal mix ${timeframePart}, ${interpretation} on ${segment}`;
+  return `Pickup remains weak ${timeframePart} on ${segment}.`;
 }
 
 function buildWhyLine(card, insightText) {
   const financial = getQuantifiedFinancialLabel(card);
-  const timeframe = getCardTimeframe(card);
-  const segment = getSegmentContext(card);
-  const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
-  const confidence = getConfidenceLevel(card);
-  const cause = confidence === 'high'
-    ? 'current pricing is actively rejecting available demand'
-    : (confidence === 'low' ? 'current pricing is filtering demand in key windows' : 'current pricing is rejecting available demand');
-  const fallback = card.value_at_stake > 0
-    ? `€${formatNumber(card.value_at_stake)} revenue at risk as ${cause} on ${segment}, leading to continued share loss over next 2-3 weeks`
-    : `MPI ${mpi !== null ? mpi.toFixed(1) : '95'} and ARI ${ari !== null ? ari.toFixed(1) : '100'} show demand rejection on ${segment}, leading to continued share loss over next 2-3 weeks`;
-  const base = financial
-    ? `${financial} as ${cause} on ${segment} in ${timeframe}, leading to continued share loss over next 2-3 weeks`
-    : fallback;
-  const similar = normalize(base) === normalize(insightText) || normalize(base).includes(normalize(insightText));
-  return similar ? `${financial || fallback}` : base;
+  const segment = getSegmentContext(card).replace(' demand', '');
+  if (financial) return `${financial} from continued demand rejection on ${segment}.`;
+  const q = getQuantificationNode(card);
+  const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
+  if (Number.isFinite(roomNights) && roomNights > 0) {
+    return `${Math.round(roomNights)} room nights at risk if current pattern continues.`;
+  }
+  return 'Material share loss continues if pricing holds.';
 }
 
 function getPriority(engineAction, recommendation) {
@@ -1875,26 +1876,18 @@ function deriveMarketContext(cards) {
 }
 
 function buildDecisionLine(card) {
-  const decision = card.phase5_decision || {};
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
-  const segment = getSegmentContext(card);
-  const timeframe = 'over next 14 days';
-  const condition = (ari !== null && mpi !== null)
-    ? `where ARI ${ari.toFixed(1)} > 105 and MPI ${mpi.toFixed(1)} < 95`
-    : (rgi !== null ? `where RGI ${rgi.toFixed(1)} <100` : 'where pickup is below weekday target');
-
+  const segment = getSegmentContext(card).replace(' demand', '');
   if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
-    return `Reduce BAR by ~6% on ${segment} for Tue-Thu ${timeframe} ${condition}`;
+    return `Lower BAR on shoulder nights over next 14 days on ${segment}, based on observed pricing resistance.`;
   }
-  if (ari !== null && mpi !== null && mpi < 95 && ari < 100) {
-    return `Increase discount depth by ~4 points on ${segment} ${timeframe} where MPI ${mpi.toFixed(1)} < 95 and ARI ${ari.toFixed(1)} < 100`;
+  if (mpi !== null && ari !== null && mpi < 95 && ari < 100) {
+    return `Tighten discount depth this week on ${segment}, based on observed weak demand response.`;
   }
-
-  const intent = (decision.decision_intent || '').toString().trim();
-  if (intent) return `${toSentence(intent).replace(/[.!?]$/, '')} on ${segment} ${timeframe} ${condition}`;
-  const decisionTypeLabel = mapDecisionTypeToExecutiveText(decision.decision_type);
-  if (decisionTypeLabel) return `${decisionTypeLabel} on ${segment} ${timeframe} ${condition}`;
-  return `Adjust pricing and offer controls on ${segment} ${timeframe} ${condition}`;
+  if (rgi !== null && rgi < 100) {
+    return `Hold rate floor and correct channel mix over next 10 days on ${segment}.`;
+  }
+  return `Reprice low-pickup nights over next 14 days on ${segment}.`;
 }
 
 function buildActionLine(card) {
@@ -1905,15 +1898,15 @@ function buildActionLine(card) {
     actionSummary.recommended_direction ||
     actionSummary.action_summary ||
     '';
-  const segment = getSegmentContext(card);
-  if (phase5Direction) return `${toSentence(phase5Direction).replace(/[.!?]$/, '')} in CRS and RMS within 72 hours where pickup remains below pace on ${segment}`;
+  const segment = getSegmentContext(card).replace(' demand', '');
+  if (phase5Direction) return `Update CRS and RMS pricing for Tue-Thu and review pickup in 72 hours on ${segment}.`;
   const first = (card.action_lines || []).find(Boolean) || '';
-  if (first) return `${toSentence(first).replace(/[.!?]$/, '')} in RMS and channel manager within 72 hours where pickup remains below pace on ${segment}`;
+  if (first) return `Apply ${toSentence(first).replace(/[.!?]$/, '')} in RMS and verify pickup daily on ${segment}.`;
   const driver = normalize(card.driver);
-  if (driver.includes('pricing')) return 'Load 10% mobile-only discount in CRS and remove OTA parity on Tue-Thu where pickup remains below pace';
-  if (driver.includes('conversion')) return 'Push direct-website rate plan in channel manager and set LOS minimum to 1 night where checkout conversion remains below pace';
-  if (driver.includes('discount')) return 'Load OTA promo ladder in RMS and cap public discounts above pace threshold where OTA pickup remains below pace';
-  return 'Adjust LOS controls in RMS and push fenced offers through channel manager where pickup remains below pace';
+  if (driver.includes('pricing')) return 'Update CRS and RMS pricing for Tue-Thu and check pickup within 72 hours.';
+  if (driver.includes('conversion')) return 'Hold BAR, update website offer hierarchy, and monitor checkout pickup daily.';
+  if (driver.includes('discount')) return 'Remove public discount leakage and relaunch fenced OTA offers with daily pickup checks.';
+  return 'Adjust RMS rate controls and monitor channel pickup every day this week.';
 }
 
 function synthesizeCoreProblem(cards) {
@@ -1926,21 +1919,22 @@ function synthesizeCoreProblem(cards) {
   });
   const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).filter(([, c]) => c > 0).slice(0, 2).map(([k]) => k);
   const totalRisk = cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
-  if (ranked.length === 0) return `€${formatNumber(totalRisk)} revenue at risk over next 21 days with share pressure on key weekdays`;
+  if (ranked.length === 0) return 'Pickup remains weak while share is slipping on priority demand segments.';
   const phrase = {
     pricing: 'pricing resistance on transient retail demand',
-    discount: 'ineffective OTA discounting',
-    conversion: 'conversion drag on direct channel demand'
+    discount: 'discounting is not buying share',
+    conversion: 'rate support is not converting on direct demand'
   };
-  return `€${formatNumber(totalRisk)} revenue at risk driven by ${ranked.map(k => phrase[k]).join(' and ')} over next 21 days`;
+  return `${ranked.map(k => phrase[k]).join(' while ')}.`;
 }
 
 function synthesizeImmediateFocus(cards) {
   const top = cards[0];
-  if (!top) return 'Immediate: tighten pricing and discount controls on Tue-Thu over next 7-14 days';
-  const decision = buildDecisionLine(top);
-  const action = buildActionLine(top);
-  return `Immediate: ${decision}; ${action} over next 7-14 days`;
+  if (!top) return 'Reprice shoulder nights and tighten discount structure this week.';
+  const d = normalize(top.driver);
+  if (d.includes('pricing') || d.includes('discount')) return 'Reprice shoulder nights and tighten discount structure this week.';
+  if (d.includes('conversion') || d.includes('visibility')) return 'Correct transient pricing first, then fix direct-channel conversion this week.';
+  return 'Correct price and discount controls first, then verify pickup in 72 hours.';
 }
 
 function renderDashboard() {
@@ -1966,6 +1960,7 @@ function renderDashboard() {
     return Number.isFinite(roomNights) && roomNights > 0 ? sum + roomNights : sum;
   }, 0);
   const summaryLegacyValue = visibleCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
+  const strongestVisibleValue = visibleCards.reduce((max, card) => Math.max(max, Number(card.value_at_stake) || 0), 0);
   const coreProblem = synthesizeCoreProblem(visibleCards);
   const immediateFocus = synthesizeImmediateFocus(visibleCards);
 
@@ -1975,17 +1970,21 @@ function renderDashboard() {
   const criticalCount = rankedCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
   const actionedCount = rankedCards.filter(c => actionedIds.has(c.id)).length;
   const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
-  let summaryRevenueRiskLabel = '€0 at risk';
+  let summaryRevenueRiskLabel = 'Impact under review';
   if (summaryRangeTotals.max > 0) {
-    if (Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) < 1) {
+    if (summaryRangeTotals.min > 0 && Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) / summaryRangeTotals.min < 0.2) {
+      summaryRevenueRiskLabel = `€${formatNumber(Math.round((summaryRangeTotals.min + summaryRangeTotals.max) / 2))} at risk`;
+    } else if (Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) < 1) {
       summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.max)} at risk (next 21 days)`;
     } else {
-      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.min)}-€${formatNumber(summaryRangeTotals.max)} at risk (next 21 days)`;
+      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.min)}-€${formatNumber(summaryRangeTotals.max)} at risk`;
     }
+  } else if (strongestVisibleValue > 0) {
+    summaryRevenueRiskLabel = `€${formatNumber(strongestVisibleValue)} at risk`;
   } else if (summaryRoomNights > 0) {
-    summaryRevenueRiskLabel = `~${Math.round(summaryRoomNights)} room nights at risk (next 21 days)`;
-  } else if (summaryLegacyValue > 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(summaryLegacyValue)} at risk (next 21 days)`;
+    summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
+  } else if (summaryLegacyValue > 0 && visibleCards.length === 0) {
+    summaryRevenueRiskLabel = `€${formatNumber(summaryLegacyValue)} at risk`;
   }
 
   document.getElementById('sidebar-hotel').textContent = hotelName;
@@ -2049,20 +2048,14 @@ function renderFindings() {
 
 function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
-  const impactRange = getQuantifiedFinancialLabel(card);
-  const insightText = buildInsightLine(card);
-  const whyItMatters = buildWhyLine(card, insightText);
+  const signalLine = buildInsightLine(card);
+  const impactLine = buildWhyLine(card, signalLine);
   const persistenceSignal = getPersistenceSignal(card);
   const decisionLine = buildDecisionLine(card);
   const actionLine = buildActionLine(card);
-  const financialSection = impactRange ? `
-        <div class="finding-section">
-          <div class="section-label">Financial Impact</div>
-          <div class="impact-block">
-            <div class="impact-value">${escHtml(impactRange)}</div>
-            <div class="impact-meta">Generated ${escHtml(formatDate(card.generated_at))}</div>
-          </div>
-        </div>` : '';
+  const confidence = getConfidenceLevel(card);
+  const confidenceBadge = confidence === 'low' ? '' : `<span class="dept-badge">${escHtml(capitalize(confidence))} confidence</span>`;
+  const evidenceSubline = `Observed window: ${escHtml(getCardTimeframe(card))}`;
 
   return `
     <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
@@ -2071,7 +2064,7 @@ function renderCard(card) {
 
         <div class="finding-center">
           <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${escHtml(insightText)}</div>
+          <div class="finding-oneliner">${evidenceSubline}</div>
         </div>
 
         <div class="finding-right">
@@ -2081,28 +2074,27 @@ function renderCard(card) {
           <div class="badges-row">
             <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
             ${card.execution_owner ? `<span class="dept-badge">${escHtml(card.execution_owner)}</span>` : ''}
-            <span class="dept-badge">${escHtml(capitalize(getConfidenceLevel(card)))} confidence</span>
+            ${confidenceBadge}
           </div>
         </div>
       </div>
 
       <div class="finding-body">
         <div class="finding-section">
-          <div class="section-label">Insight</div>
-          <div class="section-text">${escHtml(insightText)}</div>
+          <div class="section-label">SIGNAL</div>
+          <div class="section-text">${escHtml(signalLine)}</div>
           ${persistenceSignal ? `<div class="impact-meta" style="margin-top:8px;">${escHtml(persistenceSignal)}</div>` : ''}
         </div>
         <div class="finding-section">
-          <div class="section-label">Why It Matters</div>
-          <div class="section-text">${escHtml(whyItMatters)}</div>
+          <div class="section-label">IMPACT</div>
+          <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(impactLine)}</div>
         </div>
-        ${financialSection}
         <div class="finding-section">
-          <div class="section-label">Decision</div>
+          <div class="section-label">DECISION</div>
           <div class="decision-line">${escHtml(decisionLine)}</div>
         </div>
         <div class="finding-section">
-          <div class="section-label">Action</div>
+          <div class="section-label">EXECUTION</div>
           <div class="action-line">${escHtml(actionLine)}</div>
           <div style="margin-top:10px; text-align:right;">
             <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
