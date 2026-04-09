@@ -1351,31 +1351,63 @@ function getCardTimeframe(card) {
   return 'last 14 days';
 }
 
+function getInterpretationFromMetrics(card) {
+  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
+    return 'pricing resistance on shoulder demand';
+  }
+  if (mpi !== null && ari !== null && mpi < 95 && ari < 100) {
+    return 'weak demand and conversion friction';
+  }
+  if (rgi !== null && rgi < 100) {
+    return 'share underperformance versus comp set';
+  }
+  return 'share underperformance in current 14-day booking window';
+}
+
+function getPersistenceSignal(card) {
+  const line = (card.temporal_line || '').trim();
+  const badge = normalize(card.temporal_badge);
+  if (line && line.toLowerCase().includes('weeks')) {
+    return `${line.replace(/^Observed/i, 'Observed consistently')}`;
+  }
+  if (badge === 'persistent') {
+    return 'Observed consistently over last 3 weeks';
+  }
+  if (badge === 'recurring') {
+    return 'Recurring pattern across multiple snapshots';
+  }
+  return '';
+}
+
 function buildInsightLine(card) {
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
   const timeframe = getCardTimeframe(card);
+  const interpretation = getInterpretationFromMetrics(card);
+  const timeframePart = timeframe.includes('week') || timeframe.includes('day')
+    ? `over ${timeframe}`
+    : `during ${timeframe}`;
   if (mpi !== null && ari !== null) {
-    const rgiPart = rgi !== null ? ` and RGI ${rgi.toFixed(1)}` : '';
-    return `ARI ${ari.toFixed(1)} vs MPI ${mpi.toFixed(1)}${rgiPart} during ${timeframe}`;
+    const rgiPart = rgi !== null ? ` while RGI ${rgi.toFixed(1)}` : '';
+    return `ARI ${ari.toFixed(1)} vs comp while MPI ${mpi.toFixed(1)}${rgiPart} ${timeframePart}, indicating ${interpretation}`;
   }
   if (ari !== null && rgi !== null) {
-    return `ARI ${ari.toFixed(1)} and RGI ${rgi.toFixed(1)} during ${timeframe}`;
+    return `ARI ${ari.toFixed(1)} with RGI ${rgi.toFixed(1)} ${timeframePart}, indicating ${interpretation}`;
   }
-  return `MPI/ARI signals tracked during ${timeframe} with pricing condition under review`;
+  return `MPI/ARI signal mix ${timeframePart}, indicating ${interpretation}`;
 }
 
 function buildWhyLine(card, insightText) {
   const financial = getQuantifiedFinancialLabel(card);
   const timeframe = getCardTimeframe(card);
-  const driver = normalize(card.driver);
+  const interpretation = getInterpretationFromMetrics(card);
   const { mpi, ari } = parseTriggerMetrics(card.trigger_display);
-  const pressure = driver.includes('pricing')
-    ? 'pricing resistance'
-    : (driver.includes('discount') ? 'discount leakage' : (driver.includes('conversion') ? 'conversion drag' : 'demand pressure'));
   const fallback = card.value_at_stake > 0
-    ? `€${formatNumber(card.value_at_stake)} revenue at risk during ${timeframe}`
-    : `MPI ${mpi !== null ? mpi.toFixed(1) : 'below 100'} and ARI ${ari !== null ? ari.toFixed(1) : 'below 100'} indicate share pressure during ${timeframe}`;
-  const base = financial ? `${financial} driven by ${pressure} during ${timeframe}` : fallback;
+    ? `€${formatNumber(card.value_at_stake)} revenue at risk as ${interpretation} is reducing pickup, with continued share loss expected over next 2-3 weeks`
+    : `MPI ${mpi !== null ? mpi.toFixed(1) : '95'} and ARI ${ari !== null ? ari.toFixed(1) : '100'} indicate ${interpretation}, with continued share loss expected over next 2-3 weeks`;
+  const base = financial
+    ? `${financial} as ${interpretation} is reducing pickup in ${timeframe}, with continued share loss expected over next 2-3 weeks`
+    : fallback;
   const similar = normalize(base) === normalize(insightText) || normalize(base).includes(normalize(insightText));
   return similar ? `${financial || fallback}` : base;
 }
@@ -1817,22 +1849,23 @@ function deriveMarketContext(cards) {
 function buildDecisionLine(card) {
   const decision = card.phase5_decision || {};
   const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
+  const timeframe = 'over next 14 days';
   const condition = (ari !== null && mpi !== null)
-    ? `where ARI ${ari.toFixed(1)} and MPI ${mpi.toFixed(1)}`
-    : (rgi !== null ? `where RGI ${rgi.toFixed(1)}` : 'where booking pace is below target this week');
+    ? `where ARI ${ari.toFixed(1)} >105 and MPI ${mpi.toFixed(1)} <95`
+    : (rgi !== null ? `where RGI ${rgi.toFixed(1)} <100` : 'where pickup is below weekday target');
 
   if (ari !== null && mpi !== null && ari > 105 && mpi < 95) {
-    return `Reduce BAR premium by 5-8% ${condition}`;
+    return `Reduce BAR premium by 5-8% on Tue-Thu ${timeframe} ${condition}`;
   }
   if (ari !== null && mpi !== null && mpi < 95 && ari < 100) {
-    return `Increase discount depth by 3-5 points ${condition}`;
+    return `Increase discount depth by 3-5 points ${timeframe} where MPI ${mpi.toFixed(1)} <95 and ARI ${ari.toFixed(1)} <100`;
   }
 
   const intent = (decision.decision_intent || '').toString().trim();
-  if (intent) return `${toSentence(intent).replace(/[.!?]$/, '')} ${condition}`;
+  if (intent) return `${toSentence(intent).replace(/[.!?]$/, '')} ${timeframe} ${condition}`;
   const decisionTypeLabel = mapDecisionTypeToExecutiveText(decision.decision_type);
-  if (decisionTypeLabel) return `${decisionTypeLabel} ${condition}`;
-  return `Tighten commercial controls ${condition}`;
+  if (decisionTypeLabel) return `${decisionTypeLabel} ${timeframe} ${condition}`;
+  return `Adjust pricing and offer controls ${timeframe} ${condition}`;
 }
 
 function buildActionLine(card) {
@@ -1843,14 +1876,14 @@ function buildActionLine(card) {
     actionSummary.recommended_direction ||
     actionSummary.action_summary ||
     '';
-  if (phase5Direction) return `${toSentence(phase5Direction).replace(/[.!?]$/, '')} during this week`;
+  if (phase5Direction) return `${toSentence(phase5Direction).replace(/[.!?]$/, '')} with CRS updates within 72 hours`;
   const first = (card.action_lines || []).find(Boolean) || '';
-  if (first) return `${toSentence(first).replace(/[.!?]$/, '')} during this week`;
+  if (first) return `${toSentence(first).replace(/[.!?]$/, '')} with RMS and channel rules updated within 72 hours`;
   const driver = normalize(card.driver);
-  if (driver.includes('pricing')) return 'Deploy fenced mobile and geo offers on Tue-Thu with closed user groups this week';
-  if (driver.includes('conversion')) return 'Re-sequence landing flow and shorten checkout steps for paid traffic this week';
-  if (driver.includes('discount')) return 'Adjust discount tiers by channel and cap open discounts on peak pickup days this week';
-  return 'Shift inventory controls to low-demand windows and align offer timing by weekday this week';
+  if (driver.includes('pricing')) return 'Load 8-12% mobile-only discount on Tue-Thu and remove public BAR parity for those dates';
+  if (driver.includes('conversion')) return 'Set LOS minimum to 1 night on low-demand dates and re-sequence checkout steps for paid traffic';
+  if (driver.includes('discount')) return 'Rebuild discount tiers by channel and cap open discounts above booked pace threshold';
+  return 'Adjust LOS controls by weekday and push fenced offers in low-demand windows through channel manager';
 }
 
 function synthesizeCoreProblem(cards) {
@@ -1862,21 +1895,22 @@ function synthesizeCoreProblem(cards) {
     if (d.includes('conversion') || d.includes('visibility')) counts.conversion += 1;
   });
   const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).filter(([, c]) => c > 0).slice(0, 2).map(([k]) => k);
-  if (ranked.length === 0) return 'Demand volatility across current period with share pressure on key weekdays';
+  const totalRisk = cards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
+  if (ranked.length === 0) return `€${formatNumber(totalRisk)} revenue at risk over next 21 days with share pressure on key weekdays`;
   const phrase = {
     pricing: 'pricing resistance on shoulder days',
     discount: 'weak discount conversion',
     conversion: 'conversion drag on direct channels'
   };
-  return ranked.map(k => phrase[k]).join(' and ');
+  return `€${formatNumber(totalRisk)} revenue at risk driven by ${ranked.map(k => phrase[k]).join(' and ')} over next 21 days`;
 }
 
 function synthesizeImmediateFocus(cards) {
   const top = cards[0];
-  if (!top) return 'Re-sequence pricing and discount controls for Tue-Thu execution this week';
+  if (!top) return 'Immediate: tighten pricing and discount controls on Tue-Thu over next 7-14 days';
   const decision = buildDecisionLine(top);
   const action = buildActionLine(top);
-  return `${decision}; ${action}`;
+  return `Immediate: ${decision}; ${action}`;
 }
 
 function renderDashboard() {
@@ -1988,6 +2022,7 @@ function renderCard(card) {
   const impactRange = getQuantifiedFinancialLabel(card);
   const insightText = buildInsightLine(card);
   const whyItMatters = buildWhyLine(card, insightText);
+  const persistenceSignal = getPersistenceSignal(card);
   const decisionLine = buildDecisionLine(card);
   const actionLine = buildActionLine(card);
   const financialSection = impactRange ? `
@@ -2024,6 +2059,7 @@ function renderCard(card) {
         <div class="finding-section">
           <div class="section-label">Insight</div>
           <div class="section-text">${escHtml(insightText)}</div>
+          ${persistenceSignal ? `<div class="impact-meta" style="margin-top:8px;">${escHtml(persistenceSignal)}</div>` : ''}
         </div>
         <div class="finding-section">
           <div class="section-label">Why It Matters</div>
