@@ -1557,13 +1557,50 @@ function buildTimingAwareExecution(card) {
 function buildExecutionActions(card) {
   const enforcedActionsRaw = card.enforced_execution_actions;
   if (Array.isArray(enforcedActionsRaw) && enforcedActionsRaw.length) {
-    return enforcedActionsRaw.map(v => (v == null ? '' : String(v).trim())).filter(Boolean);
+    return enforcedActionsRaw.map(v => (v == null ? '' : String(v).trim())).filter(Boolean).slice(0, 3);
   }
   if (typeof enforcedActionsRaw === 'string' && enforcedActionsRaw.trim()) {
     return enforcedActionsRaw
       .split(/\n|•|;|\u2022/)
       .map(s => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  const role = normalize(card.arbitration_role);
+  const primaryDriver = normalize(card.primary_driver);
+  if (role === 'primary') {
+    if (primaryDriver === 'pricing') {
+      return [
+        'Reduce BAR by 5-8% on Tue-Thu immediately',
+        'Remove premium vs comp set on low-demand days',
+        'Monitor pickup daily and reassess after Sunday cycle'
+      ];
+    }
+    if (primaryDriver === 'discounting' || primaryDriver === 'discount') {
+      return [
+        'Tighten public discount depth immediately',
+        'Keep only fenced support on weak-demand windows',
+        'Review conversion response after the next pickup cycle'
+      ];
+    }
+  }
+
+  if (role === 'supporting') {
+    if (primaryDriver === 'pricing') {
+      return [
+        'Stop additional public discounts during pricing correction',
+        'Keep only fenced offers for tactical support',
+        'Reassess discount efficiency after the next pickup cycle'
+      ];
+    }
+    if (primaryDriver === 'discounting' || primaryDriver === 'discount') {
+      return [
+        'Keep pricing posture stable while discount optimization runs',
+        'Constrain new rate moves to avoid strategy conflict',
+        'Recheck pickup after the next pickup cycle'
+      ];
+    }
   }
   const timing = getActionTimingBasis(card);
   const family = getIssueFamily(card);
@@ -1572,24 +1609,21 @@ function buildExecutionActions(card) {
     return [
       `Lower CRS/RMS pricing on ${scope} immediately`,
       'Remove unnecessary BAR premium on those nights',
-      'Keep any discount support fenced rather than public',
-      `Check pickup again ${timing}`
+      'Keep any discount support fenced rather than public'
     ];
   }
   if (family === 'discount') {
     return [
       'Pull weak public discounts on underperforming nights',
       'Keep remaining support behind fenced offers only',
-      'Cut promotions that dilute rate without lifting share',
-      `Review response ${timing}`
+      'Cut promotions that dilute rate without lifting share'
     ];
   }
   if (family === 'direct') {
     return [
       'Correct direct-offer logic before widening price support',
       'Align website, CRS, and channel-manager offer setup',
-      'Hold broad price moves until direct demand response stabilizes',
-      `Review response ${timing}`
+      'Hold broad price moves until direct demand response stabilizes'
     ];
   }
   return [
@@ -1783,6 +1817,8 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       timeline: engineAction?.financial_impact?.impact_timeline || '—',
       confidence: engineAction?.financial_impact?.confidence || '—',
       driver: issue.driver || recommendation?.driver || '',
+      primary_driver: issue.primary_driver || '',
+      arbitration_role: issue.arbitration_role || '',
       temporal_badge: temporalCue?.badge || '',
       temporal_line: temporalCue?.line || '',
       phase5_decision: phase5Decision,
@@ -2047,6 +2083,24 @@ function deriveMarketContext(cards) {
 }
 
 function buildDecisionLine(card) {
+  const role = normalize(card.arbitration_role);
+  const primaryDriver = normalize(card.primary_driver);
+  if (role === 'primary') {
+    if (primaryDriver === 'pricing') {
+      return 'Reduce BAR on Tue-Thu to restore competitiveness and regain share.';
+    }
+    if (primaryDriver === 'discounting' || primaryDriver === 'discount') {
+      return 'Tighten public discounting and keep support fenced.';
+    }
+  }
+  if (role === 'supporting') {
+    if (primaryDriver === 'pricing') {
+      return 'Support pricing correction by aligning discount structure and avoiding additional public promotions.';
+    }
+    if (primaryDriver === 'discounting' || primaryDriver === 'discount') {
+      return 'Support discount optimization while maintaining stable pricing posture.';
+    }
+  }
   console.log("RENDER_ENFORCED", {
     title: card.title,
     finding_key: card.finding_key,
