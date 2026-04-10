@@ -1555,6 +1555,16 @@ function buildTimingAwareExecution(card) {
 }
 
 function buildExecutionActions(card) {
+  const enforcedActionsRaw = card.enforced_execution_actions;
+  if (Array.isArray(enforcedActionsRaw) && enforcedActionsRaw.length) {
+    return enforcedActionsRaw.map(v => (v == null ? '' : String(v).trim())).filter(Boolean);
+  }
+  if (typeof enforcedActionsRaw === 'string' && enforcedActionsRaw.trim()) {
+    return enforcedActionsRaw
+      .split(/\n|•|;|\u2022/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
   const timing = getActionTimingBasis(card);
   const family = getIssueFamily(card);
   const scope = inferScopeReference(card);
@@ -1777,6 +1787,16 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       phase5_decision: phase5Decision,
       phase5_action: phase5Action,
       phase5_controlled_action: issueControlledAction,
+      enforced_decision_line:
+        phase5Decision.enforced_decision_line ||
+        phase5Decision.arbitrated_decision_line ||
+        '',
+      enforced_execution_actions:
+        phase5Action.enforced_execution_actions ||
+        phase5Decision.enforced_execution_actions ||
+        phase5Action.arbitrated_execution_actions ||
+        phase5Decision.arbitrated_execution_actions ||
+        [],
       phase5_quantification: phase5Quant,
       market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
@@ -1907,6 +1927,16 @@ function buildCardsFromData(engineRow, recommendations, actions) {
       driver: engineAction?.driver || recommendation?.driver || '',
       phase5_decision: phase5Decision,
       phase5_action: phase5Action,
+      enforced_decision_line:
+        phase5Decision.enforced_decision_line ||
+        phase5Decision.arbitrated_decision_line ||
+        '',
+      enforced_execution_actions:
+        phase5Action.enforced_execution_actions ||
+        phase5Decision.enforced_execution_actions ||
+        phase5Action.arbitrated_execution_actions ||
+        phase5Decision.arbitrated_execution_actions ||
+        [],
       phase5_quantification: phase5Quant,
       market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
@@ -2024,6 +2054,8 @@ function deriveMarketContext(cards) {
 }
 
 function buildDecisionLine(card) {
+  const enforced = (card.enforced_decision_line || '').toString().trim();
+  if (enforced) return enforced;
   return buildTimingAwareDecision(card);
 }
 
