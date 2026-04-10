@@ -1788,16 +1788,8 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       phase5_decision: phase5Decision,
       phase5_action: phase5Action,
       phase5_controlled_action: issueControlledAction,
-      enforced_decision_line:
-        phase5Decision.enforced_decision_line ||
-        phase5Decision.arbitrated_decision_line ||
-        '',
-      enforced_execution_actions:
-        phase5Action.enforced_execution_actions ||
-        phase5Decision.enforced_execution_actions ||
-        phase5Action.arbitrated_execution_actions ||
-        phase5Decision.arbitrated_execution_actions ||
-        [],
+      enforced_decision_line: issue.enforced_decision_line || null,
+      enforced_execution_actions: issue.enforced_execution_actions || null,
       phase5_quantification: phase5Quant,
       market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
@@ -1879,6 +1871,7 @@ function buildCardsFromData(engineRow, recommendations, actions) {
   });
 
   const cards = uniqueEngineActions.map(engineAction => {
+    const issue = engineAction || {};
     const joinKey = getEngineJoinKey(engineAction);
     const titleKey = normalize(engineAction.title);
 
@@ -1935,16 +1928,8 @@ function buildCardsFromData(engineRow, recommendations, actions) {
       driver: engineAction?.driver || recommendation?.driver || '',
       phase5_decision: phase5Decision,
       phase5_action: phase5Action,
-      enforced_decision_line:
-        phase5Decision.enforced_decision_line ||
-        phase5Decision.arbitrated_decision_line ||
-        '',
-      enforced_execution_actions:
-        phase5Action.enforced_execution_actions ||
-        phase5Decision.enforced_execution_actions ||
-        phase5Action.arbitrated_execution_actions ||
-        phase5Decision.arbitrated_execution_actions ||
-        [],
+      enforced_decision_line: issue.enforced_decision_line || null,
+      enforced_execution_actions: issue.enforced_execution_actions || null,
       phase5_quantification: phase5Quant,
       market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
