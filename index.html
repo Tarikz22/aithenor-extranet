@@ -1758,12 +1758,13 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       'medium'
     );
 
-    return {
+    const card = {
       id: buildCardId(engineRow.snapshot_date, engineRow.period_label, engineAction),
       snapshot_date: engineRow.snapshot_date,
       generated_at: engineRow.generated_at,
       hotel_name: engineRow.hotel_code,
       period_label: engineRow.period_label,
+      finding_key: issue.finding_key,
       title: issue.title || recommendation?.title || 'Untitled Finding',
       one_liner: buildOneLiner(cleanKeyInsight, rootCause),
       key_insight: cleanKeyInsight,
@@ -1802,6 +1803,13 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       raw_recommendation: recommendation,
       raw_engine_action: engineAction
     };
+    console.log("CARD_ENFORCED", {
+      title: card.title,
+      finding_key: card.finding_key,
+      enforced_decision_line: card.enforced_decision_line,
+      enforced_execution_actions: card.enforced_execution_actions
+    });
+    return card;
   });
 
   return {
@@ -2054,6 +2062,11 @@ function deriveMarketContext(cards) {
 }
 
 function buildDecisionLine(card) {
+  console.log("RENDER_ENFORCED", {
+    title: card.title,
+    finding_key: card.finding_key,
+    enforced_decision_line: card.enforced_decision_line
+  });
   const enforced = (card.enforced_decision_line || '').toString().trim();
   if (enforced) return enforced;
   return buildTimingAwareDecision(card);
