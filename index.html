@@ -1826,6 +1826,7 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       phase5_controlled_action: issueControlledAction,
       enforced_decision_line: issue.enforced_decision_line || null,
       enforced_execution_actions: issue.enforced_execution_actions || null,
+      commercial_narrative: issue.commercial_narrative || null,
       phase5_quantification: phase5Quant,
       market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
@@ -2262,7 +2263,6 @@ function renderCard(card) {
   const persistenceSignal = getPersistenceSignal(card);
   const decisionLine = card.enforced_decision_line || card.decision || "";
   const executionActionsRaw = card.enforced_execution_actions || card.execution_actions || [];
-  const executionSource = card.enforced_execution_actions ? 'enforced' : 'legacy';
   const executionActions = Array.isArray(executionActionsRaw)
     ? executionActionsRaw
     : String(executionActionsRaw)
@@ -2302,20 +2302,21 @@ function renderCard(card) {
           <div class="section-text">${escHtml(signalLine)}</div>
           ${persistenceSignal ? `<div class="impact-meta" style="margin-top:8px;">${escHtml(persistenceSignal)}</div>` : ''}
         </div>
+        ${card.commercial_narrative ? `
+        <div class="finding-section">
+          <div class="section-label">ANALYSIS</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(card.commercial_narrative)}</div>
+        </div>` : ''}
         <div class="finding-section">
           <div class="section-label">IMPACT</div>
           <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(impactLine)}</div>
         </div>
         <div class="finding-section">
-          <div class="impact-meta">arbitration_role: ${escHtml(card.arbitration_role || 'EMPTY')}</div>
-          <div class="impact-meta">primary_driver: ${escHtml(card.primary_driver || 'EMPTY')}</div>
-          <div class="impact-meta">enforced_decision_line: ${escHtml(card.enforced_decision_line || 'EMPTY')}</div>
           <div class="section-label">DECISION</div>
           <div class="decision-line">${escHtml(decisionLine)}</div>
         </div>
         <div class="finding-section">
           <div class="section-label">EXECUTION</div>
-          <div class="impact-meta">execution source: ${escHtml(executionSource)}</div>
           <ul class="action-line" style="margin-left:16px; display:flex; flex-direction:column; gap:4px;">${executionList}</ul>
           <div style="margin-top:10px; text-align:right;">
             <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
