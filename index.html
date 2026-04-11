@@ -2721,6 +2721,23 @@ function renderForwardCard(card) {
       .trim();
   }
 
+  if (forwardAnalysisNarrative) {
+    forwardAnalysisNarrative = forwardAnalysisNarrative
+      .split('\n\n')
+      .map(para => {
+        const sents = para
+          .split(/\.\s+/)
+          .map(s => s.trim())
+          .filter(Boolean)
+          .filter(s => !s.toLowerCase().includes('snapshot history'));
+        return sents.join('.  ');
+      })
+      .map(p => p.trim())
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+  }
+
   const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
   const forwardImpactLine = buildForwardImpactLine(card);
   const decisionLine = (card.enforced_decision_line || '').toString().trim();
@@ -2761,7 +2778,7 @@ function renderForwardCard(card) {
         </div>
         ${forwardAnalysisNarrative ? `
         <div class="finding-section">
-          <div class="section-label">ANALYSIS</div>
+          <div class="section-label">FORWARD ANALYSIS</div>
           <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(forwardAnalysisNarrative)}</div>
         </div>` : ''}
         <div class="finding-section">
