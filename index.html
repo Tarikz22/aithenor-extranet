@@ -408,7 +408,65 @@ body {
 .tab.active .tab-count { background: var(--gold-pale); color: var(--amber); }
 
 /* ── FINDINGS ─────────────────────────────────────────── */
-.findings-list { display: flex; flex-direction: column; gap: 10px; }
+.findings-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.findings-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.column-header {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  padding: 0 0 10px 0;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 4px;
+}
+
+.column-header .column-period {
+  font-weight: 400;
+  color: var(--gray-400);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.finding-card.forward-card .priority-stripe {
+  background: #185FA5;
+}
+
+.finding-card.forward-card {
+  border-left: none;
+}
+
+.forward-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: #E6F1FB;
+  color: #185FA5;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+.decision-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.5;
+}
 
 .finding-card {
   background: var(--white);
@@ -537,7 +595,6 @@ body {
   line-height: 1;
 }
 .impact-meta { margin-top: 5px; font-size: 11px; color: var(--gray-600); }
-.decision-line { font-size: 13px; font-weight: 600; color: var(--navy); line-height: 1.5; }
 .action-line { font-size: 13px; color: var(--gray-900); line-height: 1.55; }
 
 /* ── EMPTY STATE ──────────────────────────────────────── */
@@ -561,6 +618,10 @@ body {
 }
 
 @media (max-width: 900px) {
+  .findings-columns {
+    grid-template-columns: 1fr;
+  }
+
   .sidebar { display: none; }
   .main { margin-left: 0; }
   .content { padding: 20px; }
@@ -772,9 +833,21 @@ body {
         </div>
       </div>
 
-      <div class="findings-list" id="findings-list"></div>
-
-      <div class="empty-state" id="empty-state">
+      <div class="findings-columns" id="findings-columns">
+        <div class="findings-column" id="findings-historical">
+          <div class="column-header">
+            Actualized performance
+            <div class="column-period" id="column-period-historical"></div>
+          </div>
+        </div>
+        <div class="findings-column" id="findings-forward">
+          <div class="column-header">
+            Forward exposure
+            <div class="column-period" id="column-period-forward"></div>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state" id="empty-state-columns" style="display:none">
         <div class="empty-state-icon">◈</div>
         <h3>No findings for this filter</h3>
         <p>Try selecting a different cycle or upload a new hotel file.</p>
@@ -817,6 +890,8 @@ let actionedIds = new Set();
 let allSnapshots = [];
 let dashboardCards = [];
 let dashboardMeta = null;
+let currentEngineRow = null;
+let currentEngineJson = null;
 
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
@@ -1832,12 +1907,6 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       raw_recommendation: recommendation,
       raw_engine_action: engineAction
     };
-    console.log("CARD_ENFORCED", {
-      title: card.title,
-      finding_key: card.finding_key,
-      enforced_decision_line: card.enforced_decision_line,
-      enforced_execution_actions: card.enforced_execution_actions
-    });
     return card;
   });
 
@@ -1855,6 +1924,30 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       market_context: overallMarketContext
     }
   };
+}
+
+function buildForwardCards(engineRow, engineJson) {
+  const issues = Array.isArray(engineJson?.forward_issues) ? engineJson.forward_issues : [];
+  return issues.map(issue => ({
+    id: 'FWD_' + issue.finding_key + '_' + engineRow.snapshot_date,
+    title: issue.title,
+    finding_key: issue.finding_key,
+    is_forward_card: true,
+    window_label: issue.window_label,
+    commercial_narrative: issue.commercial_narrative || null,
+    enforced_decision_line: issue.enforced_decision_line || null,
+    enforced_execution_actions: issue.enforced_execution_actions || [],
+    priority: issue.priority || 'medium',
+    issue_family: issue.issue_family,
+    forward_window: issue.forward_window,
+    trigger_display: '',
+    has_null_metrics: true,
+    value_at_stake: null,
+    execution_owner: 'Revenue',
+    snapshot_date: engineRow.snapshot_date,
+    period_label: engineRow.period_label,
+    department: 'Revenue'
+  }));
 }
 
 function buildCardsFromData(engineRow, recommendations, actions) {
@@ -2102,11 +2195,6 @@ function buildDecisionLine(card) {
       return 'Support discount optimization while maintaining stable pricing posture.';
     }
   }
-  console.log("RENDER_ENFORCED", {
-    title: card.title,
-    finding_key: card.finding_key,
-    enforced_decision_line: card.enforced_decision_line
-  });
   const enforced = (card.enforced_decision_line || '').toString().trim();
   if (enforced) return enforced;
   return buildTimingAwareDecision(card);
@@ -2150,6 +2238,8 @@ function renderDashboard() {
     : [...dashboardCards];
   const rankedCards = sortByPriorityAndRisk(cardsForPeriod).slice(0, 3);
   const visibleCards = getFilteredCards();
+  const visibleForwardCards = getFilteredForwardCards();
+  const combinedFindingsCount = visibleCards.length + visibleForwardCards.length;
   const summaryRangeTotals = visibleCards.reduce((acc, card) => {
     const q = getQuantificationNode(card);
     const rr = q.revenue_range || q.revenueAtRiskRange || q.revenue_at_risk_range || null;
@@ -2176,8 +2266,10 @@ function renderDashboard() {
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
   const totalValue = summaryLegacyValue || dashboardMeta?.total_value || 0;
   const criticalCount = visibleCards.filter(c => c.priority === 'high' || c.priority === 'critical').length;
-  const actionedCount = visibleCards.filter(c => actionedIds.has(c.id)).length;
-  const pct = rankedCards.length ? Math.round((actionedCount / rankedCards.length) * 100) : 0;
+  const actionedCount =
+    visibleCards.filter(c => actionedIds.has(c.id)).length +
+    visibleForwardCards.filter(c => actionedIds.has(c.id)).length;
+  const pct = combinedFindingsCount ? Math.round((actionedCount / combinedFindingsCount) * 100) : 0;
   let summaryRevenueRiskLabel = visibleCards.length ? 'High revenue exposure' : 'Impact under review';
   if (summaryRangeTotals.max > 0) {
     if (summaryRangeTotals.min > 0 && Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) / summaryRangeTotals.min < 0.2) {
@@ -2203,22 +2295,29 @@ function renderDashboard() {
 
   document.getElementById('stat-total').textContent = formatCurrency(totalValue);
   document.getElementById('stat-critical').textContent = criticalCount;
-  document.getElementById('stat-findings').textContent = rankedCards.length;
+  document.getElementById('stat-findings').textContent = combinedFindingsCount;
   document.getElementById('stat-actioned').textContent = actionedCount;
-  document.getElementById('badge-count').textContent = rankedCards.length;
+  document.getElementById('badge-count').textContent = combinedFindingsCount;
   document.getElementById('summary-revenue-risk').textContent = summaryRevenueRiskLabel;
   document.getElementById('summary-primary-focus').textContent = String(criticalCount);
   document.getElementById('summary-market-context').textContent = String(actionedCount);
 
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('progress-pct').textContent = pct + '%';
-  document.getElementById('progress-label').textContent = `${actionedCount} of ${rankedCards.length} findings actioned`;
+  document.getElementById('progress-label').textContent = `${actionedCount} of ${combinedFindingsCount} findings actioned`;
 
-  document.getElementById('tab-all').textContent = rankedCards.length;
+  document.getElementById('tab-all').textContent = combinedFindingsCount;
   document.getElementById('tab-revenue').textContent = rankedCards.filter(c => isRevenueDepartment(c.department)).length;
   document.getElementById('tab-cost').textContent = rankedCards.filter(c => !isRevenueDepartment(c.department)).length;
   document.getElementById('tab-critical').textContent = criticalCount;
   document.getElementById('tab-actioned').textContent = actionedCount;
+
+  const colHist = document.getElementById('column-period-historical');
+  const colFwd = document.getElementById('column-period-forward');
+  if (colHist && colFwd) {
+    colHist.textContent = currentEngineRow?.period_label || '';
+    colFwd.textContent = deriveForwardColumnPeriodLabel(currentEngineJson);
+  }
 
   renderFindings();
 }
@@ -2241,27 +2340,92 @@ function getFilteredCards() {
   return sortByPriorityAndRisk(cards).slice(0, 3);
 }
 
-function renderFindings() {
-  const cards = getFilteredCards();
-  const list = document.getElementById('findings-list');
-  const empty = document.getElementById('empty-state');
+function getFilteredForwardCards() {
+  if (!currentEngineRow || !currentEngineJson) return [];
+  let cards = buildForwardCards(currentEngineRow, currentEngineJson);
+  cards = currentPeriod
+    ? cards.filter(card => card.period_label === currentPeriod)
+    : cards;
 
-  if (!cards.length) {
-    list.innerHTML = '';
-    empty.style.display = 'block';
+  if (currentTab === 'revenue') {
+    cards = cards.filter(card => isRevenueDepartment(card.department));
+  } else if (currentTab === 'cost') {
+    cards = cards.filter(card => !isRevenueDepartment(card.department));
+  } else if (currentTab === 'critical') {
+    cards = cards.filter(card => card.priority === 'high' || card.priority === 'critical');
+  } else if (currentTab === 'actioned') {
+    cards = cards.filter(card => actionedIds.has(card.id));
+  }
+
+  return sortByPriorityAndRisk(cards).slice(0, 3);
+}
+
+function deriveForwardColumnPeriodLabel(engineJson) {
+  const issues = Array.isArray(engineJson?.forward_issues) ? engineJson.forward_issues : [];
+  for (const issue of issues) {
+    const fw = issue.forward_window;
+    if (fw != null && String(fw).trim()) return String(fw).trim();
+  }
+  for (const issue of issues) {
+    const wl = (issue.window_label || '').toString();
+    const m = wl.match(/next\s+(\d+)\s*days?/i);
+    if (m) return `Next ${m[1]} days`;
+  }
+  for (const issue of issues) {
+    const wl = issue.window_label;
+    if (wl != null && String(wl).trim()) return String(wl).trim();
+  }
+  return 'Next 264 days';
+}
+
+function renderFindings() {
+  const historicalCards = getFilteredCards();
+  const forwardCards = getFilteredForwardCards();
+  const histCol = document.getElementById('findings-historical');
+  const fwdCol = document.getElementById('findings-forward');
+  const columnsEl = document.getElementById('findings-columns');
+  const emptyCols = document.getElementById('empty-state-columns');
+  if (!histCol || !fwdCol || !columnsEl || !emptyCols) return;
+
+  const headerHist = histCol.querySelector('.column-header');
+  const headerFwd = fwdCol.querySelector('.column-header');
+  histCol.innerHTML = '';
+  fwdCol.innerHTML = '';
+  histCol.appendChild(headerHist);
+  fwdCol.appendChild(headerFwd);
+
+  if (!historicalCards.length && !forwardCards.length) {
+    columnsEl.style.display = 'none';
+    emptyCols.style.display = 'block';
     return;
   }
 
-  empty.style.display = 'none';
-  list.innerHTML = cards.map(renderCard).join('');
+  columnsEl.style.display = 'grid';
+  emptyCols.style.display = 'none';
+
+  historicalCards.forEach(card => {
+    histCol.insertAdjacentHTML('beforeend', renderCard(card));
+  });
+  forwardCards.forEach(card => {
+    fwdCol.insertAdjacentHTML('beforeend', renderForwardCard(card));
+  });
+}
+
+function forwardSignalLine(card) {
+  const narrative = (card.commercial_narrative || '').toString().trim();
+  if (!narrative) return '';
+  const idx = narrative.indexOf('.');
+  return idx === -1 ? narrative : narrative.slice(0, idx + 1).trim();
 }
 
 function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
   const signalLine = buildInsightLine(card);
+  const keyInsightLine = (card.key_insight && String(card.key_insight).trim()) || '';
+  const signalDisplay = keyInsightLine || signalLine;
   const impactLine = buildWhyLine(card, signalLine);
   const persistenceSignal = getPersistenceSignal(card);
-  const decisionLine = card.enforced_decision_line || card.decision || "";
+  const decisionLine = (card.enforced_decision_line || card.decision || '').toString().trim();
   const executionActionsRaw = card.enforced_execution_actions || card.execution_actions || [];
   const executionActions = Array.isArray(executionActionsRaw)
     ? executionActionsRaw
@@ -2299,7 +2463,7 @@ function renderCard(card) {
       <div class="finding-body">
         <div class="finding-section">
           <div class="section-label">SIGNAL</div>
-          <div class="section-text">${escHtml(signalLine)}</div>
+          <div class="section-text">${escHtml(signalDisplay)}</div>
           ${persistenceSignal ? `<div class="impact-meta" style="margin-top:8px;">${escHtml(persistenceSignal)}</div>` : ''}
         </div>
         ${card.commercial_narrative ? `
@@ -2311,6 +2475,68 @@ function renderCard(card) {
           <div class="section-label">IMPACT</div>
           <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(impactLine)}</div>
         </div>
+        <div class="finding-section">
+          <div class="section-label">DECISION</div>
+          <div class="decision-line">${escHtml(decisionLine)}</div>
+        </div>
+        <div class="finding-section">
+          <div class="section-label">EXECUTION</div>
+          <ul class="action-line" style="margin-left:16px; display:flex; flex-direction:column; gap:4px;">${executionList}</ul>
+          <div style="margin-top:10px; text-align:right;">
+            <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
+              ${isActioned ? '✓ Actioned' : 'Mark as actioned'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderForwardCard(card) {
+  const isActioned = actionedIds.has(card.id);
+  const signalDisplay = forwardSignalLine(card);
+  const decisionLine = (card.enforced_decision_line || '').toString().trim();
+  const executionActionsRaw = card.enforced_execution_actions || [];
+  const executionActions = Array.isArray(executionActionsRaw)
+    ? executionActionsRaw
+    : String(executionActionsRaw)
+        .split(/\n|•|;|\u2022/)
+        .map(s => s.trim())
+        .filter(Boolean);
+  const executionList = executionActions.map(item => `<li>${escHtml(item)}</li>`).join('');
+
+  return `
+    <div class="finding-card forward-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
+      <div class="finding-header">
+        <div class="priority-stripe ${escHtml(card.priority)}"></div>
+
+        <div class="finding-center">
+          <div class="finding-title">${escHtml(card.title)}</div>
+          <div class="finding-oneliner">${escHtml(card.period_label || '')}</div>
+        </div>
+
+        <div class="finding-right">
+          <div class="trigger-metric-value" style="font-size:11px; text-align:right;">${escHtml(card.window_label || '')}</div>
+          <div class="trigger-metric-label">Forward window</div>
+
+          <div class="badges-row">
+            <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
+            <span class="forward-badge">Forward</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="finding-body">
+        <div class="finding-section">
+          <div class="section-label">SIGNAL</div>
+          <div class="section-text">${escHtml(signalDisplay)}</div>
+        </div>
+        ${card.commercial_narrative ? `
+        <div class="finding-section">
+          <div class="section-label">ANALYSIS</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(card.commercial_narrative)}</div>
+        </div>` : ''}
         <div class="finding-section">
           <div class="section-label">DECISION</div>
           <div class="decision-line">${escHtml(decisionLine)}</div>
@@ -2364,11 +2590,13 @@ async function loadDashboard() {
     if (!currentSnapshot) {
       dashboardCards = [];
       dashboardMeta = null;
+      currentEngineRow = null;
+      currentEngineJson = null;
       populatePeriodFilter([]);
       renderDashboard();
       showLoading(false);
       document.getElementById('dashboard').style.display = 'block';
-      document.getElementById('empty-state').style.display = 'block';
+      document.getElementById('empty-state-columns').style.display = 'block';
       return;
     }
 
@@ -2421,10 +2649,18 @@ async function loadDashboard() {
     dashboardCards = built.cards;
     dashboardMeta = built.meta;
 
+    currentEngineRow = engineRow;
+    currentEngineJson =
+      typeof engineRow.engine_json === 'string'
+        ? JSON.parse(engineRow.engine_json)
+        : (engineRow.engine_json || {});
+
     renderDashboard();
     showLoading(false);
     document.getElementById('dashboard').style.display = 'block';
   } catch (err) {
+    currentEngineRow = null;
+    currentEngineJson = null;
     showLoading(false);
     showError('Could not load data: ' + err.message);
     console.error(err);
