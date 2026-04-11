@@ -1395,19 +1395,101 @@ function getQuantificationNode(card) {
   return nested && typeof nested === 'object' ? nested : {};
 }
 
+function getPhase5Root(card) {
+  const p = card.phase5_quantification;
+  return p && typeof p === 'object' ? p : {};
+}
+
+function formatCommercialInterpretationForDisplay(card, interpretationRaw) {
+  const text = (interpretationRaw || '').toString().trim();
+  if (!text) return '';
+  const p5 = getPhase5Root(card);
+  const qs = p5.quantified_signals && typeof p5.quantified_signals === 'object' ? p5.quantified_signals : {};
+  const issueFamilyNorm = normalize((p5.issue_family || qs.issue_family || card.issue_family || '').toString());
+  const q = getQuantificationNode(card);
+  const roomNights = Number(
+    q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk ?? p5.room_nights_at_risk ?? qs.room_nights_at_risk
+  );
+  if (
+    issueFamilyNorm.includes('discount_inefficiency') &&
+    Number.isFinite(roomNights) &&
+    roomNights > 500
+  ) {
+    const qsRr = qs.revenue_range && typeof qs.revenue_range === 'object' ? qs.revenue_range : null;
+    if (qsRr) {
+      const minE = Number(qsRr.min ?? qsRr.low ?? qsRr.from);
+      const maxE = Number(qsRr.max ?? qsRr.high ?? qsRr.to);
+      if (Number.isFinite(maxE) && maxE > 0) {
+        const minStr = Number.isFinite(minE) && minE > 0 ? `€${formatNumber(minE)}` : '';
+        const maxStr = `€${formatNumber(maxE)}`;
+        const band = minStr ? `${minStr}-${maxStr}` : maxStr;
+        return `ADR gap versus fair share: estimated ${band} revenue shortfall.`;
+      }
+    }
+  }
+  return text;
+}
+
+function getQuantifiedSignalsRevenueRange(card) {
+  const qs = getPhase5Root(card).quantified_signals;
+  const rr = qs && typeof qs === 'object' ? qs.revenue_range : null;
+  if (!rr) return null;
+  const max = Number(rr.max ?? rr.high ?? rr.to);
+  if (!Number.isFinite(max) || max <= 0) return null;
+  const min = Number(rr.min ?? rr.low ?? rr.from);
+  return {
+    min: Number.isFinite(min) ? min : null,
+    max,
+    raw: rr
+  };
+}
+
 function getQuantifiedFinancialLabel(card) {
   const q = getQuantificationNode(card);
+  const p5 = getPhase5Root(card);
+  const qs = p5.quantified_signals && typeof p5.quantified_signals === 'object' ? p5.quantified_signals : {};
+  const issueFamilyRaw = (p5.issue_family || qs.issue_family || card.issue_family || '').toString();
+  const issueFamilyNorm = normalize(issueFamilyRaw);
+  const roomNightsRaw = Number(
+    q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk ?? p5.room_nights_at_risk ?? qs.room_nights_at_risk
+  );
+
   const rr = q.revenue_range || q.revenueAtRiskRange || q.revenue_at_risk_range || null;
   const rangeLabel = rr
     ? formatRiskRange(rr.min ?? rr.low ?? rr.from, rr.max ?? rr.high ?? rr.to)
     : '';
   if (rangeLabel) return rangeLabel;
 
-  const roomNightsLabel = formatRoomNightsRisk(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
-  if (roomNightsLabel) return `~${roomNightsLabel}`;
+  const roomNightsLabel = formatRoomNightsRisk(
+    q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk ?? p5.room_nights_at_risk ?? qs.room_nights_at_risk
+  );
+  if (roomNightsLabel) {
+    if (
+      issueFamilyNorm.includes('discount_inefficiency') &&
+      Number.isFinite(roomNightsRaw) &&
+      roomNightsRaw > 500
+    ) {
+      const qsRr = qs.revenue_range && typeof qs.revenue_range === 'object' ? qs.revenue_range : null;
+      if (qsRr) {
+        const minE = Number(qsRr.min ?? qsRr.low ?? qsRr.from);
+        const maxE = Number(qsRr.max ?? qsRr.high ?? qsRr.to);
+        if (Number.isFinite(maxE) && maxE > 0) {
+          const minStr = Number.isFinite(minE) && minE > 0 ? `€${formatNumber(minE)}` : '';
+          const maxStr = `€${formatNumber(maxE)}`;
+          const band = minStr ? `${minStr}-${maxStr}` : maxStr;
+          return `ADR gap versus fair share: estimated ${band} revenue shortfall.`;
+        }
+      }
+    }
+    return `~${roomNightsLabel}`;
+  }
 
   if (card.value_at_stake > 0) {
     return `€${formatNumber(card.value_at_stake)} revenue at risk`;
+  }
+  const commercialInterpretation = (p5.commercial_interpretation || qs.commercial_interpretation || '').toString().trim();
+  if (commercialInterpretation) {
+    return formatCommercialInterpretationForDisplay(card, commercialInterpretation);
   }
   return null;
 }
@@ -1548,27 +1630,50 @@ function buildInsightLine(card) {
   return 'Share stayed below target across core demand windows.';
 }
 
+function formatImpactEuroPlus(value) {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) return '';
+  return `€${formatNumber(v)}+`;
+}
+
+function getImpactIssueFamilyKey(card) {
+  const p5 = getPhase5Root(card);
+  const qs = p5.quantified_signals && typeof p5.quantified_signals === 'object' ? p5.quantified_signals : {};
+  const raw = (p5.issue_family || qs.issue_family || card.issue_family || '').toString();
+  const n = normalize(raw);
+  if (n.includes('pricing_resistance')) return 'pricing_resistance';
+  if (n.includes('discount_inefficiency')) return 'discount_inefficiency';
+  if (n.includes('intentional_volume_recovery')) return 'intentional_volume_recovery';
+  if (n.includes('missed_pricing_opportunity')) return 'missed_pricing_opportunity';
+  const coarse = getIssueFamily(card);
+  if (coarse === 'pricing') return 'pricing_resistance';
+  if (coarse === 'discount') return 'discount_inefficiency';
+  if (coarse === 'direct') return 'missed_pricing_opportunity';
+  return '';
+}
+
+function buildQuantifiedSignalsImpactLine(card) {
+  const rr = getQuantifiedSignalsRevenueRange(card);
+  if (!rr) return '';
+  const maxStr = formatImpactEuroPlus(rr.max);
+  if (!maxStr) return '';
+  const family = getImpactIssueFamilyKey(card);
+  if (family === 'pricing_resistance') return `${maxStr} estimated revenue at risk from share gap.`;
+  if (family === 'discount_inefficiency') return `${maxStr} revenue impact from rate-to-share inefficiency.`;
+  if (family === 'intentional_volume_recovery') return `${maxStr} rate concession cost versus last year.`;
+  if (family === 'missed_pricing_opportunity') return `${maxStr} estimated rate uplift opportunity.`;
+  return `${maxStr} estimated revenue at risk.`;
+}
+
 function buildWhyLine(card, insightText) {
-  const financial = getQuantifiedFinancialLabel(card);
-  const family = getIssueFamily(card);
-  const scope = inferScopeReference(card);
-  if (financial) {
-    if (family === 'pricing') return `${financial} on ${scope}.`;
-    if (family === 'discount') return `${financial} while discounting fails to recover share.`;
-    if (family === 'direct') return `${financial} from missed direct-demand capture.`;
-    return `${financial} across current priority windows.`;
+  const qLine = buildQuantifiedSignalsImpactLine(card);
+  if (qLine) return qLine;
+  const v = Number(card.value_at_stake);
+  if (Number.isFinite(v) && v > 0) {
+    const euro = formatImpactEuroPlus(v);
+    return euro ? `${euro} estimated revenue exposure.` : '';
   }
-  const q = getQuantificationNode(card);
-  const roomNights = Number(q.room_nights_at_risk ?? q.roomNightsAtRisk ?? q.rooms_at_risk);
-  if (Number.isFinite(roomNights) && roomNights > 0) {
-    return `~${Math.round(roomNights)} room nights at risk on ${scope}.`;
-  }
-  const estimated = estimateFallbackImpact(card);
-  if (estimated && estimated.includes('estimated')) return `${estimated} on ${scope}.`;
-  if (family === 'pricing') return 'Current pricing is rejecting demand and share is slipping.';
-  if (family === 'discount') return 'Margin is being diluted without enough share recovery.';
-  if (family === 'direct') return 'Direct share is slipping despite available demand.';
-  return estimateFallbackImpact(card);
+  return '';
 }
 
 function getObservedWindow(card) {
@@ -1903,6 +2008,7 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       enforced_execution_actions: issue.enforced_execution_actions || null,
       commercial_narrative: issue.commercial_narrative || null,
       phase5_quantification: phase5Quant,
+      issue_family: issue.issue_family || phase5Quant.issue_family || '',
       market_context: overallMarketContext || recommendation?.market_context || '',
       raw_recommendation: recommendation,
       raw_engine_action: engineAction
@@ -1926,11 +2032,89 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
   };
 }
 
+function stripForwardSignalDateRangePrefix(text) {
+  if (!text) return '';
+  const t = text.trim();
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}\s*[–\-→]\s*\d{1,2}\/\d{1,2}\/\d{2,4}/.test(t)) {
+    const colon = t.indexOf(':');
+    if (colon !== -1) return t.slice(colon + 1).trim();
+  }
+  return t;
+}
+
+function buildForwardPaceSignalLine(card) {
+  const narrative = (card.commercial_narrative || '').toString().trim();
+  if (!narrative) return '';
+  const firstPara = (narrative.split(/\n\n+/)[0] || '').trim();
+  if (!firstPara) return '';
+  const sentences = firstPara
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  let signal = sentences.find(s => s.includes('%')) || '';
+  if (!signal && sentences.length) signal = sentences[0];
+  if (!signal) {
+    const firstDot = firstPara.indexOf('.');
+    signal = firstDot === -1 ? firstPara : firstPara.slice(0, firstDot + 1).trim();
+  }
+  return stripForwardSignalDateRangePrefix(signal.trim());
+}
+
+function extractForwardDragSegment(narrative) {
+  const t = (narrative || '').toString();
+  const m = t.match(/(.+?)\s+is\s+the\s+largest\s+drag/i);
+  if (!m) return '';
+  let seg = m[1].trim();
+  seg = seg.replace(/^the\s+/i, '').replace(/\s+segment\s*$/i, '').trim();
+  return seg;
+}
+
+function extractForwardWindowShortDescription(windowLabel) {
+  const w = (windowLabel || '').toString().trim();
+  if (!w) return '';
+  let m = w.match(/next\s+(\d+)\s+days?/i);
+  if (m) return `next ${m[1]} days`;
+  m = w.match(/days\s+(\d+)\s*[-–]\s*(\d+)\s+ahead/i);
+  if (m) return `days ${m[1]}–${m[2]} ahead`;
+  const colon = w.indexOf(':');
+  if (colon !== -1) return w.slice(0, colon).trim();
+  return w.length > 56 ? `${w.slice(0, 53)}…` : w;
+}
+
+function buildForwardCardTitle(issue) {
+  const narrative = issue.commercial_narrative || '';
+  const segment = extractForwardDragSegment(narrative);
+  const windowDesc = extractForwardWindowShortDescription(issue.window_label);
+  if (segment && windowDesc) return `${segment} pace shortfall — ${windowDesc}`;
+  if (segment) return `${segment} pace shortfall`;
+  return issue.title || 'Forward finding';
+}
+
+function formatRoomNightsIntegerDisplay(raw) {
+  const n = Number(String(raw).replace(/,/g, ''));
+  if (!Number.isFinite(n)) return '';
+  return n.toLocaleString('en-US');
+}
+
+function extractRoomNightsBehindReference(narrative) {
+  const m = (narrative || '').toString().match(/(\d[\d,]*)\s+room\s+nights\s+behind\s+reference/i);
+  if (!m) return '';
+  return formatRoomNightsIntegerDisplay(m[1]);
+}
+
+function buildForwardImpactLine(card) {
+  const x = extractRoomNightsBehindReference(card.commercial_narrative);
+  const win = extractForwardWindowShortDescription(card.window_label) || (card.window_label || '').trim();
+  if (x && win) return `${x} room nights behind reference pace — ${win}.`;
+  if (x) return `${x} room nights behind reference pace.`;
+  return 'Pace shortfall detected — see analysis for detail.';
+}
+
 function buildForwardCards(engineRow, engineJson) {
   const issues = Array.isArray(engineJson?.forward_issues) ? engineJson.forward_issues : [];
   return issues.map(issue => ({
     id: 'FWD_' + issue.finding_key + '_' + engineRow.snapshot_date,
-    title: issue.title,
+    title: buildForwardCardTitle(issue),
     finding_key: issue.finding_key,
     is_forward_card: true,
     window_label: issue.window_label,
@@ -2411,13 +2595,6 @@ function renderFindings() {
   });
 }
 
-function forwardSignalLine(card) {
-  const narrative = (card.commercial_narrative || '').toString().trim();
-  if (!narrative) return '';
-  const idx = narrative.indexOf('.');
-  return idx === -1 ? narrative : narrative.slice(0, idx + 1).trim();
-}
-
 function renderCard(card) {
   const isActioned = actionedIds.has(card.id);
   const signalLine = buildInsightLine(card);
@@ -2495,7 +2672,9 @@ function renderCard(card) {
 
 function renderForwardCard(card) {
   const isActioned = actionedIds.has(card.id);
-  const signalDisplay = forwardSignalLine(card);
+  const signalDisplay = buildForwardPaceSignalLine(card);
+  const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
+  const forwardImpactLine = buildForwardImpactLine(card);
   const decisionLine = (card.enforced_decision_line || '').toString().trim();
   const executionActionsRaw = card.enforced_execution_actions || [];
   const executionActions = Array.isArray(executionActionsRaw)
@@ -2513,7 +2692,7 @@ function renderForwardCard(card) {
 
         <div class="finding-center">
           <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${escHtml(card.period_label || '')}</div>
+          <div class="finding-oneliner">${evidenceSubline}</div>
         </div>
 
         <div class="finding-right">
@@ -2537,6 +2716,10 @@ function renderForwardCard(card) {
           <div class="section-label">ANALYSIS</div>
           <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(card.commercial_narrative)}</div>
         </div>` : ''}
+        <div class="finding-section">
+          <div class="section-label">IMPACT</div>
+          <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(forwardImpactLine)}</div>
+        </div>
         <div class="finding-section">
           <div class="section-label">DECISION</div>
           <div class="decision-line">${escHtml(decisionLine)}</div>
