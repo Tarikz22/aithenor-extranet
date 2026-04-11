@@ -2672,7 +2672,55 @@ function renderCard(card) {
 
 function renderForwardCard(card) {
   const isActioned = actionedIds.has(card.id);
-  const signalDisplay = buildForwardPaceSignalLine(card);
+  const narrative = (card.commercial_narrative || '').toString().trim();
+
+  const splitForwardSentences = para =>
+    para
+      .split(/\.\s+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+  const stripForwardSignalWindowPrefix = sent => {
+    let s = sent.trim();
+    const reDays = /^Days\s+\d+[–\-]\d+\s+ahead:\s*.+?\s*(?:→|->)\s*.+?\s+is\s+/i;
+    const reNext = /^Next\s+\d+\s+days:\s*.+?\s*(?:→|->)\s*.+?\s+is\s+\.?/i;
+    if (reDays.test(s)) s = s.replace(reDays, '');
+    else if (reNext.test(s)) s = s.replace(reNext, '');
+    s = s.trim();
+    if (s.length) s = s.charAt(0).toUpperCase() + s.slice(1);
+    return s;
+  };
+
+  let signalDisplay = '';
+  const signalFirstPara = (narrative.split(/\n\n+/)[0] || '').trim();
+  if (signalFirstPara) {
+    const sents = splitForwardSentences(signalFirstPara);
+    const pctSent = sents.find(x => x.includes('%'));
+    if (pctSent) {
+      let t = stripForwardSignalWindowPrefix(pctSent);
+      if (t && !/\.$/.test(t)) t += '.';
+      signalDisplay = t;
+    }
+  }
+
+  let forwardAnalysisNarrative = narrative;
+  if (narrative) {
+    const paras = narrative.split(/\n\n+/);
+    const fp = (paras[0] || '').trim();
+    const dotSpace = fp.search(/\.\s+/);
+    const firstSent = dotSpace === -1 ? fp : fp.slice(0, dotSpace + 1).trim();
+    const rest = dotSpace === -1 ? '' : fp.slice(dotSpace + 1).trim();
+    const winStart = /^(Days\s+\d+[–\-]\d+\s+ahead:|Next\s+\d+\s+days:)/i;
+    if (fp && winStart.test(firstSent)) {
+      paras[0] = rest;
+    }
+    forwardAnalysisNarrative = paras
+      .map(p => p.trim())
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+  }
+
   const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
   const forwardImpactLine = buildForwardImpactLine(card);
   const decisionLine = (card.enforced_decision_line || '').toString().trim();
@@ -2711,10 +2759,10 @@ function renderForwardCard(card) {
           <div class="section-label">SIGNAL</div>
           <div class="section-text">${escHtml(signalDisplay)}</div>
         </div>
-        ${card.commercial_narrative ? `
+        ${forwardAnalysisNarrative ? `
         <div class="finding-section">
           <div class="section-label">ANALYSIS</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(card.commercial_narrative)}</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(forwardAnalysisNarrative)}</div>
         </div>` : ''}
         <div class="finding-section">
           <div class="section-label">IMPACT</div>
