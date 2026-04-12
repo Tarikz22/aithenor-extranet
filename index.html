@@ -2707,7 +2707,53 @@ function renderFindings() {
       ].filter(Boolean).join(' ')
     };
 
-    const mHtml = renderCard(mCard);
+    // Inject a precise impact line for monthly cards.
+    // buildWhyLine() does not know how to read monthly card structure
+    // so we override key_insight with the impact statement.
+    // key_insight takes priority over the auto-built signal line
+    // in renderCard() when present — we repurpose it here for IMPACT
+    // by also setting a whyLine override on the card object.
+    const mDir = mIssue.period_comparison?.direction;
+    const mOccDelta = mIssue.card_metrics?.avgOcc != null &&
+                  mIssue.period_comparison?.period_avg_occ != null
+      ? Math.abs(mIssue.card_metrics.avgOcc -
+             mIssue.period_comparison.period_avg_occ).toFixed(1)
+      : null;
+    const mRgiDelta = mIssue.card_metrics?.avgRGI != null &&
+                  mIssue.period_comparison?.period_avg_rgi != null
+      ? Math.abs(mIssue.card_metrics.avgRGI -
+             mIssue.period_comparison.period_avg_rgi).toFixed(1)
+      : null;
+
+    let mImpactLine = '';
+    if (mDir === 'above') {
+      mImpactLine = [
+        `${mIssue.month_label || 'This month'} outperformed`,
+        mOccDelta ? `Occ +${mOccDelta}pts vs period` : null,
+        mRgiDelta ? `RGI +${mRgiDelta}pts vs period` : null,
+        mIssue.dominant_segment
+          ? `led by ${mIssue.dominant_segment}` : null
+      ].filter(Boolean).join(' — ');
+    } else {
+      mImpactLine = [
+        `${mIssue.month_label || 'This month'} underperformed`,
+        mOccDelta ? `Occ -${mOccDelta}pts vs period` : null,
+        mRgiDelta ? `RGI -${mRgiDelta}pts vs period` : null,
+        mIssue.dominant_segment
+          ? `drag from ${mIssue.dominant_segment}` : null
+      ].filter(Boolean).join(' — ');
+    }
+
+    mCard.expected_outcome = mImpactLine;
+
+    const mHtmlRaw = renderCard(mCard);
+    const mHtml = mHtmlRaw.replace(
+      /Observed window:[^<]*/,
+      `Month: ${escHtml(mIssue.month_label || mIssue.month_key || '')}`
+    ).replace(
+      /(<div class="section-label">IMPACT<\/div>\s*<div class="section-text" style="font-weight:700; color:var\(--navy\);">)[^<]*(<\/div>)/,
+      mImpactLine ? (_, a, b) => `${a}${escHtml(mImpactLine)}${b}` : '$&'
+    );
 
     let styledMHtml = mHtml
       .replace('class="finding-card', 'class="finding-card monthly-card');
@@ -2775,7 +2821,58 @@ function renderFindings() {
       key_insight:   msKeyInsight
     };
 
-    const msHtml = renderCard(msCard);
+    // Inject precise impact line for mix shift cards.
+    // buildWhyLine() cannot read mix shift quantification structure.
+    const msRevImpactLine = msRevImpact != null
+      ? `£${msRevFmt} estimated revenue impact`
+      : null;
+
+    let msImpactLine = '';
+    if (msIssue.pattern === 'displacement') {
+      msImpactLine = [
+        msRevImpactLine,
+        msQ.shifted_rn ? `${msQ.shifted_rn} room nights displaced` : null,
+        msQ.loser_adr_ty && msQ.gainer_adr_ty
+          ? `ADR differential: ${Math.round(msQ.loser_adr_ty -
+          msQ.gainer_adr_ty)}` : null
+      ].filter(Boolean).join(' — ');
+    } else if (msIssue.pattern === 'rate_dilution') {
+      msImpactLine = [
+        msRevImpactLine,
+        msQ.adr_drop_pct
+          ? `ADR down ${msQ.adr_drop_pct.toFixed(1)}% YoY` : null,
+        msQ.rn_ty
+          ? `across ${Math.round(msQ.rn_ty).toLocaleString()} room nights`
+          : null
+      ].filter(Boolean).join(' — ');
+    } else if (msIssue.pattern === 'concentration') {
+      const shareStr = msQ.share_ty != null ? msQ.share_ty.toFixed(0) : '?';
+      msImpactLine = [
+        msQ.dominant_segment
+          ? `${msQ.dominant_segment} at ${shareStr}% of mix`
+          : null,
+        msQ.rev_share_pct != null
+          ? `${msQ.rev_share_pct.toFixed(0)}% of total revenue` : null
+      ].filter(Boolean).join(' — ');
+    }
+
+    if (msImpactLine) msCard.expected_outcome = msImpactLine;
+
+    const iss0 = currentEngineJson?.issues?.[0];
+    const msPeriodLabel = (iss0?.window_label != null && String(iss0.window_label).trim())
+      ? String(iss0.window_label).trim()
+      : (iss0?.episode_week_start && iss0?.episode_week_end
+        ? `${iss0.episode_week_start} → ${iss0.episode_week_end}`
+        : 'Actualized period');
+
+    const msHtmlRaw = renderCard(msCard);
+    const msHtml = msHtmlRaw.replace(
+      /Observed window:[^<]*/,
+      `Period: ${escHtml(msPeriodLabel)}`
+    ).replace(
+      /(<div class="section-label">IMPACT<\/div>\s*<div class="section-text" style="font-weight:700; color:var\(--navy\);">)[^<]*(<\/div>)/,
+      msImpactLine ? (_, a, b) => `${a}${escHtml(msImpactLine)}${b}` : '$&'
+    );
 
     let styledMsHtml = msHtml
       .replace('class="finding-card', 'class="finding-card mix-shift-card');
