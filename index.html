@@ -532,6 +532,175 @@ body {
   border-radius: 3px;
 }
 
+/* ── Phase 3: Grouped collapsible layout ────────────── */
+
+.findings-group {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid var(--gray-200);
+  background: var(--white);
+}
+
+.group-header {
+  display: grid;
+  grid-template-columns: 4px 1fr auto;
+  align-items: stretch;
+  min-height: 64px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--white);
+  transition: background 0.15s;
+}
+
+.group-header:hover {
+  background: var(--gray-100);
+}
+
+.group-accent {
+  border-radius: 4px 0 0 4px;
+}
+
+/* accent colors per group type */
+.group-accent.historical  { background: var(--orange); }
+.group-accent.monthly     { background: var(--gold); }
+.group-accent.mix-shift   { background: #0F6E56; }
+.group-accent.forward     { background: #185FA5; }
+.group-accent.forecast    { background: #7C3AED; }
+
+.group-header-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.group-header-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.group-count {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--gray-400);
+  background: var(--gray-100);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.group-brief {
+  font-size: 12px;
+  color: var(--gray-900);
+  font-weight: 400;
+  line-height: 1.4;
+  /* truncate to one line */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.group-header-right {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  min-width: 100px;
+}
+
+.group-metric {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.group-metric.positive { color: var(--green); }
+.group-metric.negative { color: var(--red); }
+.group-metric.warning  { color: var(--orange); }
+
+.group-meta {
+  font-size: 10px;
+  color: var(--gray-400);
+  text-align: right;
+}
+
+.group-chevron {
+  font-size: 11px;
+  color: var(--gray-400);
+  transition: transform 0.2s ease;
+  margin-top: 2px;
+}
+
+.group-header.open .group-chevron {
+  transform: rotate(180deg);
+}
+
+.group-cards {
+  display: none;
+  flex-direction: column;
+  border-top: 0.5px solid var(--gray-100);
+  /* remove border-radius from cards inside groups */
+  padding: 0;
+}
+
+.group-cards.open {
+  display: flex;
+}
+
+/* cards inside groups lose their outer margin and border-radius */
+.group-cards .finding-card {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 0.5px solid var(--gray-100);
+  margin: 0;
+}
+
+.group-cards .finding-card:last-child {
+  border-bottom: none;
+}
+
+/* monthly cards inside groups keep their gold left border
+   but lose the outer margin/indent */
+.group-cards .monthly-card {
+  margin-left: 0;
+  border-left: 3px solid var(--gold);
+}
+
+/* mix shift cards keep their teal left border */
+.group-cards .mix-shift-card {
+  border-left: 3px solid #0F6E56;
+}
+
+/* forward cards inside groups */
+.group-cards .forward-card {
+  border-left: 3px solid #185FA5;
+}
+
+/* forecast gap cards inside groups */
+.group-cards .forecast-gap-card {
+  border-left: 3px solid #7C3AED;
+}
+
+/* empty group — hide entirely */
+.findings-group.empty {
+  display: none;
+}
+
 .finding-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
 .finding-card.actioned { opacity: 0.58; }
 
@@ -2638,6 +2807,192 @@ function deriveForwardColumnPeriodLabel(engineJson) {
   return 'Next 264 days';
 }
 
+// Phase 3: Toggle a collapsible group open or closed.
+// Called by onclick on .group-header elements.
+function toggleGroup(headerEl) {
+  const isOpen = headerEl.classList.contains('open');
+  headerEl.classList.toggle('open', !isOpen);
+  const cards = headerEl.nextElementSibling;
+  if (cards && cards.classList.contains('group-cards')) {
+    cards.classList.toggle('open', !isOpen);
+  }
+}
+
+// Phase 3: Build a collapsible group header HTML string.
+// groupType: 'historical' | 'monthly' | 'mix-shift' | 'forward' | 'forecast'
+// groupName: display label e.g. "Historical Analysis"
+// brief: one-line signal summary
+// metric: right-side primary number e.g. "£317K"
+// metricClass: 'warning' | 'negative' | 'positive' | ''
+// metaLabel: right-side sub-label e.g. "revenue at risk"
+// count: number of cards in this group
+function buildGroupHeader(groupType, groupName, brief,
+                           metric, metricClass, metaLabel, count) {
+  const countHtml = count > 0
+    ? `<span class="group-count">${count}</span>`
+    : '';
+  const metricHtml = metric
+    ? `<div class="group-metric ${escHtml(metricClass || '')}">
+         ${escHtml(metric)}
+       </div>
+       <div class="group-meta">${escHtml(metaLabel || '')}</div>`
+    : `<div class="group-meta">${escHtml(metaLabel || '')}</div>`;
+
+  // Caller closes group-cards and findings-group with </div></div> after cards.
+  return `
+    <div class="findings-group">
+    <div class="group-header" onclick="toggleGroup(this)">
+      <div class="group-accent ${escHtml(groupType)}"></div>
+      <div class="group-header-body">
+        <div class="group-header-top">
+          <span class="group-name">${escHtml(groupName)}</span>
+          ${countHtml}
+        </div>
+        <div class="group-brief">${escHtml(brief)}</div>
+      </div>
+      <div class="group-header-right">
+        ${metricHtml}
+        <span class="group-chevron">▼</span>
+      </div>
+    </div>
+    <div class="group-cards">
+  `;
+}
+
+// Phase 3: Compute summary data for all group headers
+// from the current engineJson. Returns an object with
+// one summary per group type.
+function computeGroupSummaries(engineJson) {
+  const fmt = v => new Intl.NumberFormat('en-GB',
+    { maximumFractionDigits: 0 }).format(Math.round(v));
+
+  // --- Historical Analysis ---
+  const issues = Array.isArray(engineJson?.issues)
+    ? engineJson.issues : [];
+  const histBrief = issues.length > 0
+    ? (issues[0].enforced_decision_line || issues[0].title || '')
+        .toString().slice(0, 90)
+    : 'No historical signals detected';
+  // Revenue at risk from financial quantification summary
+  const fqs = engineJson?.financial_quantification_summary;
+  const histRevRisk = fqs?.strongest_hidden_losses?.[0]
+    ?.revenue_range?.max ?? null;
+  const histAllRev = Array.isArray(fqs?.issue_level_quantification)
+    ? fqs.issue_level_quantification.reduce((s, q) =>
+        s + (q?.quantified_signals?.revenue_range?.max || 0), 0)
+    : null;
+  const histMetric = histAllRev && histAllRev > 0
+    ? `£${fmt(histAllRev)}`
+    : histRevRisk ? `£${fmt(histRevRisk)}` : null;
+
+  // --- Monthly Detail ---
+  const monthly = Array.isArray(engineJson?.monthly_issues)
+    ? engineJson.monthly_issues : [];
+  const above = monthly.filter(m =>
+    m?.period_comparison?.direction === 'above').length;
+  const below = monthly.filter(m =>
+    m?.period_comparison?.direction === 'below').length;
+  const monthBriefParts = [];
+  if (below > 0) monthBriefParts.push(
+    `${below} month${below > 1 ? 's' : ''} underperformed`);
+  if (above > 0) monthBriefParts.push(
+    `${above} month${above > 1 ? 's' : ''} outperformed`);
+  const monthBrief = monthBriefParts.length > 0
+    ? monthBriefParts.join(', ')
+    : 'No monthly divergence detected';
+  const monthBreaches = monthly.reduce((s, m) =>
+    s + (m?.period_comparison?.breach_count || 0), 0);
+
+  // --- Mix Shift ---
+  const mixShift = Array.isArray(engineJson?.mix_shift_issues)
+    ? engineJson.mix_shift_issues : [];
+  const mixRevTotal = mixShift.reduce((s, ms) => {
+    const q = ms?.quantification || {};
+    return s + (q.revenue_cost || q.revenue_lost || 0);
+  }, 0);
+  const primaryMix = mixShift[0];
+  const mixBrief = primaryMix
+    ? (primaryMix.enforced_decision_line || primaryMix.title || '')
+        .toString().slice(0, 90)
+    : 'No mix shift patterns detected';
+  const mixMetric = mixRevTotal > 0 ? `£${fmt(mixRevTotal)}` : null;
+
+  // --- Forward Pace ---
+  const forward = Array.isArray(engineJson?.forward_issues)
+    ? engineJson.forward_issues : [];
+  // Total room nights behind reference across all windows
+  const fwdRnBehind = forward.reduce((s, f) => {
+    // Extract room nights from commercial_narrative
+    const match = (f?.commercial_narrative || '')
+      .match(/Currently (\d+) room nights behind/);
+    return s + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  const fwdBrief = forward.length > 0
+    ? (forward[0]?.commercial_narrative || '')
+        .split('\n')[0].slice(0, 90)
+    : 'No forward pace data';
+  const fwdMetric = fwdRnBehind > 0
+    ? `${fwdRnBehind} RN behind` : null;
+
+  // --- Forecast Gap ---
+  const fcGap = Array.isArray(engineJson?.forecast_gap_issues)
+    ? engineJson.forecast_gap_issues : [];
+  const fcRevTotal = fcGap.reduce((s, f) =>
+    s + (f?.quantification?.rev_gap || 0), 0);
+  const fcOtbPcts = fcGap
+    .map(f => f?.card_metrics?.avgOcc)
+    .filter(v => v != null);
+  const fcAvgOtbPct = fcOtbPcts.length > 0
+    ? Math.round(fcOtbPcts.reduce((a, b) => a + b, 0)
+        / fcOtbPcts.length)
+    : null;
+  const fcBrief = fcAvgOtbPct != null
+    ? `OTB tracking at ${fcAvgOtbPct}% of plan across all windows`
+    : fcGap.length > 0
+      ? (fcGap[0]?.enforced_decision_line || '').slice(0, 90)
+      : 'No forecast data available';
+  const fcMetric = fcRevTotal > 0 ? `£${fmt(fcRevTotal)}` : null;
+
+  return {
+    historical: {
+      brief: histBrief,
+      metric: histMetric,
+      metricClass: 'warning',
+      metaLabel: 'revenue at risk',
+      count: issues.length
+    },
+    monthly: {
+      brief: monthBrief,
+      metric: monthBreaches > 0 ? `${monthBreaches}` : null,
+      metricClass: '',
+      metaLabel: monthBreaches > 0
+        ? 'metric breaches' : 'no divergence',
+      count: monthly.length
+    },
+    mixShift: {
+      brief: mixBrief,
+      metric: mixMetric,
+      metricClass: 'negative',
+      metaLabel: 'revenue impact',
+      count: mixShift.length
+    },
+    forward: {
+      brief: fwdBrief,
+      metric: fwdMetric,
+      metricClass: 'warning',
+      metaLabel: 'vs last year',
+      count: forward.length
+    },
+    forecast: {
+      brief: fcBrief,
+      metric: fcMetric,
+      metricClass: 'negative',
+      metaLabel: 'vs forecast plan',
+      count: fcGap.length
+    }
+  };
+}
+
 function renderFindings() {
   const historicalCards = getFilteredCards();
   const forwardCards = getFilteredForwardCards();
@@ -2651,10 +3006,22 @@ function renderFindings() {
   const headerFwd = fwdCol.querySelector('.column-header');
   histCol.innerHTML = '';
   fwdCol.innerHTML = '';
-  histCol.appendChild(headerHist);
-  fwdCol.appendChild(headerFwd);
+  if (headerHist) histCol.appendChild(headerHist);
+  if (headerFwd) fwdCol.appendChild(headerFwd);
 
-  if (!historicalCards.length && !forwardCards.length) {
+  const engineJson = currentEngineJson || {};
+  const monthlyIssues = Array.isArray(engineJson.monthly_issues)
+    ? engineJson.monthly_issues : [];
+  const mixShiftIssues = Array.isArray(engineJson.mix_shift_issues)
+    ? engineJson.mix_shift_issues : [];
+  const forecastGapIssues = Array.isArray(engineJson.forecast_gap_issues)
+    ? engineJson.forecast_gap_issues : [];
+
+  const hasAny = historicalCards.length || forwardCards.length ||
+    monthlyIssues.length || mixShiftIssues.length ||
+    forecastGapIssues.length;
+
+  if (!hasAny) {
     columnsEl.style.display = 'none';
     emptyCols.style.display = 'block';
     return;
@@ -2663,312 +3030,314 @@ function renderFindings() {
   columnsEl.style.display = 'grid';
   emptyCols.style.display = 'none';
 
-  historicalCards.forEach(card => {
-    histCol.insertAdjacentHTML('beforeend', renderCard(card));
-  });
+  // Compute all group summaries once
+  const summaries = computeGroupSummaries(engineJson);
 
-  // Phase 2: Monthly detail cards — below period cards in left column.
-  // Render only when monthly_issues has entries.
-  // When empty (single-regime dataset), nothing renders.
-  const monthlyIssues = Array.isArray(currentEngineJson?.monthly_issues)
-    ? currentEngineJson.monthly_issues : [];
+  // ── LEFT COLUMN ──────────────────────────────────────
 
-  for (const mIssue of monthlyIssues) {
-    const mCard = {
-      id: 'MONTHLY_' + (mIssue.finding_key || mIssue.month_key || '')
-          + '_' + (currentEngineRow?.snapshot_date || ''),
-      finding_key:   mIssue.finding_key,
-      title:         mIssue.title || mIssue.month_label || 'Monthly Detail',
-      priority:      mIssue.priority || 'medium',
-      // trigger_display: show month metrics in MPI/ARI/RGI header
-      trigger_display: [
-        mIssue.card_metrics?.avgMPI != null
-          ? mIssue.card_metrics.avgMPI.toFixed(1) : '—',
-        mIssue.card_metrics?.avgARI != null
-          ? mIssue.card_metrics.avgARI.toFixed(1) : '—',
-        mIssue.card_metrics?.avgRGI != null
-          ? mIssue.card_metrics.avgRGI.toFixed(1) : '—'
-      ].join(' / '),
-      execution_owner: null,
-      commercial_narrative:       mIssue.commercial_narrative || null,
-      enforced_decision_line:     mIssue.enforced_decision_line || null,
-      enforced_execution_actions: mIssue.enforced_execution_actions || [],
-      card_metrics:  mIssue.card_metrics || null,
-      issue_family:  mIssue.issue_family || '',
-      // SIGNAL line: direction and breach count — read by buildInsightLine
-      key_insight: [
-        mIssue.month_label || '',
-        mIssue.period_comparison?.direction === 'above'
-          ? 'outperformed the period average'
-          : 'underperformed the period average',
-        mIssue.period_comparison?.breach_count
-          ? `across ${mIssue.period_comparison.breach_count} metrics`
-          : ''
-      ].filter(Boolean).join(' ')
-    };
-
-    // Inject a precise impact line for monthly cards.
-    // buildWhyLine() does not know how to read monthly card structure
-    // so we override key_insight with the impact statement.
-    // key_insight takes priority over the auto-built signal line
-    // in renderCard() when present — we repurpose it here for IMPACT
-    // by also setting a whyLine override on the card object.
-    const mDir = mIssue.period_comparison?.direction;
-    const mOccDelta = mIssue.card_metrics?.avgOcc != null &&
-                  mIssue.period_comparison?.period_avg_occ != null
-      ? Math.abs(mIssue.card_metrics.avgOcc -
-             mIssue.period_comparison.period_avg_occ).toFixed(1)
-      : null;
-    const mRgiDelta = mIssue.card_metrics?.avgRGI != null &&
-                  mIssue.period_comparison?.period_avg_rgi != null
-      ? Math.abs(mIssue.card_metrics.avgRGI -
-             mIssue.period_comparison.period_avg_rgi).toFixed(1)
-      : null;
-
-    let mImpactLine = '';
-    if (mDir === 'above') {
-      mImpactLine = [
-        `${mIssue.month_label || 'This month'} outperformed`,
-        mOccDelta ? `Occ +${mOccDelta}pts vs period` : null,
-        mRgiDelta ? `RGI +${mRgiDelta}pts vs period` : null,
-        mIssue.dominant_segment
-          ? `led by ${mIssue.dominant_segment}` : null
-      ].filter(Boolean).join(' — ');
-    } else {
-      mImpactLine = [
-        `${mIssue.month_label || 'This month'} underperformed`,
-        mOccDelta ? `Occ -${mOccDelta}pts vs period` : null,
-        mRgiDelta ? `RGI -${mRgiDelta}pts vs period` : null,
-        mIssue.dominant_segment
-          ? `drag from ${mIssue.dominant_segment}` : null
-      ].filter(Boolean).join(' — ');
-    }
-
-    mCard.expected_outcome = mImpactLine;
-
-    const mHtmlRaw = renderCard(mCard);
-    const mHtml = mHtmlRaw.replace(
-      /Observed window:[^<]*/,
-      `Month: ${escHtml(mIssue.month_label || mIssue.month_key || '')}`
-    ).replace(
-      /(<div class="section-label">IMPACT<\/div>\s*<div class="section-text" style="font-weight:700; color:var\(--navy\);">)[^<]*(<\/div>)/,
-      mImpactLine ? (_, a, b) => `${a}${escHtml(mImpactLine)}${b}` : '$&'
+  // GROUP 1: Historical Analysis
+  if (historicalCards.length > 0) {
+    const s = summaries.historical;
+    histCol.insertAdjacentHTML('beforeend',
+      buildGroupHeader('historical', 'Historical Analysis',
+        s.brief, s.metric, s.metricClass, s.metaLabel, s.count)
     );
-
-    let styledMHtml = mHtml
-      .replace('class="finding-card', 'class="finding-card monthly-card');
-
-    styledMHtml = styledMHtml.replace(
-      '<div class="finding-title">',
-      '<div class="monthly-card-label">Monthly Detail</div>' +
-      '<div class="finding-title">'
-    );
-
-    histCol.insertAdjacentHTML('beforeend', styledMHtml);
+    historicalCards.forEach(card => {
+      histCol.insertAdjacentHTML('beforeend', renderCard(card));
+    });
+    histCol.insertAdjacentHTML('beforeend', '</div></div>');
   }
 
-  // Phase 2: Mix shift cards — below monthly cards in left column.
-  // Three patterns: displacement, concentration, rate_dilution.
-  // Render only when mix_shift_issues has entries.
-  const mixShiftIssues = Array.isArray(currentEngineJson?.mix_shift_issues)
-    ? currentEngineJson.mix_shift_issues : [];
-
-  for (const msIssue of mixShiftIssues) {
-    const msQ = msIssue.quantification || {};
-    const msRevImpact = msQ.revenue_cost || msQ.revenue_lost || null;
-    const msRevFmt = msRevImpact != null
-      ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
-          .format(Math.round(msRevImpact))
-      : null;
-
-    let msKeyInsight = '';
-    if (msIssue.pattern === 'displacement') {
-      msKeyInsight = msQ.loser_segment && msQ.gainer_segment
-        ? `${msQ.loser_segment} losing share to ${msQ.gainer_segment}` +
-          (msQ.revenue_cost
-            ? ` — £${msRevFmt} revenue cost`
-            : '')
-        : msIssue.title || '';
-    } else if (msIssue.pattern === 'rate_dilution') {
-      const adrPct = msQ.adr_drop_pct != null ? msQ.adr_drop_pct.toFixed(1) : '?';
-      const revDestroyed = msRevFmt != null ? `£${msRevFmt} revenue destroyed` : 'revenue impact not quantified';
-      msKeyInsight = msQ.segment
-        ? `${msQ.segment} ADR down ${adrPct}% — ${revDestroyed}`
-        : msIssue.title || '';
-    } else if (msIssue.pattern === 'concentration') {
-      msKeyInsight = msQ.dominant_segment
-        ? `${msQ.dominant_segment} represents ${msQ.share_ty != null
-            ? msQ.share_ty.toFixed(0)
-            : '?'}% of room nights — concentration risk`
-        : msIssue.title || '';
-    } else {
-      msKeyInsight = msIssue.title || '';
-    }
-
-    const msCard = {
-      id: 'MIX_' + (msIssue.finding_key || '')
-          + '_' + (currentEngineRow?.snapshot_date || ''),
-      finding_key:   msIssue.finding_key,
-      title:         msIssue.title || 'Mix Shift',
-      priority:      msIssue.priority || 'medium',
-      // Show meaningful metric in header instead of empty MPI/ARI/RGI
-      trigger_display: (() => {
-        if (msIssue.pattern === 'displacement') {
-          return msQ.revenue_cost != null
-            ? `£${new Intl.NumberFormat('en-GB',
-                { maximumFractionDigits: 0 })
-                .format(Math.round(msQ.revenue_cost))}`
-            : '—';
-        }
-        if (msIssue.pattern === 'rate_dilution') {
-          return msQ.adr_drop_pct != null
-            ? `−${msQ.adr_drop_pct.toFixed(1)}% ADR`
-            : '—';
-        }
-        if (msIssue.pattern === 'concentration') {
-          return msQ.share_ty != null
-            ? `${msQ.share_ty.toFixed(0)}% of mix`
-            : '—';
-        }
-        return '—';
-      })(),
-      execution_owner: null,
-      commercial_narrative:       msIssue.commercial_narrative || null,
-      enforced_decision_line:     msIssue.enforced_decision_line || null,
-      enforced_execution_actions: msIssue.enforced_execution_actions || [],
-      card_metrics:  msIssue.card_metrics || null,
-      issue_family:  msIssue.issue_family || '',
-      key_insight:   msKeyInsight
-    };
-
-    // Inject precise impact line for mix shift cards.
-    // buildWhyLine() cannot read mix shift quantification structure.
-    const msRevImpactLine = msRevImpact != null
-      ? `£${msRevFmt} estimated revenue impact`
-      : null;
-
-    let msImpactLine = '';
-    if (msIssue.pattern === 'displacement') {
-      msImpactLine = [
-        msRevImpactLine,
-        msQ.shifted_rn ? `${msQ.shifted_rn} room nights displaced` : null,
-        msQ.loser_adr_ty && msQ.gainer_adr_ty
-          ? `ADR differential: ${Math.round(msQ.loser_adr_ty -
-          msQ.gainer_adr_ty)}` : null
-      ].filter(Boolean).join(' — ');
-    } else if (msIssue.pattern === 'rate_dilution') {
-      msImpactLine = [
-        msRevImpactLine,
-        msQ.adr_drop_pct
-          ? `ADR down ${msQ.adr_drop_pct.toFixed(1)}% YoY` : null,
-        msQ.rn_ty
-          ? `across ${Math.round(msQ.rn_ty).toLocaleString()} room nights`
-          : null
-      ].filter(Boolean).join(' — ');
-    } else if (msIssue.pattern === 'concentration') {
-      const shareStr = msQ.share_ty != null ? msQ.share_ty.toFixed(0) : '?';
-      msImpactLine = [
-        msQ.dominant_segment
-          ? `${msQ.dominant_segment} at ${shareStr}% of mix`
-          : null,
-        msQ.rev_share_pct != null
-          ? `${msQ.rev_share_pct.toFixed(0)}% of total revenue` : null
-      ].filter(Boolean).join(' — ');
-    }
-
-    if (msImpactLine) msCard.expected_outcome = msImpactLine;
-
-    const iss0 = currentEngineJson?.issues?.[0];
-    const msPeriodLabel = (iss0?.window_label != null && String(iss0.window_label).trim())
-      ? String(iss0.window_label).trim()
-      : (iss0?.episode_week_start && iss0?.episode_week_end
-        ? `${iss0.episode_week_start} → ${iss0.episode_week_end}`
-        : 'Actualized period');
-
-    const msHtmlRaw = renderCard(msCard);
-    const msHtml = msHtmlRaw.replace(
-      /Observed window:[^<]*/,
-      `Period: ${escHtml(msPeriodLabel)}`
-    ).replace(
-      /(<div class="section-label">IMPACT<\/div>\s*<div class="section-text" style="font-weight:700; color:var\(--navy\);">)[^<]*(<\/div>)/,
-      msImpactLine ? (_, a, b) => `${a}${escHtml(msImpactLine)}${b}` : '$&'
+  // GROUP 2: Monthly Detail
+  if (monthlyIssues.length > 0) {
+    const s = summaries.monthly;
+    histCol.insertAdjacentHTML('beforeend',
+      buildGroupHeader('monthly', 'Monthly Detail',
+        s.brief, s.metric, s.metricClass, s.metaLabel, s.count)
     );
 
-    let styledMsHtml = msHtml
-      .replace('class="finding-card', 'class="finding-card mix-shift-card');
+    for (const mIssue of monthlyIssues) {
+      // --- same card building logic as before, unchanged ---
+      const mCard = {
+        id: 'MONTHLY_' + (mIssue.finding_key || mIssue.month_key || '')
+            + '_' + (currentEngineRow?.snapshot_date || ''),
+        finding_key:   mIssue.finding_key,
+        title:         mIssue.title || mIssue.month_label || 'Monthly Detail',
+        priority:      mIssue.priority || 'medium',
+        trigger_display: [
+          mIssue.card_metrics?.avgMPI != null
+            ? mIssue.card_metrics.avgMPI.toFixed(1) : '—',
+          mIssue.card_metrics?.avgARI != null
+            ? mIssue.card_metrics.avgARI.toFixed(1) : '—',
+          mIssue.card_metrics?.avgRGI != null
+            ? mIssue.card_metrics.avgRGI.toFixed(1) : '—'
+        ].join(' / '),
+        execution_owner: null,
+        commercial_narrative:       mIssue.commercial_narrative || null,
+        enforced_decision_line:     mIssue.enforced_decision_line || null,
+        enforced_execution_actions: mIssue.enforced_execution_actions || [],
+        card_metrics:  mIssue.card_metrics || null,
+        issue_family:  mIssue.issue_family || '',
+        key_insight: [
+          mIssue.month_label || '',
+          mIssue.period_comparison?.direction === 'above'
+            ? 'outperformed the period average'
+            : 'underperformed the period average',
+          mIssue.period_comparison?.breach_count
+            ? `across ${mIssue.period_comparison.breach_count} metrics`
+            : ''
+        ].filter(Boolean).join(' ')
+      };
 
-    const patternLabel = msIssue.pattern === 'displacement' ? 'Displacement'
-      : msIssue.pattern === 'rate_dilution' ? 'Rate Dilution'
-      : msIssue.pattern === 'concentration' ? 'Concentration Risk'
-      : 'Mix Shift';
+      const mDir = mIssue.period_comparison?.direction;
+      const mOccDelta = mIssue.card_metrics?.avgOcc != null &&
+                    mIssue.period_comparison?.period_avg_occ != null
+        ? Math.abs(mIssue.card_metrics.avgOcc -
+               mIssue.period_comparison.period_avg_occ).toFixed(1)
+        : null;
+      const mRgiDelta = mIssue.card_metrics?.avgRGI != null &&
+                    mIssue.period_comparison?.period_avg_rgi != null
+        ? Math.abs(mIssue.card_metrics.avgRGI -
+               mIssue.period_comparison.period_avg_rgi).toFixed(1)
+        : null;
 
-    styledMsHtml = styledMsHtml.replace(
-      '<div class="trigger-metric-label">MPI / ARI / RGI</div>',
-      `<div class="trigger-metric-label">${escHtml(patternLabel)}</div>`
-    );
+      let mImpactLine = '';
+      if (mDir === 'above') {
+        mImpactLine = [
+          `${mIssue.month_label || 'This month'} outperformed`,
+          mOccDelta ? `Occ +${mOccDelta}pts vs period` : null,
+          mRgiDelta ? `RGI +${mRgiDelta}pts vs period` : null,
+          mIssue.dominant_segment
+            ? `led by ${mIssue.dominant_segment}` : null
+        ].filter(Boolean).join(' — ');
+      } else {
+        mImpactLine = [
+          `${mIssue.month_label || 'This month'} underperformed`,
+          mOccDelta ? `Occ -${mOccDelta}pts vs period` : null,
+          mRgiDelta ? `RGI -${mRgiDelta}pts vs period` : null,
+          mIssue.dominant_segment
+            ? `drag from ${mIssue.dominant_segment}` : null
+        ].filter(Boolean).join(' — ');
+      }
+      mCard.expected_outcome = mImpactLine;
 
-    styledMsHtml = styledMsHtml.replace(
-      /(<span class="priority-badge [^"]+">[^<]*<\/span>)/,
-      '$1\n            <span class="mix-shift-badge">Mix Shift</span>'
-    );
-
-    histCol.insertAdjacentHTML('beforeend', styledMsHtml);
-  }
-
-  forwardCards.forEach(card => {
-    fwdCol.insertAdjacentHTML('beforeend', renderForwardCard(card));
-  });
-
-  // Phase 2: Render forecast gap cards in the right column,
-  // below the existing LY pace forward cards.
-  // forecast_gap_issues compares OTB vs hotel's own forecast —
-  // a different and separate signal from forward_issues (OTB vs LY).
-  const forecastGapIssues = Array.isArray(currentEngineJson?.forecast_gap_issues)
-    ? currentEngineJson.forecast_gap_issues : [];
-
-  for (const fgIssue of forecastGapIssues) {
-    const otbPctOfPlan = fgIssue.card_metrics?.avgOcc != null
-      ? `${fgIssue.card_metrics.avgOcc.toFixed(1)}% of plan` : null;
-
-    // Build the card object using fields renderForwardCard() expects
-    const fgCard = {
-      id: 'FCG_' + (fgIssue.finding_key || '') + '_' + (currentEngineRow?.snapshot_date || ''),
-      finding_key:   fgIssue.finding_key,
-      title:         fgIssue.title || 'Forecast Gap',
-      priority:      fgIssue.priority || 'medium',
-      window_label:  fgIssue.window_label || '',
-      granularity:   'forecast_gap',
-      quantification: fgIssue.quantification || null,
-      // SIGNAL: OTB as % of plan — repurposed from avgOcc field
-      // renderForwardCard extracts signal from first % in commercial_narrative
-      commercial_narrative:       fgIssue.commercial_narrative || null,
-      enforced_decision_line:     fgIssue.enforced_decision_line || null,
-      enforced_execution_actions: fgIssue.enforced_execution_actions || [],
-      card_metrics:  fgIssue.card_metrics || null,
-      issue_family:  fgIssue.issue_family || '',
-      is_forward_card: true
-    };
-
-    // Render using existing renderForwardCard — no new render function needed
-    const fgHtml = renderForwardCard(fgCard);
-
-    // Inject forecast-gap-card CSS class and replace Forward badge
-    // with Forecast Gap badge
-    let styledFgHtml = fgHtml
-      .replace('class="finding-card forward-card',
-               'class="finding-card forward-card forecast-gap-card')
-      .replace('<span class="forward-badge">Forward</span>',
-               '<span class="forecast-gap-badge">Forecast Gap</span>');
-
-    // Replace the window label line in the header to show OTB vs plan context
-    if (otbPctOfPlan) {
-      styledFgHtml = styledFgHtml.replace(
-        `>${escHtml(fgCard.window_label || '')}<`,
-        `>${escHtml(otbPctOfPlan)}<`
+      const mHtmlRaw = renderCard(mCard);
+      const mHtml = mHtmlRaw.replace(
+        /Observed window:[^<]*/,
+        `Month: ${escHtml(mIssue.month_label || mIssue.month_key || '')}`
+      ).replace(
+        /(<div class="section-label">IMPACT<\/div>\s*<div class="section-text" style="font-weight:700; color:var\(--navy\);">)[^<]*(<\/div>)/,
+        mImpactLine ? (_, a, b) => `${a}${escHtml(mImpactLine)}${b}` : '$&'
       );
-    }
 
-    fwdCol.insertAdjacentHTML('beforeend', styledFgHtml);
+      let styledMHtml = mHtml
+        .replace('class="finding-card', 'class="finding-card monthly-card');
+      styledMHtml = styledMHtml.replace(
+        '<div class="finding-title">',
+        '<div class="monthly-card-label">Monthly Detail</div>' +
+        '<div class="finding-title">'
+      );
+      histCol.insertAdjacentHTML('beforeend', styledMHtml);
+    }
+    histCol.insertAdjacentHTML('beforeend', '</div></div>');
+  }
+
+  // GROUP 3: Mix Shift
+  if (mixShiftIssues.length > 0) {
+    const s = summaries.mixShift;
+    histCol.insertAdjacentHTML('beforeend',
+      buildGroupHeader('mix-shift', 'Mix Shift',
+        s.brief, s.metric, s.metricClass, s.metaLabel, s.count)
+    );
+
+    for (const msIssue of mixShiftIssues) {
+      // --- same card building logic as before, unchanged ---
+      const msQ = msIssue.quantification || {};
+      const msRevImpact = msQ.revenue_cost || msQ.revenue_lost || null;
+      const msRevFmt = msRevImpact != null
+        ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
+            .format(Math.round(msRevImpact))
+        : null;
+
+      let msKeyInsight = '';
+      if (msIssue.pattern === 'displacement') {
+        msKeyInsight = msQ.loser_segment && msQ.gainer_segment
+          ? `${msQ.loser_segment} losing share to ${msQ.gainer_segment}` +
+            (msQ.revenue_cost ? ` — £${msRevFmt} revenue cost` : '')
+          : msIssue.title || '';
+      } else if (msIssue.pattern === 'rate_dilution') {
+        const adrPct = msQ.adr_drop_pct != null
+          ? msQ.adr_drop_pct.toFixed(1) : '?';
+        msKeyInsight = msQ.segment
+          ? `${msQ.segment} ADR down ${adrPct}% — £${msRevFmt} revenue destroyed`
+          : msIssue.title || '';
+      } else if (msIssue.pattern === 'concentration') {
+        msKeyInsight = msQ.dominant_segment
+          ? `${msQ.dominant_segment} represents ${msQ.share_ty != null
+              ? msQ.share_ty.toFixed(0) : '?'}% of room nights`
+          : msIssue.title || '';
+      } else {
+        msKeyInsight = msIssue.title || '';
+      }
+
+      const msCard = {
+        id: 'MIX_' + (msIssue.finding_key || '')
+            + '_' + (currentEngineRow?.snapshot_date || ''),
+        finding_key:   msIssue.finding_key,
+        title:         msIssue.title || 'Mix Shift',
+        priority:      msIssue.priority || 'medium',
+        trigger_display: (() => {
+          if (msIssue.pattern === 'displacement') {
+            return msQ.revenue_cost != null
+              ? `£${new Intl.NumberFormat('en-GB',
+                  { maximumFractionDigits: 0 })
+                  .format(Math.round(msQ.revenue_cost))}` : '—';
+          }
+          if (msIssue.pattern === 'rate_dilution') {
+            return msQ.adr_drop_pct != null
+              ? `−${msQ.adr_drop_pct.toFixed(1)}% ADR` : '—';
+          }
+          if (msIssue.pattern === 'concentration') {
+            return msQ.share_ty != null
+              ? `${msQ.share_ty.toFixed(0)}% of mix` : '—';
+          }
+          return '—';
+        })(),
+        execution_owner: null,
+        commercial_narrative:       msIssue.commercial_narrative || null,
+        enforced_decision_line:     msIssue.enforced_decision_line || null,
+        enforced_execution_actions: msIssue.enforced_execution_actions || [],
+        card_metrics:  msIssue.card_metrics || null,
+        issue_family:  msIssue.issue_family || '',
+        key_insight:   msKeyInsight
+      };
+
+      const msRevImpactLine = msRevImpact != null
+        ? `£${msRevFmt} estimated revenue impact` : null;
+      let msImpactLine = '';
+      if (msIssue.pattern === 'displacement') {
+        msImpactLine = [
+          msRevImpactLine,
+          msQ.shifted_rn ? `${msQ.shifted_rn} room nights displaced` : null,
+          msQ.loser_adr_ty && msQ.gainer_adr_ty
+            ? `ADR differential: ${Math.round(msQ.loser_adr_ty -
+                msQ.gainer_adr_ty)}` : null
+        ].filter(Boolean).join(' — ');
+      } else if (msIssue.pattern === 'rate_dilution') {
+        msImpactLine = [
+          msRevImpactLine,
+          msQ.adr_drop_pct
+            ? `ADR down ${msQ.adr_drop_pct.toFixed(1)}% YoY` : null,
+          msQ.rn_ty
+            ? `across ${Math.round(msQ.rn_ty).toLocaleString()} room nights`
+            : null
+        ].filter(Boolean).join(' — ');
+      } else if (msIssue.pattern === 'concentration') {
+        const shareStr = msQ.share_ty != null
+          ? msQ.share_ty.toFixed(0) : '?';
+        msImpactLine = [
+          msQ.dominant_segment
+            ? `${msQ.dominant_segment} at ${shareStr}% of mix` : null,
+          msQ.rev_share_pct != null
+            ? `${msQ.rev_share_pct.toFixed(0)}% of total revenue` : null
+        ].filter(Boolean).join(' — ');
+      }
+      if (msImpactLine) msCard.expected_outcome = msImpactLine;
+
+      const iss0 = engineJson?.issues?.[0];
+      const msPeriodLabel = (iss0?.window_label != null &&
+        String(iss0.window_label).trim())
+        ? String(iss0.window_label).trim()
+        : (iss0?.episode_week_start && iss0?.episode_week_end
+          ? `${iss0.episode_week_start} → ${iss0.episode_week_end}`
+          : 'Actualized period');
+
+      const msHtmlRaw = renderCard(msCard);
+      const msHtml = msHtmlRaw.replace(
+        /Observed window:[^<]*/,
+        `Period: ${escHtml(msPeriodLabel)}`
+      ).replace(
+        /(<div class="section-label">IMPACT<\/div>\s*<div class="section-text" style="font-weight:700; color:var\(--navy\);">)[^<]*(<\/div>)/,
+        msImpactLine ? (_, a, b) => `${a}${escHtml(msImpactLine)}${b}` : '$&'
+      );
+
+      let styledMsHtml = msHtml
+        .replace('class="finding-card', 'class="finding-card mix-shift-card');
+      const patternLabel = msIssue.pattern === 'displacement'
+        ? 'Displacement'
+        : msIssue.pattern === 'rate_dilution' ? 'Rate Dilution'
+        : msIssue.pattern === 'concentration' ? 'Concentration Risk'
+        : 'Mix Shift';
+      styledMsHtml = styledMsHtml.replace(
+        '<div class="trigger-metric-label">MPI / ARI / RGI</div>',
+        `<div class="trigger-metric-label">${escHtml(patternLabel)}</div>`
+      );
+      styledMsHtml = styledMsHtml.replace(
+        /(<span class="priority-badge [^"]+">[^<]*<\/span>)/,
+        '$1\n            <span class="mix-shift-badge">Mix Shift</span>'
+      );
+      histCol.insertAdjacentHTML('beforeend', styledMsHtml);
+    }
+    histCol.insertAdjacentHTML('beforeend', '</div></div>');
+  }
+
+  // ── RIGHT COLUMN ─────────────────────────────────────
+
+  // GROUP 4: Forward Pace
+  if (forwardCards.length > 0) {
+    const s = summaries.forward;
+    fwdCol.insertAdjacentHTML('beforeend',
+      buildGroupHeader('forward', 'Forward Pace',
+        s.brief, s.metric, s.metricClass, s.metaLabel, s.count)
+    );
+    forwardCards.forEach(card => {
+      fwdCol.insertAdjacentHTML('beforeend', renderForwardCard(card));
+    });
+    fwdCol.insertAdjacentHTML('beforeend', '</div></div>');
+  }
+
+  // GROUP 5: Forecast Gap
+  if (forecastGapIssues.length > 0) {
+    const s = summaries.forecast;
+    fwdCol.insertAdjacentHTML('beforeend',
+      buildGroupHeader('forecast', 'Forecast Gap',
+        s.brief, s.metric, s.metricClass, s.metaLabel, s.count)
+    );
+
+    for (const fgIssue of forecastGapIssues) {
+      const otbPctOfPlan = fgIssue.card_metrics?.avgOcc != null
+        ? `${fgIssue.card_metrics.avgOcc.toFixed(1)}% of plan` : null;
+      const fgCard = {
+        id: 'FCG_' + (fgIssue.finding_key || '')
+            + '_' + (currentEngineRow?.snapshot_date || ''),
+        finding_key:   fgIssue.finding_key,
+        title:         fgIssue.title || 'Forecast Gap',
+        priority:      fgIssue.priority || 'medium',
+        window_label:  fgIssue.window_label || '',
+        granularity:   'forecast_gap',
+        quantification: fgIssue.quantification || null,
+        commercial_narrative:       fgIssue.commercial_narrative || null,
+        enforced_decision_line:     fgIssue.enforced_decision_line || null,
+        enforced_execution_actions: fgIssue.enforced_execution_actions || [],
+        card_metrics:  fgIssue.card_metrics || null,
+        issue_family:  fgIssue.issue_family || '',
+        is_forward_card: true
+      };
+      const fgHtml = renderForwardCard(fgCard);
+      let styledFgHtml = fgHtml
+        .replace('class="finding-card forward-card',
+                 'class="finding-card forward-card forecast-gap-card')
+        .replace('<span class="forward-badge">Forward</span>',
+                 '<span class="forecast-gap-badge">Forecast Gap</span>');
+      if (otbPctOfPlan) {
+        styledFgHtml = styledFgHtml.replace(
+          `>${escHtml(fgCard.window_label || '')}<`,
+          `>${escHtml(otbPctOfPlan)}<`
+        );
+      }
+      fwdCol.insertAdjacentHTML('beforeend', styledFgHtml);
+    }
+    fwdCol.insertAdjacentHTML('beforeend', '</div></div>');
   }
 }
 
