@@ -476,6 +476,44 @@ body {
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
+/* ── Phase 2: Forecast Gap cards — right column, after pace cards ── */
+/* Purple-violet left border distinguishes from orange (historical)  */
+/* and the existing blue forward pace cards                          */
+.forecast-gap-card {
+  border-left: 3px solid #7C3AED;
+  margin-top: 8px;
+}
+
+.forecast-gap-badge {
+  display: inline-block;
+  background: #EDE9FE;
+  color: #5B21B6;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+/* ── Phase 2: Monthly detail cards — left column, below period cards ── */
+/* Gold left border, indented, visually subordinate                      */
+.monthly-card {
+  border-left: 3px solid var(--gold);
+  margin-left: 20px;
+  margin-top: 8px;
+  opacity: 0.93;
+}
+
+.monthly-card-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
 .finding-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
 .finding-card.actioned { opacity: 0.58; }
 
@@ -2590,9 +2628,120 @@ function renderFindings() {
   historicalCards.forEach(card => {
     histCol.insertAdjacentHTML('beforeend', renderCard(card));
   });
+
+  // Phase 2: Render monthly detail cards in the left column,
+  // below period cards. monthly_issues only generates cards when
+  // a month's dynamics differ materially from the period average.
+  // When empty, nothing renders — existing cards are unaffected.
+  const monthlyIssues = Array.isArray(currentEngineJson?.monthly_issues)
+    ? currentEngineJson.monthly_issues : [];
+
+  for (const mIssue of monthlyIssues) {
+    // Build card object using fields renderCard() expects
+    const mCard = {
+      id: 'MONTHLY_' + (mIssue.finding_key || mIssue.month_key || '')
+          + '_' + (currentEngineRow?.snapshot_date || ''),
+      finding_key:   mIssue.finding_key,
+      title:         mIssue.title || mIssue.month_label || 'Monthly Detail',
+      priority:      mIssue.priority || 'medium',
+      // trigger_display: show month metrics in MPI/ARI/RGI header
+      trigger_display: [
+        mIssue.card_metrics?.avgMPI != null
+          ? mIssue.card_metrics.avgMPI.toFixed(1) : '—',
+        mIssue.card_metrics?.avgARI != null
+          ? mIssue.card_metrics.avgARI.toFixed(1) : '—',
+        mIssue.card_metrics?.avgRGI != null
+          ? mIssue.card_metrics.avgRGI.toFixed(1) : '—'
+      ].join(' / '),
+      execution_owner: null,
+      commercial_narrative:       mIssue.commercial_narrative || null,
+      enforced_decision_line:     mIssue.enforced_decision_line || null,
+      enforced_execution_actions: mIssue.enforced_execution_actions || [],
+      card_metrics:  mIssue.card_metrics || null,
+      issue_family:  mIssue.issue_family || '',
+      // SIGNAL line: direction and breach count — read by buildInsightLine
+      key_insight: [
+        mIssue.month_label || '',
+        mIssue.period_comparison?.direction === 'above'
+          ? 'outperformed the period average'
+          : 'underperformed the period average',
+        mIssue.period_comparison?.breach_count
+          ? `across ${mIssue.period_comparison.breach_count} metrics`
+          : ''
+      ].filter(Boolean).join(' ')
+    };
+
+    // Render using existing renderCard — no new render function needed
+    const mHtml = renderCard(mCard);
+
+    // Inject monthly-card CSS class and prepend the Monthly Detail label
+    // inside the card header, before the title
+    let styledMHtml = mHtml
+      .replace('class="finding-card', 'class="finding-card monthly-card');
+
+    // Insert the Monthly Detail label before the finding-title div
+    styledMHtml = styledMHtml.replace(
+      '<div class="finding-title">',
+      '<div class="monthly-card-label">Monthly Detail</div>' +
+      '<div class="finding-title">'
+    );
+
+    histCol.insertAdjacentHTML('beforeend', styledMHtml);
+  }
+
   forwardCards.forEach(card => {
     fwdCol.insertAdjacentHTML('beforeend', renderForwardCard(card));
   });
+
+  // Phase 2: Render forecast gap cards in the right column,
+  // below the existing LY pace forward cards.
+  // forecast_gap_issues compares OTB vs hotel's own forecast —
+  // a different and separate signal from forward_issues (OTB vs LY).
+  const forecastGapIssues = Array.isArray(currentEngineJson?.forecast_gap_issues)
+    ? currentEngineJson.forecast_gap_issues : [];
+
+  for (const fgIssue of forecastGapIssues) {
+    const otbPctOfPlan = fgIssue.card_metrics?.avgOcc != null
+      ? `${fgIssue.card_metrics.avgOcc.toFixed(1)}% of plan` : null;
+
+    // Build the card object using fields renderForwardCard() expects
+    const fgCard = {
+      id: 'FCG_' + (fgIssue.finding_key || '') + '_' + (currentEngineRow?.snapshot_date || ''),
+      finding_key:   fgIssue.finding_key,
+      title:         fgIssue.title || 'Forecast Gap',
+      priority:      fgIssue.priority || 'medium',
+      window_label:  fgIssue.window_label || '',
+      // SIGNAL: OTB as % of plan — repurposed from avgOcc field
+      // renderForwardCard extracts signal from first % in commercial_narrative
+      commercial_narrative:       fgIssue.commercial_narrative || null,
+      enforced_decision_line:     fgIssue.enforced_decision_line || null,
+      enforced_execution_actions: fgIssue.enforced_execution_actions || [],
+      card_metrics:  fgIssue.card_metrics || null,
+      issue_family:  fgIssue.issue_family || '',
+      is_forward_card: true
+    };
+
+    // Render using existing renderForwardCard — no new render function needed
+    const fgHtml = renderForwardCard(fgCard);
+
+    // Inject forecast-gap-card CSS class and replace Forward badge
+    // with Forecast Gap badge
+    let styledFgHtml = fgHtml
+      .replace('class="finding-card forward-card',
+               'class="finding-card forward-card forecast-gap-card')
+      .replace('<span class="forward-badge">Forward</span>',
+               '<span class="forecast-gap-badge">Forecast Gap</span>');
+
+    // Replace the window label line in the header to show OTB vs plan context
+    if (otbPctOfPlan) {
+      styledFgHtml = styledFgHtml.replace(
+        `>${escHtml(fgCard.window_label || '')}<`,
+        `>${escHtml(otbPctOfPlan)}<`
+      );
+    }
+
+    fwdCol.insertAdjacentHTML('beforeend', styledFgHtml);
+  }
 }
 
 function renderCard(card) {
