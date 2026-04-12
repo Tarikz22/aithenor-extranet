@@ -2934,8 +2934,34 @@ function computeGroupSummaries(engineJson) {
     });
   }
   // Primary segment from segment_attribution_summary
-  const primarySeg = primaryIssue?.segment_attribution_summary?.primary_segment
+  const primarySegRaw = primaryIssue?.segment_attribution_summary
+    ?.primary_segment
     || primaryIssue?.primary_segment || null;
+  // Convert USALI bucket key to display name using existing helper
+  const primarySegDisplay = primarySegRaw
+    ? (typeof usaliBucketToDisplayName === 'function'
+        ? usaliBucketToDisplayName(primarySegRaw, primarySegRaw)
+        : null)
+    : null;
+  // Fallback: if usaliBucketToDisplayName is not available in
+  // frontend scope, use a simple lookup map instead
+  const segDisplayMap = {
+    transient_retail: 'Retail Transient',
+    transient_discount: 'Discount / OTA',
+    transient_negotiated: 'Negotiated',
+    transient_wholesale: 'Wholesale',
+    transient_qualified: 'Qualified Rate',
+    group_corporate: 'Corporate Groups',
+    group_association: 'Association & Convention',
+    group_government: 'Government Groups',
+    group_smerf: 'SMERF',
+    group_wholesale: 'Wholesale Groups',
+    group_other: 'Groups',
+    contract: 'Contract / Crew'
+  };
+  const primarySeg = primarySegRaw
+    ? (primarySegDisplay || segDisplayMap[primarySegRaw] || primarySegRaw)
+    : null;
   if (primarySeg) {
     histPills.push({
       label: 'Segment',
@@ -3072,9 +3098,17 @@ function computeGroupSummaries(engineJson) {
         value: q.gainer_segment,
         cls: 'pill-neutral'
       });
-      if (q.adr_spread_pct != null) mixPills.push({
+      // Compute ADR spread from actual ADR values if adr_spread_pct
+      // is null — derived as (loser ADR - gainer ADR) / loser ADR
+      const adrSpreadPct = q.adr_spread_pct != null
+        ? q.adr_spread_pct
+        : (q.loser_adr_ty != null && q.gainer_adr_ty != null &&
+           q.loser_adr_ty > 0)
+          ? ((q.loser_adr_ty - q.gainer_adr_ty) / q.loser_adr_ty * 100)
+          : null;
+      if (adrSpreadPct != null) mixPills.push({
         label: 'ADR spread',
-        value: `${q.adr_spread_pct.toFixed(1)}%`,
+        value: `${adrSpreadPct.toFixed(1)}%`,
         cls: 'pill-warning'
       });
     } else if (primaryMix.pattern === 'rate_dilution') {
