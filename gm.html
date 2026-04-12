@@ -503,11 +503,11 @@ body {
     <div class="topbar-inner">
       <div>
         <h1 class="topbar-title">GM Briefing</h1>
-        <div class="topbar-sub">One-page executive reader by department — Revenue, Sales, Marketing.</div>
+        <div class="topbar-sub">One-page executive briefing — signals, decisions, and accountability.</div>
       </div>
       <div class="topbar-actions">
         <div class="chip" id="user-email">—</div>
-        <button class="btn btn-secondary" onclick="loadRecommendations()">Refresh</button>
+        <button class="btn btn-secondary" onclick="loadBriefing()">Refresh</button>
         <button class="btn btn-primary" onclick="logout()">Sign Out</button>
       </div>
     </div>
@@ -623,8 +623,6 @@ body {
 </div>
 
 <script>
-let allData = [];
-
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 </script>
@@ -635,150 +633,563 @@ const CURRENT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 <script>
 // Replace placeholder keys with the working anon key from the current app before using in production.
 const supabaseClient = window.supabase.createClient('https://fpnlzpfkygsyvkettjuj.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns');
-
-function normalize(value) {
-  return (value || '')
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
+</script>
+<script>
+// --- HELPERS ---
 
 function escHtml(str) {
   if (str == null) return '';
   return str.toString()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+function fmt(v) {
+  const n = Number(v) || 0;
+  if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return '€' + Math.round(n / 1000) + 'K';
+  if (n > 0) return '€' + Math.round(n);
+  return '—';
 }
 
-function formatNumber(n) {
-  const num = Number(n) || 0;
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return Math.round(num / 1000) + 'K';
-  return Math.round(num).toString();
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
-function parseNumericValue(value) {
-  if (value == null || value === '') return 0;
-  if (typeof value === 'number') return value;
-  const cleaned = value.toString().replace(/,/g, '');
-  const matches = cleaned.match(/-?\d+(?:\.\d+)?/g);
-  if (!matches || !matches.length) return 0;
-  return Number(matches[matches.length - 1]) || 0;
+function driverToDepartment(driver) {
+  if (!driver) return 'Revenue';
+  const d = driver.toLowerCase();
+  if (d === 'pricing') return 'Revenue';
+  if (d === 'mix_strategy') return 'Sales';
+  if (d === 'conversion' || d === 'visibility') return 'Marketing';
+  return 'Revenue';
 }
 
-function calculateRevenueUpside(record) {
-  const linked = record.linked_actions || [];
-  return linked.reduce((sum, a) => sum + (Number(a.estimated_revenue_upside) || 0), 0);
+function priorityOrder(p) {
+  const m = { critical: 4, high: 3, medium: 2, low: 1 };
+  return m[(p || '').toLowerCase()] || 1;
 }
 
-function calculateGopImpact(record) {
-  const linked = record.linked_actions || [];
-  return linked.reduce((sum, a) => {
-    const explicit = parseNumericValue(a.estimated_gop_saving);
-    if (explicit > 0) return sum + explicit;
-    return sum + ((Number(a.estimated_revenue_upside) || 0) * 0.65);
-  }, 0);
-}
+// --- DATA EXTRACTION ---
 
-function getGeneratedDate(record) {
-  const linkedActions = record.linked_actions || [];
-  const candidates = [];
-  linkedActions.forEach(a => {
-    [a.date_generated, a.generated_at, a.updated_at, a.created_at].forEach(v => { if (v) candidates.push(v); });
-  });
-  [record.date_generated, record.generated_at, record.updated_at, record.created_at].forEach(v => { if (v) candidates.push(v); });
-  const valid = candidates.map(v => new Date(v)).filter(d => !Number.isNaN(d.getTime())).sort((a, b) => b - a);
-  return valid.length ? formatDate(valid[0].toISOString()) : '—';
-}
+/**
+ * Flatten all issue types from engine_json into one unified list.
+ * Each issue gets a normalized shape for rendering.
+ */
+function extractAllIssues(ej) {
+  const issues = [];
 
-function getDepartmentBucket(record) {
-  const source = `${record.department || ''} ${record.owner_department || ''}`.toLowerCase();
-  if (source.includes('sales')) return 'sales';
-  if (source.includes('marketing') || source.includes('distribution') || source.includes('digital')) return 'marketing';
-  return 'revenue';
-}
-
-function priorityScore(priority) {
-  const p = (priority || '').toLowerCase();
-  if (p === 'critical') return 4;
-  if (p === 'high') return 3;
-  if (p === 'medium') return 2;
-  return 1;
-}
-
-function sortRecords(records) {
-  return [...records].sort((a, b) => {
-    const prioDiff = priorityScore(b.priority) - priorityScore(a.priority);
-    if (prioDiff !== 0) return prioDiff;
-    return calculateRevenueUpside(b) - calculateRevenueUpside(a);
-  });
-}
-
-function formatActionList(actions, finding = {}) {
-  if (!actions || actions.length === 0) {
-    const fallback = finding.action_plan || finding.action || '';
-    return fallback ? `<li>${escHtml(fallback)}</li>` : '<li>No action plan attached in the latest cycle.</li>';
-  }
-  const lines = [];
-  actions.forEach(action => {
-    const pieces = [];
-    if (action.action_title) pieces.push(action.action_title);
-    if (action.action_detail) pieces.push(action.action_detail);
-    if (!pieces.length) {
-      [action.action_plan, action.recommended_action, action.action].forEach(v => { if (v) pieces.push(v); });
-    }
-    pieces.forEach(piece => {
-      piece.toString()
-        .split(/\n|•|→|\d+\.|—/)
-        .map(s => s.replace(/^[\s\-*•→]+/, '').trim())
-        .filter(s => s.length > 3)
-        .forEach(s => lines.push(s));
+  // Historical analysis issues
+  (Array.isArray(ej.issues) ? ej.issues : []).forEach(issue => {
+    const fqs = (ej.financial_quantification_summary
+      ?.issue_level_quantification || [])
+      .find(q => q.finding_key === issue.finding_key);
+    const revMax = fqs?.quantified_signals?.revenue_range?.max || 0;
+    issues.push({
+      id:           issue.finding_key || Math.random().toString(),
+      type:         'historical',
+      title:        issue.title || 'Commercial signal',
+      priority:     issue.priority || 'medium',
+      driver:       issue.primary_driver || 'pricing',
+      department:   driverToDepartment(issue.primary_driver),
+      signal:       issue.commercial_narrative
+                      ? issue.commercial_narrative.split('\n\n')[0] : '',
+      analysis:     issue.commercial_narrative || '',
+      decision:     issue.enforced_decision_line || '',
+      execution:    Array.isArray(issue.enforced_execution_actions)
+                      ? issue.enforced_execution_actions : [],
+      revenue:      revMax,
+      card_metrics: issue.card_metrics || {},
+      issue_family: issue.issue_family || '',
+      window_label: issue.window_label || ''
     });
   });
-  if (!lines.length) return '<li>No action plan attached in the latest cycle.</li>';
-  return lines.map(line => `<li>${escHtml(line)}</li>`).join('');
+
+  // Forward pace issues
+  (Array.isArray(ej.forward_issues) ? ej.forward_issues : [])
+  .forEach(issue => {
+    issues.push({
+      id:           issue.finding_key || Math.random().toString(),
+      type:         'forward',
+      title:        issue.title || 'Forward pace signal',
+      priority:     issue.priority || 'medium',
+      driver:       'pricing',
+      department:   'Revenue',
+      signal:       issue.commercial_narrative
+                      ? issue.commercial_narrative.split('\n\n')[0] : '',
+      analysis:     issue.commercial_narrative || '',
+      decision:     issue.enforced_decision_line || '',
+      execution:    Array.isArray(issue.enforced_execution_actions)
+                      ? issue.enforced_execution_actions : [],
+      revenue:      0,
+      card_metrics: issue.card_metrics || {},
+      issue_family: 'pace_gap',
+      window_label: issue.window_label || ''
+    });
+  });
+
+  // Forecast gap issues
+  (Array.isArray(ej.forecast_gap_issues) ? ej.forecast_gap_issues : [])
+  .forEach(issue => {
+    const revGap = issue.quantification?.rev_gap || 0;
+    issues.push({
+      id:           issue.finding_key || Math.random().toString(),
+      type:         'forecast',
+      title:        issue.title || 'Forecast gap',
+      priority:     issue.priority || 'medium',
+      driver:       'pricing',
+      department:   'Revenue',
+      signal:       issue.commercial_narrative
+                      ? issue.commercial_narrative.split('\n\n')[0] : '',
+      analysis:     issue.commercial_narrative || '',
+      decision:     issue.enforced_decision_line || '',
+      execution:    Array.isArray(issue.enforced_execution_actions)
+                      ? issue.enforced_execution_actions : [],
+      revenue:      revGap,
+      card_metrics: issue.card_metrics || {},
+      issue_family: issue.issue_family || 'volume_miss',
+      window_label: issue.window_label || ''
+    });
+  });
+
+  // Mix shift issues
+  (Array.isArray(ej.mix_shift_issues) ? ej.mix_shift_issues : [])
+  .forEach(issue => {
+    const revCost = issue.quantification?.revenue_cost
+                 || issue.quantification?.revenue_lost || 0;
+    issues.push({
+      id:           issue.finding_key || Math.random().toString(),
+      type:         'mix_shift',
+      title:        issue.title || 'Mix shift signal',
+      priority:     issue.priority || 'medium',
+      driver:       issue.primary_driver || 'mix_strategy',
+      department:   driverToDepartment(issue.primary_driver),
+      signal:       issue.commercial_narrative
+                      ? issue.commercial_narrative.split('\n\n')[0] : '',
+      analysis:     issue.commercial_narrative || '',
+      decision:     issue.enforced_decision_line || '',
+      execution:    Array.isArray(issue.enforced_execution_actions)
+                      ? issue.enforced_execution_actions : [],
+      revenue:      revCost,
+      card_metrics: issue.card_metrics || {},
+      issue_family: issue.issue_family || 'mix_displacement',
+      window_label: ''
+    });
+  });
+
+  // Monthly issues
+  (Array.isArray(ej.monthly_issues) ? ej.monthly_issues : [])
+  .forEach(issue => {
+    issues.push({
+      id:           issue.finding_key || Math.random().toString(),
+      type:         'monthly',
+      title:        issue.title || 'Monthly detail',
+      priority:     issue.priority || 'medium',
+      driver:       issue.primary_driver || 'pricing',
+      department:   driverToDepartment(issue.primary_driver),
+      signal:       issue.commercial_narrative
+                      ? issue.commercial_narrative.split('\n\n')[0] : '',
+      analysis:     issue.commercial_narrative || '',
+      decision:     issue.enforced_decision_line || '',
+      execution:    Array.isArray(issue.enforced_execution_actions)
+                      ? issue.enforced_execution_actions : [],
+      revenue:      0,
+      card_metrics: issue.card_metrics || {},
+      issue_family: issue.issue_family || '',
+      window_label: issue.month_label || ''
+    });
+  });
+
+  // Sort by priority descending, then revenue descending
+  return issues.sort((a, b) => {
+    const pd = priorityOrder(b.priority) - priorityOrder(a.priority);
+    if (pd !== 0) return pd;
+    return b.revenue - a.revenue;
+  });
 }
 
-function getOwner(record) {
-  const action = (record.linked_actions || [])[0] || {};
-  const ownerParts = [
-    action.owner_role,
-    action.owner_department,
-    action.execution_owner,
-    action.owner,
-    record.execution_owner,
-    record.owner,
-    record.department
-  ].filter(Boolean);
-  return ownerParts.length ? ownerParts.join(' · ') : '—';
+// --- RENDER FUNCTIONS ---
+
+function renderHero(ej, hotelCode, periodLabel, snapshotDate) {
+  // Total revenue at risk across all quantified issues
+  const fqs = ej.financial_quantification_summary;
+  const totalRevRisk = (fqs?.issue_level_quantification || [])
+    .reduce((s, q) => s + (q?.quantified_signals?.revenue_range?.max || 0), 0);
+
+  // Add forecast gap revenue
+  const fcRevTotal = (ej.forecast_gap_issues || [])
+    .reduce((s, f) => s + (f?.quantification?.rev_gap || 0), 0);
+  const totalExposure = totalRevRisk + fcRevTotal;
+
+  // Primary driver
+  const primaryDriver = ej.driver?.primary_driver || 'pricing';
+  const driverLabel = {
+    pricing: 'Pricing resistance',
+    conversion: 'Conversion drag',
+    mix_strategy: 'Mix imbalance',
+    visibility: 'Visibility gap'
+  }[primaryDriver] || capitalize(primaryDriver);
+
+  // OTB vs plan avg
+  const fcGaps = (ej.forecast_gap_issues || [])
+    .map(f => f?.card_metrics?.avgOcc).filter(v => v != null);
+  const otbVsPlan = fcGaps.length
+    ? Math.round(fcGaps.reduce((a, b) => a + b, 0) / fcGaps.length) + '%'
+    : '—';
+
+  // Total signals
+  const allIssues = extractAllIssues(ej);
+  const totalSignals = allIssues.length;
+  const highCount = allIssues.filter(i =>
+    i.priority === 'high' || i.priority === 'critical').length;
+
+  // GM headline sentence
+  const topIssue = allIssues[0];
+  const headline = topIssue
+    ? `${topIssue.title} is the lead commercial signal this cycle, with ${fmt(totalExposure)} total revenue exposure across ${totalSignals} finding${totalSignals !== 1 ? 's' : ''}. Primary driver is ${driverLabel.toLowerCase()} — immediate action is required from Revenue${highCount > 1 ? ', Sales, and Marketing' : ''}.`
+    : 'No commercial signals detected for this cycle.';
+
+  // Render hero stats
+  document.getElementById('hero-hotel').textContent = hotelCode || '—';
+  document.getElementById('hero-copy').textContent = headline;
+  document.getElementById('gm-headline').textContent = headline;
+  document.getElementById('meta-hotel').textContent = hotelCode || '—';
+  document.getElementById('meta-period').textContent = periodLabel || '—';
+  document.getElementById('meta-generated').textContent = snapshotDate || '—';
+  document.getElementById('stat-findings').textContent = totalSignals;
+  document.getElementById('stat-revenue').textContent = fmt(totalExposure);
+  document.getElementById('stat-gop').textContent = driverLabel;
+  document.getElementById('stat-critical').textContent = otbVsPlan;
+
+  // Update stat labels to match new meaning
+  const statLabels = document.querySelectorAll('.stat-label');
+  if (statLabels[0]) statLabels[0].textContent = 'SIGNALS DETECTED';
+  if (statLabels[1]) statLabels[1].textContent = 'REVENUE AT RISK';
+  if (statLabels[2]) statLabels[2].textContent = 'PRIMARY DRIVER';
+  if (statLabels[3]) statLabels[3].textContent = 'OTB VS PLAN';
+
+  const statSubs = document.querySelectorAll('.stat-sub');
+  if (statSubs[0]) statSubs[0].textContent = 'This cycle';
+  if (statSubs[1]) statSubs[1].textContent = 'Quantified exposure';
+  if (statSubs[2]) statSubs[2].textContent = 'Commercial lever';
+  if (statSubs[3]) statSubs[3].textContent = 'Avg across windows';
 }
 
-function getDueDate(record) {
-  const linked = record.linked_actions || [];
-  return linked.find(a => a?.due_date)?.due_date || linked.find(a => a?.dueDate)?.dueDate || '—';
+function renderPriorityDecisions(issues) {
+  // Top 3 by priority + revenue
+  const top3 = issues.slice(0, 3);
+  document.getElementById('priority-list').innerHTML = top3.map((issue, i) => `
+    <div class="priority-item">
+      <strong>${i + 1}. ${escHtml(issue.title)}</strong>
+      <div class="priority-meta">
+        ${escHtml(issue.decision)}
+        ${issue.revenue > 0
+          ? ` <span style="color:var(--high);font-weight:600;">
+              Â· ${escHtml(fmt(issue.revenue))} at risk</span>`
+          : ''}
+      </div>
+    </div>
+  `).join('');
+
+  // Department signal list
+  const deptSummary = { Revenue: [], Sales: [], Marketing: [] };
+  issues.forEach(i => {
+    if (deptSummary[i.department]) deptSummary[i.department].push(i);
+  });
+  document.getElementById('signal-list').innerHTML =
+    Object.entries(deptSummary)
+      .filter(([, items]) => items.length > 0)
+      .map(([dept, items]) => `
+        <div class="signal-item">
+          <strong>${escHtml(dept)}:</strong>
+          <div class="signal-meta">
+            ${escHtml(items[0].title)} is the lead signal.
+            ${escHtml(items[0].signal.slice(0, 120))}
+            ${items.length > 1
+              ? ` +${items.length - 1} additional finding${items.length > 2 ? 's' : ''}.`
+              : ''}
+          </div>
+        </div>
+      `).join('');
+
+  // Decision prompts
+  document.getElementById('decision-list').innerHTML = top3.map(issue => `
+    <div class="signal-item">
+      <strong>${escHtml(issue.title)}:</strong>
+      <div class="signal-meta">${escHtml(issue.decision)}</div>
+    </div>
+  `).join('');
+
+  // Forward friction — forward + forecast gap signals
+  const forwardIssues = issues.filter(i =>
+    i.type === 'forward' || i.type === 'forecast');
+  document.getElementById('friction-list').innerHTML =
+    forwardIssues.length > 0
+    ? forwardIssues.slice(0, 2).map(issue => `
+        <div class="signal-item">
+          <strong>${escHtml(issue.window_label || issue.title)}:</strong>
+          <div class="signal-meta">${escHtml(issue.signal.slice(0, 160))}</div>
+        </div>
+      `).join('')
+    : '<div class="signal-item"><div class="signal-meta">No forward exposure signals detected for this cycle.</div></div>';
 }
 
-function getOutcome(record) {
-  const action = (record.linked_actions || [])[0] || {};
-  return action.expected_outcome || record.expected_outcome || '—';
+function renderDepartmentSnapshot(issues) {
+  const depts = {
+    Revenue:   { label: 'Revenue',              issues: [] },
+    Sales:     { label: 'Sales & Distribution', issues: [] },
+    Marketing: { label: 'Marketing',            issues: [] }
+  };
+  issues.forEach(i => {
+    if (depts[i.department]) depts[i.department].issues.push(i);
+  });
+
+  document.getElementById('department-grid').innerHTML =
+    Object.values(depts).map(dept => {
+      const totalRev = dept.issues.reduce((s, i) => s + i.revenue, 0);
+      const gopEst   = Math.round(totalRev * 0.65);
+      const leads    = dept.issues.slice(0, 2);
+      const narrative = dept.issues.length > 0
+        ? `${dept.issues[0].title} is the lead ${dept.label.toLowerCase()} signal. ${dept.issues[0].signal.slice(0, 100)}`
+        : `No material ${dept.label.toLowerCase()} issues detected this cycle.`;
+
+      return `
+        <div class="department-card">
+          <div class="department-name">${escHtml(dept.label)}</div>
+          <div class="department-sub">${escHtml(narrative)}</div>
+          <div class="department-stats">
+            <div class="mini">
+              <div class="mini-label">Findings</div>
+              <div class="mini-value">${dept.issues.length}</div>
+              <div class="mini-sub">This cycle</div>
+            </div>
+            <div class="mini">
+              <div class="mini-label">Revenue</div>
+              <div class="mini-value">${fmt(totalRev)}</div>
+              <div class="mini-sub">At risk</div>
+            </div>
+            <div class="mini">
+              <div class="mini-label">GOP est.</div>
+              <div class="mini-value">${totalRev > 0 ? fmt(gopEst) : '—'}</div>
+              <div class="mini-sub">Directional</div>
+            </div>
+          </div>
+          <div class="dept-leads">
+            ${leads.length ? leads.map(item => `
+              <div class="dept-lead">
+                <div class="dept-lead-title">${escHtml(item.title)}</div>
+                <div class="dept-lead-copy">
+                  ${escHtml(item.decision)}
+                  Owner: ${escHtml(dept.label)}.
+                </div>
+              </div>
+            `).join('') : `
+              <div class="dept-lead">
+                <div class="dept-lead-copy">
+                  No briefing items for this department this cycle.
+                </div>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }).join('');
 }
 
-function getPrimaryRecords(records, count = 3) {
-  return sortRecords(records).slice(0, count);
+function renderFindingBriefing(issues) {
+  const typeLabel = {
+    historical: 'Historical analysis',
+    forward:    'Forward pace',
+    forecast:   'Forecast gap',
+    mix_shift:  'Mix shift',
+    monthly:    'Monthly detail'
+  };
+
+  const riskProjection = issue => {
+    if (issue.revenue > 0) {
+      const q90 = Math.round(issue.revenue / 4);
+      return `If no action is taken, roughly ${fmt(q90)} revenue could remain unrealised over the next 90 days.`;
+    }
+    return 'If no action is taken, this issue is likely to continue eroding commercial performance into the next cycle.';
+  };
+
+  document.getElementById('finding-grid').innerHTML = issues.map(issue => {
+    const priority = (issue.priority || 'medium').toLowerCase();
+    const executionList = issue.execution
+      .map(e => `<li>${escHtml(e)}</li>`).join('');
+    const analysisParas = issue.analysis.split('\n\n')
+      .filter(Boolean).slice(0, 3)
+      .map(p => `<p style="margin:0 0 8px;line-height:1.7;">${escHtml(p)}</p>`)
+      .join('');
+
+    return `
+      <article class="finding-brief">
+        <div class="finding-top">
+          <div>
+            <div class="finding-kicker">
+              ${escHtml(typeLabel[issue.type] || 'Strategic finding')}
+              ${issue.window_label
+                ? ` Â· ${escHtml(issue.window_label)}` : ''}
+            </div>
+            <div class="finding-title">${escHtml(issue.title)}</div>
+            <div class="finding-summary">${escHtml(issue.signal)}</div>
+          </div>
+          <div class="badges">
+            <span class="badge ${escHtml(priority)}">
+              ${escHtml(capitalize(priority))}
+            </span>
+            <span class="badge dept">${escHtml(issue.department)}</span>
+          </div>
+        </div>
+        <div class="finding-body">
+          <div class="finding-columns">
+            <div class="info-card">
+              <div class="info-title">Analysis</div>
+              <div class="info-text">${analysisParas}</div>
+              ${executionList ? `
+                <div class="info-title" style="margin-top:14px;">
+                  Execution actions
+                </div>
+                <ul class="action-list">${executionList}</ul>
+              ` : ''}
+            </div>
+            <div class="info-card">
+              <div class="info-title">Decision & Impact</div>
+              <div class="info-text">
+                <strong>Decision:</strong> ${escHtml(issue.decision)}
+              </div>
+              <div class="info-text" style="margin-top:10px;">
+                <strong>Owner:</strong> ${escHtml(issue.department)}
+              </div>
+              <div class="info-text" style="margin-top:10px;">
+                <strong>Revenue at risk:</strong>
+                ${issue.revenue > 0
+                  ? `<strong style="color:var(--critical);">
+                      ${escHtml(fmt(issue.revenue))}
+                    </strong>`
+                  : '—'}
+              </div>
+              ${issue.card_metrics?.avgMPI != null ? `
+                <div class="info-text" style="margin-top:10px;">
+                  <strong>Market position:</strong>
+                  MPI ${Number(issue.card_metrics.avgMPI).toFixed(1)} /
+                  ARI ${Number(issue.card_metrics.avgARI || 0).toFixed(1)} /
+                  RGI ${Number(issue.card_metrics.avgRGI || 0).toFixed(1)}
+                </div>
+              ` : ''}
+              <div class="decision-note" style="margin-top:14px;">
+                <div class="info-title">GM Decision Required</div>
+                <div class="info-text">${escHtml(issue.decision)}</div>
+              </div>
+            </div>
+          </div>
+          <div class="exec-matrix">
+            <div class="exec-cell">
+              <div class="exec-label">Type</div>
+              <div class="exec-value">
+                ${escHtml(typeLabel[issue.type] || '—')}
+              </div>
+            </div>
+            <div class="exec-cell">
+              <div class="exec-label">Driver</div>
+              <div class="exec-value">
+                ${escHtml(capitalize(
+                  (issue.driver || '').replace(/_/g, ' ')
+                ))}
+              </div>
+            </div>
+            <div class="exec-cell">
+              <div class="exec-label">Revenue at risk</div>
+              <div class="exec-value">
+                ${issue.revenue > 0
+                  ? `<strong>${escHtml(fmt(issue.revenue))}</strong>`
+                  : '—'}
+              </div>
+            </div>
+            <div class="exec-cell">
+              <div class="exec-label">GOP impact (est.)</div>
+              <div class="exec-value">
+                ${issue.revenue > 0
+                  ? `<strong>${escHtml(fmt(
+                      Math.round(issue.revenue * 0.65)
+                    ))}</strong>`
+                  : '—'}
+              </div>
+            </div>
+          </div>
+          <div class="decision-note">
+            <div class="info-title">If Nothing Is Done</div>
+            <div class="info-text">
+              ${escHtml(riskProjection(issue))}
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
 }
+
+// --- MAIN LOAD FUNCTION ---
+
+async function loadBriefing() {
+  showLoading(true);
+  hideError();
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('engine_outputs')
+      .select('id, hotel_code, snapshot_date, period_label, engine_json')
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      showLoading(false);
+      document.getElementById('empty-state').style.display = 'flex';
+      return;
+    }
+
+    const ej = typeof data.engine_json === 'string'
+      ? JSON.parse(data.engine_json)
+      : (data.engine_json || {});
+
+    const allIssues = extractAllIssues(ej);
+
+    if (!allIssues.length) {
+      showLoading(false);
+      document.getElementById('empty-state').style.display = 'flex';
+      return;
+    }
+
+    renderHero(
+      ej,
+      data.hotel_code,
+      data.period_label,
+      data.snapshot_date
+    );
+    renderPriorityDecisions(allIssues);
+    renderDepartmentSnapshot(allIssues);
+    renderFindingBriefing(allIssues);
+
+    showLoading(false);
+    document.getElementById('dashboard').style.display = 'block';
+
+  } catch (err) {
+    showLoading(false);
+    showError('Could not load briefing: ' + err.message);
+    console.error(err);
+  }
+}
+
+// --- AUTH FUNCTIONS ---
 
 function showLoading(show) {
-  document.getElementById('loading-state').style.display = show ? 'flex' : 'none';
+  document.getElementById('loading-state').style.display =
+    show ? 'flex' : 'none';
 }
 
 function showError(msg) {
@@ -788,391 +1199,6 @@ function showError(msg) {
 
 function hideError() {
   document.getElementById('error-state').style.display = 'none';
-}
-
-async function loadRecommendations() {
-  showLoading(true);
-  hideError();
-  document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('empty-state').style.display = 'none';
-
-  try {
-    const { data: latestRunRows, error: latestRunError } = await supabaseClient
-      .from('Recommendations')
-      .select('created_at, hotel_name, period')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (latestRunError) throw latestRunError;
-
-    const latestRun = latestRunRows?.[0];
-    if (!latestRun) {
-      allData = [];
-      showLoading(false);
-      document.getElementById('empty-state').style.display = 'flex';
-      return;
-    }
-
-    const latestCreatedAt = new Date(latestRun.created_at);
-    const batchStart = new Date(latestCreatedAt.getTime() - 15 * 60 * 1000).toISOString();
-
-    const recommendationsQuery = supabaseClient
-      .from('Recommendations')
-      .select('*')
-      .eq('hotel_name', latestRun.hotel_name)
-      .eq('period', latestRun.period)
-      .gte('created_at', batchStart)
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    const actionsQuery = supabaseClient
-      .from('actions')
-      .select('*')
-      .eq('hotel_name', latestRun.hotel_name)
-      .eq('period', latestRun.period)
-      .gte('created_at', batchStart)
-      .order('created_at', { ascending: false })
-      .limit(500);
-
-    const [
-      { data: findings, error: findingsError },
-      { data: actions, error: actionsError }
-    ] = await Promise.all([recommendationsQuery, actionsQuery]);
-
-    if (findingsError) throw findingsError;
-    if (actionsError) throw actionsError;
-
-    const cleanFindings = (findings || []).filter(r => {
-      const t = r.finding_title || '';
-      return !t.startsWith('{') && !t.startsWith('[') && !t.includes('input_tokens') && t.length > 3;
-    });
-
-    allData = cleanFindings.map(finding => {
-      const linkedActions = (actions || []).filter(action =>
-        normalize(action.hotel_name) === normalize(finding.hotel_name) &&
-        normalize(action.period) === normalize(finding.period) &&
-        normalize(action.finding_title_reference) === normalize(finding.finding_title)
-      );
-      return { ...finding, linked_actions: linkedActions };
-    });
-
-    showLoading(false);
-    if (!allData.length) {
-      document.getElementById('empty-state').style.display = 'flex';
-      return;
-    }
-
-    renderDashboard(allData);
-    document.getElementById('dashboard').style.display = 'block';
-  } catch (err) {
-    showLoading(false);
-    showError('Could not load data: ' + err.message);
-    console.error(err);
-  }
-}
-
-
-function formatCurrencyShort(value) {
-  return value > 0 ? `€${formatNumber(Math.round(value))}` : '—';
-}
-
-function getRiskProjection(record) {
-  const revenue = calculateRevenueUpside(record);
-  const gop = calculateGopImpact(record);
-  const quarterlyRevenue = revenue > 0 ? revenue / 4 : 0;
-  const quarterlyGop = gop > 0 ? gop / 4 : 0;
-  if (quarterlyRevenue > 0 && quarterlyGop > 0) {
-    return `If no action is taken, roughly ${formatCurrencyShort(quarterlyRevenue)} revenue and ${formatCurrencyShort(quarterlyGop)} GOP could remain unrealised over the next 90 days.`;
-  }
-  if (quarterlyRevenue > 0) {
-    return `If no action is taken, roughly ${formatCurrencyShort(quarterlyRevenue)} revenue could remain unrealised over the next 90 days.`;
-  }
-  return 'If no action is taken, this issue is likely to continue eroding commercial performance into the next cycle.';
-}
-
-function getDecisionPrompt(record) {
-  const department = getDepartmentBucket(record);
-  const due = getDueDate(record);
-  if (department === 'sales') {
-    return `Confirm account-level recovery plan and commercial guardrails for ${record.finding_title || 'this issue'} by ${due}.`;
-  }
-  if (department === 'marketing') {
-    return `Approve channel visibility and demand-generation response for ${record.finding_title || 'this issue'} by ${due}.`;
-  }
-  return `Validate pricing, mix, and inventory strategy for ${record.finding_title || 'this issue'} by ${due}.`;
-}
-
-function getDepartmentNarrative(bucket) {
-  if (!bucket.records.length) {
-    return `No material ${bucket.label.toLowerCase()} issues were detected in the latest cycle.`;
-  }
-  const top = bucket.records[0];
-  const revenue = calculateRevenueUpside(top);
-  const cause = top.root_cause || top.cause || 'commercial execution gap';
-  return `${top.finding_title} is leading ${bucket.label.toLowerCase()} attention, with ${revenue > 0 ? `${formatCurrencyShort(revenue)} annualised upside at stake` : 'meaningful commercial exposure'} and a root cause tied to ${cause.toLowerCase()}.`;
-}
-
-function getLeadActionSummary(record) {
-  const linked = record.linked_actions || [];
-  const first = linked[0] || {};
-  return first.action_title || first.action_detail || record.action_plan || record.action || 'No action plan attached in the latest cycle.';
-}
-
-function buildGMHeadline(records, buckets, totalRevenueUpside, totalGopImpact) {
-  const topRecords = getPrimaryRecords(records, 2);
-  const topRisk = topRecords[0];
-  const second = topRecords[1];
-  const activeDepartments = Object.values(buckets).filter(bucket => bucket.records.length);
-  const leadDepartments = activeDepartments
-    .sort((a, b) => b.totalRevenue - a.totalRevenue)
-    .slice(0, 2)
-    .map(bucket => bucket.label);
-  const parts = [];
-  if (topRisk) {
-    parts.push(`${topRisk.finding_title} is the lead issue, with ${formatCurrencyShort(calculateRevenueUpside(topRisk))} annualised revenue at stake`);
-  }
-  if (second) {
-    parts.push(`${second.finding_title} is the next pressure point`);
-  }
-  if (leadDepartments.length) {
-    parts.push(`requiring immediate alignment across ${leadDepartments.join(' and ')}`);
-  }
-  if (totalRevenueUpside > 0 || totalGopImpact > 0) {
-    parts.push(`The latest cycle concentrates ${formatCurrencyShort(totalRevenueUpside)} revenue exposure and ${formatCurrencyShort(totalGopImpact)} directional GOP impact`);
-  }
-  return parts.join(', ') + '.';
-}
-
-function buildFrictionPoints(records) {
-  const frictions = [];
-  const revenueRecord = sortRecords(records.filter(r => getDepartmentBucket(r) === 'revenue'))[0];
-  const salesRecord = sortRecords(records.filter(r => getDepartmentBucket(r) === 'sales'))[0];
-  const marketingRecord = sortRecords(records.filter(r => getDepartmentBucket(r) === 'marketing'))[0];
-
-  if (revenueRecord && salesRecord) {
-    frictions.push({
-      title: 'Revenue vs Sales alignment',
-      copy: `${revenueRecord.finding_title} and ${salesRecord.finding_title} should be reviewed together to avoid pricing recovery and account production moving in different directions.`
-    });
-  }
-  if (revenueRecord && marketingRecord) {
-    frictions.push({
-      title: 'Pricing vs demand generation',
-      copy: `${marketingRecord.finding_title} may not convert fully unless ${revenueRecord.finding_title.toLowerCase()} is addressed at the same time.`
-    });
-  }
-  if (!frictions.length && revenueRecord) {
-    frictions.push({
-      title: 'Execution concentration',
-      copy: `${revenueRecord.finding_title} is carrying the bulk of current exposure and requires cross-functional support beyond a single department.`
-    });
-  }
-  return frictions.slice(0, 3);
-}
-
-function renderExecutiveOverview(records) {
-  const totalRevenueUpside = records.reduce((sum, r) => sum + calculateRevenueUpside(r), 0);
-  const totalGopImpact = records.reduce((sum, r) => sum + calculateGopImpact(r), 0);
-  const criticalCount = records.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
-  const topRecords = getPrimaryRecords(records, 3);
-  const hotelName = records[0]?.hotel_name || '—';
-  const period = records[0]?.period || '—';
-  const generated = getGeneratedDate(records[0] || {});
-  const buckets = buildDepartmentBuckets(records);
-  const frictions = buildFrictionPoints(records);
-
-  document.getElementById('hero-hotel').textContent = hotelName;
-  document.getElementById('meta-hotel').textContent = hotelName;
-  document.getElementById('meta-period').textContent = period;
-  document.getElementById('meta-generated').textContent = generated;
-  document.getElementById('hero-copy').textContent = `${records.length} active strategic finding${records.length === 1 ? '' : 's'} were generated for the latest cycle. This briefing translates them into decisions, accountabilities, and risk exposure for Revenue, Sales, and Marketing.`;
-
-  document.getElementById('stat-findings').textContent = records.length;
-  document.getElementById('stat-revenue').textContent = formatCurrencyShort(totalRevenueUpside);
-  document.getElementById('stat-gop').textContent = formatCurrencyShort(totalGopImpact);
-  document.getElementById('stat-critical').textContent = criticalCount;
-  document.getElementById('gm-headline').textContent = buildGMHeadline(records, buckets, totalRevenueUpside, totalGopImpact);
-
-  const priorityList = document.getElementById('priority-list');
-  priorityList.innerHTML = topRecords.map((record, index) => {
-    const impact = calculateRevenueUpside(record);
-    const trigger = record.trigger_metric ? ` · ${escHtml(record.trigger_metric)}` : '';
-    return `
-      <div class="priority-item">
-        <strong>${index + 1}. ${escHtml(record.finding_title || 'Untitled finding')}</strong>
-        <div class="priority-meta">${escHtml(record.diagnosis || record.situation || 'No diagnosis available.')} ${impact > 0 ? `Estimated upside: ${escHtml(formatCurrencyShort(impact))}.` : ''}${trigger}</div>
-      </div>
-    `;
-  }).join('');
-
-  const signalRows = [];
-  ['revenue', 'sales', 'marketing'].forEach(dep => {
-    const bucket = buckets[dep];
-    if (!bucket.records.length) return;
-    signalRows.push(`
-      <div class="signal-item">
-        <strong>${bucket.label}:</strong>
-        <div class="signal-meta">${escHtml(getDepartmentNarrative(bucket))}</div>
-      </div>
-    `);
-  });
-  document.getElementById('signal-list').innerHTML = signalRows.join('');
-
-  const decisionRows = topRecords.map(record => `
-    <div class="signal-item">
-      <strong>${escHtml(record.finding_title)}:</strong>
-      <div class="signal-meta">${escHtml(getDecisionPrompt(record))}</div>
-    </div>
-  `).join('');
-  document.getElementById('decision-list').innerHTML = decisionRows;
-
-  document.getElementById('friction-list').innerHTML = frictions.map(item => `
-    <div class="signal-item">
-      <strong>${escHtml(item.title)}:</strong>
-      <div class="signal-meta">${escHtml(item.copy)}</div>
-    </div>
-  `).join('');
-}
-
-function buildDepartmentBuckets(records) {
-  const buckets = {
-    revenue: { label: 'Revenue', records: [] },
-    sales: { label: 'Sales', records: [] },
-    marketing: { label: 'Marketing', records: [] }
-  };
-  records.forEach(record => {
-    const bucket = getDepartmentBucket(record);
-    buckets[bucket].records.push(record);
-  });
-  Object.values(buckets).forEach(bucket => {
-    bucket.records = sortRecords(bucket.records);
-    bucket.totalRevenue = bucket.records.reduce((sum, r) => sum + calculateRevenueUpside(r), 0);
-    bucket.totalGop = bucket.records.reduce((sum, r) => sum + calculateGopImpact(r), 0);
-    bucket.critical = bucket.records.filter(r => (r.priority || '').toLowerCase() === 'critical').length;
-  });
-  return buckets;
-}
-
-function renderDepartmentSnapshot(records) {
-  const buckets = buildDepartmentBuckets(records);
-  const grid = document.getElementById('department-grid');
-  grid.innerHTML = ['revenue', 'sales', 'marketing'].map(key => {
-    const bucket = buckets[key];
-    const leads = bucket.records.slice(0, 2);
-    return `
-      <div class="department-card">
-        <div class="department-name">${bucket.label}</div>
-        <div class="department-sub">${getDepartmentNarrative(bucket)}</div>
-        <div class="department-stats">
-          <div class="mini">
-            <div class="mini-label">Findings</div>
-            <div class="mini-value">${bucket.records.length}</div>
-            <div class="mini-sub">Current cycle</div>
-          </div>
-          <div class="mini">
-            <div class="mini-label">Revenue</div>
-            <div class="mini-value">${formatCurrencyShort(bucket.totalRevenue)}</div>
-            <div class="mini-sub">Annual at stake</div>
-          </div>
-          <div class="mini">
-            <div class="mini-label">GOP</div>
-            <div class="mini-value">${formatCurrencyShort(bucket.totalGop)}</div>
-            <div class="mini-sub">Directional impact</div>
-          </div>
-        </div>
-        <div class="dept-leads">
-          ${leads.length ? leads.map(item => `
-            <div class="dept-lead">
-              <div class="dept-lead-title">${escHtml(item.finding_title)}</div>
-              <div class="dept-lead-copy">${escHtml(getLeadActionSummary(item))} Owner: ${escHtml(getOwner(item))}. Due: ${escHtml(getDueDate(item))}.</div>
-            </div>
-          `).join('') : '<div class="dept-lead"><div class="dept-lead-copy">No current briefing items for this department.</div></div>'}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderFindingBriefing(records) {
-  const sorted = sortRecords(records);
-  const grid = document.getElementById('finding-grid');
-  grid.innerHTML = sorted.map(record => {
-    const linked = record.linked_actions || [];
-    const revenue = calculateRevenueUpside(record);
-    const gop = calculateGopImpact(record);
-    const generatedDate = getGeneratedDate(record);
-    const department = capitalize(getDepartmentBucket(record));
-    const priority = (record.priority || 'medium').toLowerCase();
-    return `
-      <article class="finding-brief">
-        <div class="finding-top">
-          <div>
-            <div class="finding-kicker">${escHtml(record.module || 'Strategic finding')}</div>
-            <div class="finding-title">${escHtml(record.finding_title || 'Untitled finding')}</div>
-            <div class="finding-summary">${escHtml(record.situation || record.diagnosis || 'No situation summary available.')}</div>
-          </div>
-          <div class="badges">
-            <span class="badge ${priority}">${escHtml(priority)}</span>
-            <span class="badge dept">${escHtml(department)}</span>
-          </div>
-        </div>
-        <div class="finding-body">
-          <div class="finding-columns">
-            <div class="info-card">
-              <div class="info-title">What / Why</div>
-              <div class="info-text"><strong>Diagnosis:</strong> ${escHtml(record.diagnosis || '—')}</div>
-              <div class="info-text" style="margin-top:10px;"><strong>Root cause:</strong> ${escHtml(record.root_cause || record.cause || '—')}</div>
-              <div class="info-text" style="margin-top:10px;"><strong>Action plan:</strong></div>
-              <ul class="action-list">${formatActionList(linked, record)}</ul>
-            </div>
-            <div class="info-card">
-              <div class="info-title">Who / When / Impact</div>
-              <div class="info-text"><strong>Owner:</strong> ${escHtml(getOwner(record))}</div>
-              <div class="info-text" style="margin-top:10px;"><strong>Due date:</strong> ${escHtml(getDueDate(record))}</div>
-              <div class="info-text" style="margin-top:10px;"><strong>Expected outcome:</strong> ${escHtml(getOutcome(record))}</div>
-              <div class="info-text" style="margin-top:10px;"><strong>Generated:</strong> ${escHtml(generatedDate)}</div>
-              <div class="decision-note">
-                <div class="info-title">GM Decision Required</div>
-                <div class="info-text">${escHtml(getDecisionPrompt(record))}</div>
-              </div>
-            </div>
-          </div>
-          <div class="exec-matrix">
-            <div class="exec-cell">
-              <div class="exec-label">Department</div>
-              <div class="exec-value">${escHtml(department)}</div>
-            </div>
-            <div class="exec-cell">
-              <div class="exec-label">Trigger</div>
-              <div class="exec-value">${escHtml(record.trigger_metric || '—')}</div>
-            </div>
-            <div class="exec-cell">
-              <div class="exec-label">Revenue at Stake</div>
-              <div class="exec-value">${revenue > 0 ? `<strong>${escHtml(formatCurrencyShort(revenue))}</strong>` : '—'}</div>
-            </div>
-            <div class="exec-cell">
-              <div class="exec-label">Estimated GOP Impact</div>
-              <div class="exec-value">${gop > 0 ? `<strong>${escHtml(formatCurrencyShort(gop))}</strong>` : '—'}</div>
-            </div>
-          </div>
-          <div class="decision-note">
-            <div class="info-title">If Nothing Is Done</div>
-            <div class="info-text">${escHtml(getRiskProjection(record))}</div>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join('');
-}
-
-function renderDashboard(records) {
-  renderExecutiveOverview(records);
-  renderDepartmentSnapshot(records);
-  renderFindingBriefing(records);
-}
-
-function capitalize(str) {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
 function showLogin() {
@@ -1192,27 +1218,25 @@ async function handleLogin(e) {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
-
   btn.textContent = 'Signing in…';
   btn.disabled = true;
   errorEl.style.display = 'none';
-
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
+  const { data, error } = await supabaseClient.auth
+    .signInWithPassword({ email, password });
   if (error) {
     let msg = 'Incorrect email or password. Please try again.';
-    if (error.message.includes('Email not confirmed')) msg = 'Please confirm your email address first.';
+    if (error.message.includes('Email not confirmed'))
+      msg = 'Please confirm your email address first.';
     errorEl.textContent = msg;
     errorEl.style.display = 'block';
     btn.textContent = 'Sign In';
     btn.disabled = false;
     return;
   }
-
   showApp(data.session.user.email);
   btn.textContent = 'Sign In';
   btn.disabled = false;
-  loadRecommendations();
+  loadBriefing();
 }
 
 async function logout() {
@@ -1220,11 +1244,13 @@ async function logout() {
   showLogin();
 }
 
+// --- BOOT ---
+
 (async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
     showApp(session.user.email);
-    loadRecommendations();
+    loadBriefing();
   } else {
     showLogin();
   }
