@@ -467,7 +467,8 @@ body {
   line-height: 1.7;
 }
 @media (max-width: 1180px) {
-  .hero-stats, .department-grid, .exec-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-stats, .exec-matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .department-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .executive-grid, .executive-grid-v4, .finding-columns { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
@@ -635,6 +636,10 @@ const CURRENT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 const supabaseClient = window.supabase.createClient('https://fpnlzpfkygsyvkettjuj.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns');
 </script>
 <script>
+// Anthropic API key for GM narrative generation (narrative-only).
+// Inject via deploy, parent page, or replace placeholder — never commit a live key.
+window.ANTHROPIC_API_KEY = window.ANTHROPIC_API_KEY || 'YOUR_ANTHROPIC_API_KEY_HERE';
+
 // --- HELPERS ---
 
 function escHtml(str) {
@@ -811,61 +816,49 @@ function extractAllIssues(ej) {
 // --- RENDER FUNCTIONS ---
 
 function renderHero(ej, hotelCode, periodLabel, snapshotDate) {
-  // Total revenue at risk across all quantified issues
   const fqs = ej.financial_quantification_summary;
   const totalRevRisk = (fqs?.issue_level_quantification || [])
     .reduce((s, q) => s + (q?.quantified_signals?.revenue_range?.max || 0), 0);
 
-  // Add forecast gap revenue
   const fcRevTotal = (ej.forecast_gap_issues || [])
     .reduce((s, f) => s + (f?.quantification?.rev_gap || 0), 0);
   const totalExposure = totalRevRisk + fcRevTotal;
 
-  // Primary driver
+  const postureMap = {
+    pricing: ej.issues?.[0]?.arbitration_role === 'primary' &&
+             ej.issues?.[0]?.card_metrics?.trend_status === 'improving'
+             ? 'Hold rate — trend recovering'
+             : 'Review rate positioning',
+    conversion: 'Strengthen conversion path',
+    mix_strategy: 'Defend mix quality',
+    visibility: 'Activate demand generation'
+  };
   const primaryDriver = ej.driver?.primary_driver || 'pricing';
-  const driverLabel = {
-    pricing: 'Pricing resistance',
-    conversion: 'Conversion drag',
-    mix_strategy: 'Mix imbalance',
-    visibility: 'Visibility gap'
-  }[primaryDriver] || capitalize(primaryDriver);
+  const postureLabel = postureMap[primaryDriver]
+    || 'Review commercial strategy';
 
-  // OTB vs plan avg
   const fcGaps = (ej.forecast_gap_issues || [])
     .map(f => f?.card_metrics?.avgOcc).filter(v => v != null);
   const otbVsPlan = fcGaps.length
     ? Math.round(fcGaps.reduce((a, b) => a + b, 0) / fcGaps.length) + '%'
     : '—';
 
-  // Total signals
   const allIssues = extractAllIssues(ej);
   const totalSignals = allIssues.length;
-  const highCount = allIssues.filter(i =>
-    i.priority === 'high' || i.priority === 'critical').length;
 
-  // GM headline sentence
-  const topIssue = allIssues[0];
-  const headline = topIssue
-    ? `${topIssue.title} is the lead commercial signal this cycle, with ${fmt(totalExposure)} total revenue exposure across ${totalSignals} finding${totalSignals !== 1 ? 's' : ''}. Primary driver is ${driverLabel.toLowerCase()} — immediate action is required from Revenue${highCount > 1 ? ', Sales, and Marketing' : ''}.`
-    : 'No commercial signals detected for this cycle.';
-
-  // Render hero stats
   document.getElementById('hero-hotel').textContent = hotelCode || '—';
-  document.getElementById('hero-copy').textContent = headline;
-  document.getElementById('gm-headline').textContent = headline;
   document.getElementById('meta-hotel').textContent = hotelCode || '—';
   document.getElementById('meta-period').textContent = periodLabel || '—';
   document.getElementById('meta-generated').textContent = snapshotDate || '—';
   document.getElementById('stat-findings').textContent = totalSignals;
   document.getElementById('stat-revenue').textContent = fmt(totalExposure);
-  document.getElementById('stat-gop').textContent = driverLabel;
+  document.getElementById('stat-gop').textContent = postureLabel;
   document.getElementById('stat-critical').textContent = otbVsPlan;
 
-  // Update stat labels to match new meaning
   const statLabels = document.querySelectorAll('.stat-label');
   if (statLabels[0]) statLabels[0].textContent = 'SIGNALS DETECTED';
   if (statLabels[1]) statLabels[1].textContent = 'REVENUE AT RISK';
-  if (statLabels[2]) statLabels[2].textContent = 'PRIMARY DRIVER';
+  if (statLabels[2]) statLabels[2].textContent = 'COMMERCIAL POSTURE';
   if (statLabels[3]) statLabels[3].textContent = 'OTB VS PLAN';
 
   const statSubs = document.querySelectorAll('.stat-sub');
@@ -873,65 +866,118 @@ function renderHero(ej, hotelCode, periodLabel, snapshotDate) {
   if (statSubs[1]) statSubs[1].textContent = 'Quantified exposure';
   if (statSubs[2]) statSubs[2].textContent = 'Commercial lever';
   if (statSubs[3]) statSubs[3].textContent = 'Avg across windows';
+
+  const heroCopyEl = document.getElementById('hero-copy');
+  heroCopyEl.textContent = 'Preparing executive briefing…';
+  heroCopyEl.style.opacity = '0.5';
+
+  const ctx = buildBriefingContext(ej, hotelCode, periodLabel, snapshotDate);
+
+  generateGMNarrative(ctx).then(result => {
+    const narrative = result.narrative || buildFallbackNarrative(ctx);
+    const paragraphs = narrative.split('\n\n').filter(Boolean);
+    heroCopyEl.innerHTML = paragraphs
+      .map(p => `<p style="margin:0 0 12px;line-height:1.7;color:rgba(248,247,242,0.82);">${escHtml(p)}</p>`)
+      .join('');
+    heroCopyEl.style.opacity = '1';
+    if (result.source === 'fallback') {
+      console.info('Hero narrative: fallback template used');
+    }
+  });
+
+  const gmHeadlineEl = document.getElementById('gm-headline');
+  if (gmHeadlineEl) {
+    gmHeadlineEl.closest('.headline-panel')
+      ?.style.setProperty('display', 'none');
+  }
 }
 
 function renderPriorityDecisions(issues) {
-  // Top 3 by priority + revenue
   const top3 = issues.slice(0, 3);
-  document.getElementById('priority-list').innerHTML = top3.map((issue, i) => `
-    <div class="priority-item">
-      <strong>${i + 1}. ${escHtml(issue.title)}</strong>
-      <div class="priority-meta">
-        ${escHtml(issue.decision)}
-        ${issue.revenue > 0
-          ? ` <span style="color:var(--high);font-weight:600;">
-              Â· ${escHtml(fmt(issue.revenue))} at risk</span>`
-          : ''}
-      </div>
-    </div>
-  `).join('');
 
-  // Department signal list
+  document.getElementById('priority-list').innerHTML =
+    top3.map((issue, i) => {
+      const revLine = issue.revenue > 0
+        ? ` <span style="color:var(--high);font-weight:600;">
+            · €${Math.round(issue.revenue / 1000)}K exposure</span>`
+        : '';
+      return `
+        <div class="priority-item">
+          <strong>${i + 1}. ${escHtml(issue.title)}</strong>
+          <div class="priority-meta">
+            ${escHtml(issue.decision)}${revLine}
+          </div>
+        </div>`;
+    }).join('');
+
   const deptSummary = { Revenue: [], Sales: [], Marketing: [] };
   issues.forEach(i => {
     if (deptSummary[i.department]) deptSummary[i.department].push(i);
   });
+
   document.getElementById('signal-list').innerHTML =
     Object.entries(deptSummary)
       .filter(([, items]) => items.length > 0)
-      .map(([dept, items]) => `
-        <div class="signal-item">
-          <strong>${escHtml(dept)}:</strong>
-          <div class="signal-meta">
-            ${escHtml(items[0].title)} is the lead signal.
-            ${escHtml(items[0].signal.slice(0, 120))}
-            ${items.length > 1
-              ? ` +${items.length - 1} additional finding${items.length > 2 ? 's' : ''}.`
-              : ''}
-          </div>
-        </div>
-      `).join('');
+      .map(([dept, items]) => {
+        const lead = items[0];
+        const revLine = lead.revenue > 0
+          ? ` €${Math.round(lead.revenue / 1000)}K at stake.` : '';
+        return `
+          <div class="signal-item">
+            <strong>${escHtml(dept)}:</strong>
+            <div class="signal-meta">
+              ${escHtml(lead.title)}.
+              ${escHtml(lead.decision)}${revLine}
+              ${items.length > 1
+                ? ` +${items.length - 1} additional signal${
+                    items.length > 2 ? 's' : ''}.`
+                : ''}
+            </div>
+          </div>`;
+      }).join('');
 
-  // Decision prompts
-  document.getElementById('decision-list').innerHTML = top3.map(issue => `
-    <div class="signal-item">
-      <strong>${escHtml(issue.title)}:</strong>
-      <div class="signal-meta">${escHtml(issue.decision)}</div>
-    </div>
-  `).join('');
-
-  // Forward friction — forward + forecast gap signals
-  const forwardIssues = issues.filter(i =>
+  const fwdIssues = issues.filter(i =>
     i.type === 'forward' || i.type === 'forecast');
-  document.getElementById('friction-list').innerHTML =
-    forwardIssues.length > 0
-    ? forwardIssues.slice(0, 2).map(issue => `
+  const fwdEl = document.getElementById('decision-list');
+  if (fwdEl) {
+    if (fwdIssues.length > 0) {
+      fwdEl.innerHTML = fwdIssues.slice(0, 2).map(issue => `
         <div class="signal-item">
           <strong>${escHtml(issue.window_label || issue.title)}:</strong>
-          <div class="signal-meta">${escHtml(issue.signal.slice(0, 160))}</div>
-        </div>
-      `).join('')
-    : '<div class="signal-item"><div class="signal-meta">No forward exposure signals detected for this cycle.</div></div>';
+          <div class="signal-meta">
+            ${escHtml(issue.signal.slice(0, 180))}
+          </div>
+        </div>`).join('');
+      const decisionLabel = fwdEl
+        .closest('.panel')
+        ?.querySelector('.panel-title');
+      if (decisionLabel) decisionLabel.textContent = 'FORWARD EXPOSURE';
+    } else {
+      fwdEl.innerHTML = `
+        <div class="signal-item">
+          <div class="signal-meta">
+            No forward exposure signals in this cycle.
+          </div>
+        </div>`;
+    }
+  }
+
+  const forwardFriction = issues.filter(i =>
+    i.type === 'forward' || i.type === 'forecast');
+  document.getElementById('friction-list').innerHTML =
+    forwardFriction.length > 0
+    ? forwardFriction.slice(0, 2).map(issue => `
+        <div class="signal-item">
+          <strong>${escHtml(issue.window_label || issue.title)}:</strong>
+          <div class="signal-meta">
+            ${escHtml(issue.decision)}
+          </div>
+        </div>`).join('')
+    : `<div class="signal-item">
+         <div class="signal-meta">
+           No cross-department friction signals this cycle.
+         </div>
+       </div>`;
 }
 
 function renderDepartmentSnapshot(issues) {
@@ -998,41 +1044,71 @@ function renderDepartmentSnapshot(issues) {
 
 function renderFindingBriefing(issues) {
   const typeLabel = {
-    historical: 'Historical analysis',
-    forward:    'Forward pace',
-    forecast:   'Forecast gap',
-    mix_shift:  'Mix shift',
-    monthly:    'Monthly detail'
+    historical: 'Historical Analysis',
+    forward:    'Forward Pace',
+    forecast:   'Forecast Gap',
+    mix_shift:  'Mix Shift',
+    monthly:    'Monthly Detail'
   };
 
-  const riskProjection = issue => {
-    if (issue.revenue > 0) {
-      const q90 = Math.round(issue.revenue / 4);
-      return `If no action is taken, roughly ${fmt(q90)} revenue could remain unrealised over the next 90 days.`;
-    }
-    return 'If no action is taken, this issue is likely to continue eroding commercial performance into the next cycle.';
+  const fmtDigest = v => {
+    const n = Number(v) || 0;
+    if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return '€' + Math.round(n / 1000) + 'K';
+    return n > 0 ? '€' + Math.round(n) : null;
   };
 
-  document.getElementById('finding-grid').innerHTML = issues.map(issue => {
+  document.getElementById('finding-grid').innerHTML =
+    issues.map(issue => {
     const priority = (issue.priority || 'medium').toLowerCase();
-    const executionList = issue.execution
-      .map(e => `<li>${escHtml(e)}</li>`).join('');
-    const analysisParas = issue.analysis.split('\n\n')
-      .filter(Boolean).slice(0, 3)
-      .map(p => `<p style="margin:0 0 8px;line-height:1.7;">${escHtml(p)}</p>`)
-      .join('');
+
+    const signalSentence = issue.signal
+      ? issue.signal.split('.')[0].trim() + '.'
+      : issue.title + '.';
+
+    const rnMatch = (issue.analysis || '').match(/(\d+) room nights behind/);
+    const impactSentence = issue.revenue > 0
+      ? `Revenue exposure is ${fmtDigest(issue.revenue)}.`
+      : issue.type === 'forward'
+        ? `This window is tracking behind last year with ${
+            rnMatch?.[1] || 'multiple'
+          } room nights at risk.`
+        : 'Financial impact is directional — monitor closely.';
+
+    const decisionSentence = issue.decision
+      ? issue.decision.split('.')[0].trim() + '.'
+      : 'No specific decision required at this stage.';
+
+    const firstAction = issue.execution?.[0] || '';
+    const ownerSentence = firstAction
+      ? `${issue.department} to action: ${firstAction
+          .split('.')[0].trim()}.`
+      : `Owner: ${issue.department}.`;
+
+    const prose = [
+      signalSentence,
+      impactSentence,
+      decisionSentence,
+      ownerSentence
+    ].join(' ');
+
+    const kickerSuffix = issue.window_label
+      ? ` · ${issue.window_label}` : '';
+
+    const riskIfDone = issue.revenue > 0
+      ? `If no action is taken, roughly ${
+          fmtDigest(Math.round(issue.revenue / 4))
+        } revenue could remain unrealised over the next 90 days.`
+      : 'If no action is taken, this issue is likely to continue eroding commercial performance into the next cycle.';
 
     return `
       <article class="finding-brief">
         <div class="finding-top">
           <div>
             <div class="finding-kicker">
-              ${escHtml(typeLabel[issue.type] || 'Strategic finding')}
-              ${issue.window_label
-                ? ` Â· ${escHtml(issue.window_label)}` : ''}
+              ${escHtml(typeLabel[issue.type] || 'Signal')}${escHtml(kickerSuffix)}
             </div>
             <div class="finding-title">${escHtml(issue.title)}</div>
-            <div class="finding-summary">${escHtml(issue.signal)}</div>
           </div>
           <div class="badges">
             <span class="badge ${escHtml(priority)}">
@@ -1041,92 +1117,340 @@ function renderFindingBriefing(issues) {
             <span class="badge dept">${escHtml(issue.department)}</span>
           </div>
         </div>
-        <div class="finding-body">
-          <div class="finding-columns">
-            <div class="info-card">
-              <div class="info-title">Analysis</div>
-              <div class="info-text">${analysisParas}</div>
-              ${executionList ? `
-                <div class="info-title" style="margin-top:14px;">
-                  Execution actions
-                </div>
-                <ul class="action-list">${executionList}</ul>
-              ` : ''}
-            </div>
-            <div class="info-card">
-              <div class="info-title">Decision & Impact</div>
-              <div class="info-text">
-                <strong>Decision:</strong> ${escHtml(issue.decision)}
-              </div>
-              <div class="info-text" style="margin-top:10px;">
-                <strong>Owner:</strong> ${escHtml(issue.department)}
-              </div>
-              <div class="info-text" style="margin-top:10px;">
-                <strong>Revenue at risk:</strong>
-                ${issue.revenue > 0
-                  ? `<strong style="color:var(--critical);">
-                      ${escHtml(fmt(issue.revenue))}
-                    </strong>`
-                  : '—'}
-              </div>
-              ${issue.card_metrics?.avgMPI != null ? `
-                <div class="info-text" style="margin-top:10px;">
-                  <strong>Market position:</strong>
-                  MPI ${Number(issue.card_metrics.avgMPI).toFixed(1)} /
-                  ARI ${Number(issue.card_metrics.avgARI || 0).toFixed(1)} /
-                  RGI ${Number(issue.card_metrics.avgRGI || 0).toFixed(1)}
-                </div>
-              ` : ''}
-              <div class="decision-note" style="margin-top:14px;">
-                <div class="info-title">GM Decision Required</div>
-                <div class="info-text">${escHtml(issue.decision)}</div>
-              </div>
-            </div>
-          </div>
-          <div class="exec-matrix">
-            <div class="exec-cell">
-              <div class="exec-label">Type</div>
-              <div class="exec-value">
-                ${escHtml(typeLabel[issue.type] || '—')}
-              </div>
-            </div>
-            <div class="exec-cell">
-              <div class="exec-label">Driver</div>
-              <div class="exec-value">
-                ${escHtml(capitalize(
-                  (issue.driver || '').replace(/_/g, ' ')
-                ))}
-              </div>
-            </div>
-            <div class="exec-cell">
-              <div class="exec-label">Revenue at risk</div>
-              <div class="exec-value">
-                ${issue.revenue > 0
-                  ? `<strong>${escHtml(fmt(issue.revenue))}</strong>`
-                  : '—'}
-              </div>
-            </div>
-            <div class="exec-cell">
-              <div class="exec-label">GOP impact (est.)</div>
-              <div class="exec-value">
-                ${issue.revenue > 0
-                  ? `<strong>${escHtml(fmt(
-                      Math.round(issue.revenue * 0.65)
-                    ))}</strong>`
-                  : '—'}
-              </div>
-            </div>
-          </div>
+        <div class="finding-body" style="padding:20px 22px;">
+          <p style="font-size:15px;line-height:1.8;color:var(--ink);
+            margin:0 0 16px;">
+            ${escHtml(prose)}
+          </p>
           <div class="decision-note">
-            <div class="info-title">If Nothing Is Done</div>
-            <div class="info-text">
-              ${escHtml(riskProjection(issue))}
+            <div class="info-title">GM Decision Required</div>
+            <div class="info-text">${escHtml(issue.decision)}</div>
+          </div>
+          ${issue.revenue > 0 ? `
+          <div style="display:grid;grid-template-columns:1fr 1fr;
+            gap:10px;margin-top:14px;">
+            <div class="mini">
+              <div class="mini-label">Revenue at risk</div>
+              <div class="mini-value">${escHtml(fmtDigest(issue.revenue) || '—')}</div>
             </div>
+            <div class="mini">
+              <div class="mini-label">GOP est.</div>
+              <div class="mini-value">${escHtml(
+                fmtDigest(Math.round(issue.revenue * 0.65)) || '—'
+              )}</div>
+            </div>
+          </div>` : ''}
+          <div class="decision-note" style="margin-top:12px;">
+            <div class="info-title">If Nothing Is Done</div>
+            <div class="info-text">${escHtml(riskIfDone)}</div>
           </div>
         </div>
-      </article>
-    `;
+      </article>`;
   }).join('');
+}
+
+/**
+ * Builds a comprehensive, flat context object from engine_json.
+ * Every field maps directly to engine data — nothing is inferred.
+ * This object is passed to Claude for narrative generation.
+ * Null fields are omitted so Claude does not mention missing topics.
+ */
+function buildBriefingContext(ej, hotelCode, periodLabel, snapshotDate) {
+  const ctx = {};
+
+  ctx.hotel = hotelCode || null;
+  ctx.period = periodLabel || null;
+  ctx.snapshot_date = snapshotDate || null;
+
+  const cm = ej.issues?.[0]?.card_metrics || {};
+  const diag = ej.diagnosis || {};
+  ctx.mpi = cm.avgMPI != null ? Number(cm.avgMPI).toFixed(1) : null;
+  ctx.ari = cm.avgARI != null ? Number(cm.avgARI).toFixed(1) : null;
+  ctx.rgi = cm.avgRGI != null ? Number(cm.avgRGI).toFixed(1) : null;
+  ctx.occ = cm.avgOcc != null ? Number(cm.avgOcc).toFixed(1) : null;
+  ctx.trend = cm.trend_status || diag.trend_status || null;
+  ctx.diagnosis_type = diag.diagnosis_type || null;
+
+  const reasoning = ej.issues?.[0]?.reasoning || {};
+  ctx.mpi_vs_ly = reasoning.variance?.mpi_variance_vs_ly != null
+    ? Number(reasoning.variance.mpi_variance_vs_ly).toFixed(1) : null;
+  ctx.ari_vs_ly = reasoning.variance?.ari_variance_vs_ly != null
+    ? Number(reasoning.variance.ari_variance_vs_ly).toFixed(1) : null;
+  ctx.rgi_vs_ly = reasoning.variance?.rgi_variance_vs_ly != null
+    ? Number(reasoning.variance.rgi_variance_vs_ly).toFixed(1) : null;
+
+  const topIssue = ej.issues?.[0] || null;
+  ctx.primary_issue_title = topIssue?.title || null;
+  ctx.primary_decision = topIssue?.enforced_decision_line || null;
+  ctx.primary_driver = topIssue?.primary_driver || null;
+  ctx.arbitration_posture = topIssue?.arbitration_role || null;
+  ctx.issue_family = topIssue?.issue_family || null;
+  ctx.period_span_days = topIssue?.span_days || null;
+
+  const fqs = ej.financial_quantification_summary;
+  const histRevMax = (fqs?.issue_level_quantification || [])
+    .reduce((s, q) =>
+      s + (q?.quantified_signals?.revenue_range?.max || 0), 0);
+  ctx.historical_revenue_at_risk = histRevMax > 0
+    ? Math.round(histRevMax) : null;
+  ctx.room_nights_at_risk = fqs?.issue_level_quantification?.[0]
+    ?.quantified_signals?.room_nights_at_risk || null;
+
+  const segAttr = topIssue?.segment_attribution_summary || {};
+  ctx.primary_segment = segAttr.primary_segment || null;
+  ctx.segment_story = segAttr.primary_segment_story || null;
+  ctx.segment_rn_delta = segAttr.rn_delta != null
+    ? Number(segAttr.rn_delta).toFixed(0) : null;
+  ctx.segment_adr_delta = segAttr.adr_delta != null
+    ? Number(segAttr.adr_delta).toFixed(0) : null;
+
+  const segAnalysis = ej.focus?.segment_analysis || [];
+  ctx.segments_above_ly = segAnalysis
+    .filter(s => s.rnGrowth > 0.02)
+    .map(s => s.segment).slice(0, 3);
+  ctx.segments_below_ly = segAnalysis
+    .filter(s => s.rnGrowth < -0.02)
+    .map(s => s.segment).slice(0, 3);
+
+  const mixShift = ej.mix_shift_issues || [];
+  const displacement = mixShift.find(m => m.pattern === 'displacement');
+  const rateDilution = mixShift.find(m => m.pattern === 'rate_dilution');
+  const concentration = mixShift.find(m => m.pattern === 'concentration');
+
+  if (displacement) {
+    const q = displacement.quantification || {};
+    ctx.displacement_loser = q.loser_segment || null;
+    ctx.displacement_gainer = q.gainer_segment || null;
+    ctx.displacement_share_shift_pts = q.share_shift_pts || null;
+    ctx.displacement_adr_spread_pct = q.adr_spread_pct || null;
+    ctx.displacement_revenue_cost = q.revenue_cost
+      ? Math.round(q.revenue_cost) : null;
+  }
+  if (rateDilution) {
+    const q = rateDilution.quantification || {};
+    ctx.rate_dilution_segment = q.segment || null;
+    ctx.rate_dilution_adr_drop_pct = q.adr_drop_pct || null;
+    ctx.rate_dilution_revenue_lost = q.revenue_lost
+      ? Math.round(q.revenue_lost) : null;
+  }
+  if (concentration) {
+    const q = concentration.quantification || {};
+    ctx.concentration_segment = q.dominant_segment || null;
+    ctx.concentration_share_pct = q.share_ty || null;
+  }
+
+  const monthly = ej.monthly_issues || [];
+  const underMonths = monthly
+    .filter(m => m.period_comparison?.direction === 'below')
+    .map(m => ({
+      month: m.month_label,
+      occ_gap: m.period_comparison?.breach_details?.occ
+        ? Number(m.period_comparison.breach_details.occ).toFixed(1)
+        : null,
+      rgi_gap: m.period_comparison?.breach_details?.rgi
+        ? Number(m.period_comparison.breach_details.rgi).toFixed(1)
+        : null,
+      dominant_segment: m.dominant_segment || null
+    }));
+  const overMonths = monthly
+    .filter(m => m.period_comparison?.direction === 'above')
+    .map(m => ({
+      month: m.month_label,
+      dominant_segment: m.dominant_segment || null
+    }));
+  if (underMonths.length) ctx.months_underperformed = underMonths;
+  if (overMonths.length) ctx.months_outperformed = overMonths;
+
+  const fwd = ej.forward_issues || [];
+  ctx.forward_windows_total = fwd.length;
+  ctx.forward_windows_behind = fwd.filter(f =>
+    (f.commercial_narrative || '').includes('behind')).length;
+
+  const fwdRnBehind = fwd.reduce((s, f) => {
+    const match = (f.commercial_narrative || '')
+      .match(/Currently (\d+) room nights behind/);
+    return s + (match ? parseInt(match[1], 10) : 0);
+  }, 0);
+  ctx.forward_total_rn_behind = fwdRnBehind > 0 ? fwdRnBehind : null;
+
+  const worstFwd = fwd.reduce((worst, f) => {
+    const match = (f.commercial_narrative || '')
+      .match(/Currently (\d+) room nights behind/);
+    const rn = match ? parseInt(match[1], 10) : 0;
+    return rn > (worst.rn || 0) ? { f, rn } : worst;
+  }, { f: null, rn: 0 });
+  if (worstFwd.f) {
+    ctx.forward_worst_window = worstFwd.f.window_label || null;
+    ctx.forward_worst_rn_gap = worstFwd.rn;
+    const segMatch = (worstFwd.f.commercial_narrative || '')
+      .match(/([A-Z][A-Za-z /]+) is the largest drag/);
+    ctx.forward_worst_drag_segment = segMatch
+      ? segMatch[1].trim() : null;
+  }
+
+  const fcGap = ej.forecast_gap_issues || [];
+  const fcOtbPcts = fcGap
+    .map(f => f?.card_metrics?.avgOcc).filter(v => v != null);
+  ctx.forecast_avg_otb_pct = fcOtbPcts.length
+    ? Math.round(fcOtbPcts.reduce((a, b) => a + b, 0) / fcOtbPcts.length)
+    : null;
+  const fcRevTotal = fcGap.reduce((s, f) =>
+    s + (f?.quantification?.rev_gap || 0), 0);
+  ctx.forecast_total_revenue_gap = fcRevTotal > 0
+    ? Math.round(fcRevTotal) : null;
+  ctx.forecast_challenge_detected = fcGap.some(f =>
+    (f?.commercial_narrative || '').includes('Forecast challenge'));
+  const fcPrimarySegs = fcGap
+    .map(f => f?.primary_segment).filter(Boolean);
+  ctx.forecast_primary_shortfall_segment = fcPrimarySegs.length
+    ? fcPrimarySegs[0] : null;
+  const fcAdrGaps = fcGap
+    .map(f => f?.quantification?.adr_gap).filter(v => v != null);
+  const fcAvgAdr = fcAdrGaps.length
+    ? fcAdrGaps.reduce((a, b) => a + b, 0) / fcAdrGaps.length : null;
+  ctx.forecast_adr_status = fcAvgAdr === null ? null
+    : Math.abs(fcAvgAdr) < 5 ? 'on_target'
+    : fcAvgAdr > 0 ? 'below_plan' : 'above_plan';
+
+  ctx.behind_on_both_pace_and_forecast =
+    (ctx.forward_windows_behind > 0) &&
+    (ctx.forecast_avg_otb_pct != null && ctx.forecast_avg_otb_pct < 90);
+  ctx.mix_shift_compounding_pricing =
+    ctx.displacement_loser != null &&
+    ctx.issue_family === 'pricing_resistance';
+  ctx.trend_improving_despite_gaps =
+    ctx.trend === 'improving' &&
+    (ctx.forward_windows_behind > 0 || ctx.historical_revenue_at_risk > 0);
+
+  Object.keys(ctx).forEach(k => {
+    if (ctx[k] === null || ctx[k] === undefined || ctx[k] === false) {
+      delete ctx[k];
+    }
+    if (Array.isArray(ctx[k]) && ctx[k].length === 0) delete ctx[k];
+  });
+
+  return ctx;
+}
+
+/**
+ * Calls the Anthropic API to generate a 3-paragraph GM narrative.
+ * Passes the full context object. Claude is strictly instructed to
+ * only use facts from the context — zero hallucination policy.
+ * Falls back to template narrative if API fails or validation fails.
+ */
+async function generateGMNarrative(ctx) {
+  const systemPrompt = `You are writing a 3-paragraph executive briefing for a General Manager of a luxury hotel.
+
+STRICT RULES — violation of any rule means the output is rejected:
+1. Use ONLY the facts provided in the data object.
+2. Do NOT add context, inference, projections, or assessments not present in the data.
+3. Do NOT invent numbers. Every figure you write must match a field in the data object exactly.
+4. If a topic has no data, do not mention it.
+5. Write in plain English. No jargon. No bullet points.
+6. Maximum 3 paragraphs. Each paragraph maximum 3 sentences.
+7. Tone: direct, professional, like a senior commercial advisor briefing a GM before a morning meeting.
+8. Do not use the word "findings". Use "signals" or "issues".
+9. Do not say "the engine detected" or "the system shows". Write as if you are the advisor.
+10. The GM will act on this. Be precise. Be assertive. Do not hedge unless the data shows uncertainty.
+
+PARAGRAPH STRUCTURE:
+Paragraph 1: Market position this period — where the hotel stands vs the competitive set (MPI, ARI, RGI, trend direction).
+Paragraph 2: The primary commercial tension — what is driving performance and what the data says to do about it. Include the most material financial consequence.
+Paragraph 3: Forward exposure — what is on the books vs plan and vs last year, and what cannot wait.`;
+
+  const userPrompt = `Write the GM briefing using this data:
+${JSON.stringify(ctx, null, 2)}
+
+Remember: only use facts from this data object.
+3 paragraphs, 3 sentences each maximum.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': window.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 400,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+
+    if (!response.ok) throw new Error('API error: ' + response.status);
+
+    const payload = await response.json();
+    const narrative = payload?.content?.[0]?.text || '';
+
+    if (!narrative || narrative.length < 100) {
+      throw new Error('Narrative too short — fallback triggered');
+    }
+
+    const validationFails = [];
+    if (ctx.mpi && !narrative.includes(ctx.mpi)) {
+      validationFails.push('mpi_missing');
+    }
+    if (ctx.rgi && !narrative.includes(ctx.rgi)) {
+      validationFails.push('rgi_missing');
+    }
+    if (validationFails.length > 2) {
+      console.warn('Narrative validation failed:', validationFails);
+      throw new Error('Validation failed — fallback triggered');
+    }
+
+    return { narrative, source: 'claude' };
+
+  } catch (err) {
+    console.warn('Claude narrative generation failed:', err.message);
+    return { narrative: null, source: 'fallback' };
+  }
+}
+
+/**
+ * Template fallback narrative — used when Claude API fails.
+ * Assembled entirely from context fields — no invented text.
+ */
+function buildFallbackNarrative(ctx) {
+  const parts = [];
+
+  if (ctx.mpi && ctx.ari && ctx.rgi) {
+    let p1 = `${ctx.hotel || 'The hotel'} closed the period with MPI ${ctx.mpi}, ARI ${ctx.ari}, and RGI ${ctx.rgi}`;
+    if (ctx.trend) p1 += ` — trend is ${ctx.trend}`;
+    if (ctx.mpi_vs_ly && ctx.rgi_vs_ly) {
+      p1 += `. MPI is ${ctx.mpi_vs_ly > 0 ? '+' : ''}${ctx.mpi_vs_ly} vs last year; RGI is ${ctx.rgi_vs_ly > 0 ? '+' : ''}${ctx.rgi_vs_ly} vs last year.`;
+    }
+    parts.push(p1);
+  }
+
+  if (ctx.primary_issue_title && ctx.primary_decision) {
+    let p2 = `The primary commercial signal is ${ctx.primary_issue_title}.`;
+    p2 += ` ${ctx.primary_decision}`;
+    if (ctx.historical_revenue_at_risk) {
+      p2 += ` Revenue at risk: €${Math.round(ctx.historical_revenue_at_risk / 1000)}K.`;
+    }
+    parts.push(p2);
+  }
+
+  if (ctx.forecast_avg_otb_pct || ctx.forward_total_rn_behind) {
+    let p3 = '';
+    if (ctx.forecast_avg_otb_pct) {
+      p3 += `Forward OTB is tracking at ${ctx.forecast_avg_otb_pct}% of plan.`;
+    }
+    if (ctx.forward_total_rn_behind) {
+      p3 += ` ${ctx.forward_total_rn_behind} room nights behind last year across forward windows.`;
+    }
+    if (ctx.forecast_challenge_detected) {
+      p3 += ` The forecast appears aggressive vs last year — validate the plan basis before acting.`;
+    }
+    if (p3) parts.push(p3);
+  }
+
+  return parts.join('\n\n') ||
+    'Upload data to generate the executive briefing.';
 }
 
 // --- MAIN LOAD FUNCTION ---
