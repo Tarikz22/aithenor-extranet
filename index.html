@@ -496,8 +496,7 @@ body {
   border-radius: 3px;
 }
 
-/* ── Phase 2: Monthly detail cards — left column, below period cards ── */
-/* Gold left border, indented, visually subordinate                      */
+/* Phase 2: Monthly detail cards — left column, below period cards */
 .monthly-card {
   border-left: 3px solid var(--gold);
   margin-left: 20px;
@@ -512,6 +511,25 @@ body {
   color: var(--gold);
   font-weight: 600;
   margin-bottom: 6px;
+}
+
+/* Phase 2: Mix shift cards — left column, below monthly cards */
+/* Teal border — distinct from orange (period), gold (monthly) */
+.mix-shift-card {
+  border-left: 3px solid #0F6E56;
+  margin-top: 8px;
+}
+
+.mix-shift-badge {
+  display: inline-block;
+  background: #E1F5EE;
+  color: #0F6E56;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
 }
 
 .finding-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
@@ -2649,15 +2667,13 @@ function renderFindings() {
     histCol.insertAdjacentHTML('beforeend', renderCard(card));
   });
 
-  // Phase 2: Render monthly detail cards in the left column,
-  // below period cards. monthly_issues only generates cards when
-  // a month's dynamics differ materially from the period average.
-  // When empty, nothing renders — existing cards are unaffected.
+  // Phase 2: Monthly detail cards — below period cards in left column.
+  // Render only when monthly_issues has entries.
+  // When empty (single-regime dataset), nothing renders.
   const monthlyIssues = Array.isArray(currentEngineJson?.monthly_issues)
     ? currentEngineJson.monthly_issues : [];
 
   for (const mIssue of monthlyIssues) {
-    // Build card object using fields renderCard() expects
     const mCard = {
       id: 'MONTHLY_' + (mIssue.finding_key || mIssue.month_key || '')
           + '_' + (currentEngineRow?.snapshot_date || ''),
@@ -2691,15 +2707,11 @@ function renderFindings() {
       ].filter(Boolean).join(' ')
     };
 
-    // Render using existing renderCard — no new render function needed
     const mHtml = renderCard(mCard);
 
-    // Inject monthly-card CSS class and prepend the Monthly Detail label
-    // inside the card header, before the title
     let styledMHtml = mHtml
       .replace('class="finding-card', 'class="finding-card monthly-card');
 
-    // Insert the Monthly Detail label before the finding-title div
     styledMHtml = styledMHtml.replace(
       '<div class="finding-title">',
       '<div class="monthly-card-label">Monthly Detail</div>' +
@@ -2707,6 +2719,83 @@ function renderFindings() {
     );
 
     histCol.insertAdjacentHTML('beforeend', styledMHtml);
+  }
+
+  // Phase 2: Mix shift cards — below monthly cards in left column.
+  // Three patterns: displacement, concentration, rate_dilution.
+  // Render only when mix_shift_issues has entries.
+  const mixShiftIssues = Array.isArray(currentEngineJson?.mix_shift_issues)
+    ? currentEngineJson.mix_shift_issues : [];
+
+  for (const msIssue of mixShiftIssues) {
+    const msQ = msIssue.quantification || {};
+    const msRevImpact = msQ.revenue_cost || msQ.revenue_lost || null;
+    const msRevFmt = msRevImpact != null
+      ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
+          .format(Math.round(msRevImpact))
+      : null;
+
+    let msKeyInsight = '';
+    if (msIssue.pattern === 'displacement') {
+      msKeyInsight = msQ.loser_segment && msQ.gainer_segment
+        ? `${msQ.loser_segment} losing share to ${msQ.gainer_segment}` +
+          (msQ.revenue_cost
+            ? ` — £${msRevFmt} revenue cost`
+            : '')
+        : msIssue.title || '';
+    } else if (msIssue.pattern === 'rate_dilution') {
+      const adrPct = msQ.adr_drop_pct != null ? msQ.adr_drop_pct.toFixed(1) : '?';
+      const revDestroyed = msRevFmt != null ? `£${msRevFmt} revenue destroyed` : 'revenue impact not quantified';
+      msKeyInsight = msQ.segment
+        ? `${msQ.segment} ADR down ${adrPct}% — ${revDestroyed}`
+        : msIssue.title || '';
+    } else if (msIssue.pattern === 'concentration') {
+      msKeyInsight = msQ.dominant_segment
+        ? `${msQ.dominant_segment} represents ${msQ.share_ty != null
+            ? msQ.share_ty.toFixed(0)
+            : '?'}% of room nights — concentration risk`
+        : msIssue.title || '';
+    } else {
+      msKeyInsight = msIssue.title || '';
+    }
+
+    const msCard = {
+      id: 'MIX_' + (msIssue.finding_key || '')
+          + '_' + (currentEngineRow?.snapshot_date || ''),
+      finding_key:   msIssue.finding_key,
+      title:         msIssue.title || 'Mix Shift',
+      priority:      msIssue.priority || 'medium',
+      trigger_display: '— / — / —',
+      execution_owner: null,
+      commercial_narrative:       msIssue.commercial_narrative || null,
+      enforced_decision_line:     msIssue.enforced_decision_line || null,
+      enforced_execution_actions: msIssue.enforced_execution_actions || [],
+      card_metrics:  msIssue.card_metrics || null,
+      issue_family:  msIssue.issue_family || '',
+      key_insight:   msKeyInsight
+    };
+
+    const msHtml = renderCard(msCard);
+
+    let styledMsHtml = msHtml
+      .replace('class="finding-card', 'class="finding-card mix-shift-card');
+
+    const patternLabel = msIssue.pattern === 'displacement' ? 'Displacement'
+      : msIssue.pattern === 'rate_dilution' ? 'Rate Dilution'
+      : msIssue.pattern === 'concentration' ? 'Concentration Risk'
+      : 'Mix Shift';
+
+    styledMsHtml = styledMsHtml.replace(
+      '<div class="trigger-metric-label">MPI / ARI / RGI</div>',
+      `<div class="trigger-metric-label">${escHtml(patternLabel)}</div>`
+    );
+
+    styledMsHtml = styledMsHtml.replace(
+      /(<span class="priority-badge [^"]+">[^<]*<\/span>)/,
+      '$1\n            <span class="mix-shift-badge">Mix Shift</span>'
+    );
+
+    histCol.insertAdjacentHTML('beforeend', styledMsHtml);
   }
 
   forwardCards.forEach(card => {
