@@ -2141,6 +2141,26 @@ function extractRoomNightsBehindReference(narrative) {
 }
 
 function buildForwardImpactLine(card) {
+  // Phase 2: Forecast gap cards carry quantification.rev_gap directly.
+  // Surface this as the headline impact — more precise than pace proxies.
+  if (card.granularity === 'forecast_gap') {
+    const revGap = card.quantification?.rev_gap;
+    const rnGap = card.quantification?.rn_gap;
+    const rnGapPct = card.quantification?.rn_gap_pct;
+    const revFmt = v => new Intl.NumberFormat('en-GB',
+      { maximumFractionDigits: 0 }).format(Math.round(v));
+    if (revGap != null && revGap > 0 && rnGap != null) {
+      return `£${revFmt(revGap)} revenue gap vs forecast — ` +
+        `${Math.round(rnGap)} room nights (${rnGapPct != null
+          ? rnGapPct.toFixed(1)
+          : '?'}%) short of plan.`;
+    }
+    if (rnGap != null && rnGap > 0) {
+      return `${Math.round(rnGap)} room nights short of forecast plan.`;
+    }
+    return 'Forecast gap detected — see analysis for detail.';
+  }
+
   const x = extractRoomNightsBehindReference(card.commercial_narrative);
   const win = extractForwardWindowShortDescription(card.window_label) || (card.window_label || '').trim();
   if (x && win) return `${x} room nights behind reference pace — ${win}.`;
@@ -2711,6 +2731,8 @@ function renderFindings() {
       title:         fgIssue.title || 'Forecast Gap',
       priority:      fgIssue.priority || 'medium',
       window_label:  fgIssue.window_label || '',
+      granularity:   'forecast_gap',
+      quantification: fgIssue.quantification || null,
       // SIGNAL: OTB as % of plan — repurposed from avgOcc field
       // renderForwardCard extracts signal from first % in commercial_narrative
       commercial_narrative:       fgIssue.commercial_narrative || null,
