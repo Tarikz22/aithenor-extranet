@@ -608,14 +608,64 @@ body {
 
 .group-brief {
   font-size: 12px;
-  color: var(--gray-900);
+  color: var(--gray-600);
   font-weight: 400;
-  line-height: 1.4;
-  /* truncate to one line */
-  white-space: nowrap;
+  line-height: 1.5;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
+}
+
+/* Group header insight pills — structured data points */
+.group-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  white-space: nowrap;
+}
+
+.group-pill .pill-label {
+  color: var(--gray-400);
+  font-weight: 400;
+  margin-right: 1px;
+}
+
+.group-pill.pill-warning {
+  background: var(--orange-light);
+  color: var(--orange);
+}
+
+.group-pill.pill-negative {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.group-pill.pill-positive {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.group-pill.pill-neutral {
+  background: var(--gray-100);
+  color: var(--gray-600);
 }
 
 .group-header-right {
@@ -2849,45 +2899,138 @@ function buildGroupHeader(groupType, groupName, brief,
 function computeGroupSummaries(engineJson) {
   const fmt = v => new Intl.NumberFormat('en-GB',
     { maximumFractionDigits: 0 }).format(Math.round(v));
+  const fmtIdx = v => v != null && Number.isFinite(v)
+    ? v.toFixed(1) : null;
 
-  // --- Historical Analysis ---
+  // ── HISTORICAL ANALYSIS ────────────────────────────
   const issues = Array.isArray(engineJson?.issues)
     ? engineJson.issues : [];
-  const histBrief = issues.length > 0
-    ? (issues[0].enforced_decision_line || issues[0].title || '')
-        .toString().slice(0, 90)
-    : 'No historical signals detected';
-  // Revenue at risk from financial quantification summary
   const fqs = engineJson?.financial_quantification_summary;
-  const histRevRisk = fqs?.strongest_hidden_losses?.[0]
-    ?.revenue_range?.max ?? null;
   const histAllRev = Array.isArray(fqs?.issue_level_quantification)
     ? fqs.issue_level_quantification.reduce((s, q) =>
         s + (q?.quantified_signals?.revenue_range?.max || 0), 0)
-    : null;
-  const histMetric = histAllRev && histAllRev > 0
-    ? `£${fmt(histAllRev)}`
-    : histRevRisk ? `£${fmt(histRevRisk)}` : null;
+    : 0;
+  const histMetric = histAllRev > 0 ? `€${fmt(histAllRev)}` : null;
 
-  // --- Monthly Detail ---
+  // Brief: primary driver + period
+  const primaryIssue = issues[0] || null;
+  const primaryDriver = primaryIssue?.primary_driver || null;
+  const driverLabel = primaryDriver === 'pricing' ? 'Pricing resistance'
+    : primaryDriver === 'conversion' ? 'Conversion drag'
+    : primaryDriver === 'mix_strategy' ? 'Mix imbalance'
+    : primaryDriver === 'visibility' ? 'Visibility gap'
+    : 'Commercial signal';
+  const histBrief = primaryIssue
+    ? `${driverLabel} — ${(primaryIssue.enforced_decision_line || '').slice(0, 80)}`
+    : 'No historical signals detected';
+
+  // Pills: primary driver | key segment | RGI | trend
+  const histPills = [];
+  if (primaryDriver) {
+    histPills.push({
+      label: 'Driver',
+      value: driverLabel,
+      cls: 'pill-warning'
+    });
+  }
+  // Primary segment from segment_attribution_summary
+  const primarySeg = primaryIssue?.segment_attribution_summary?.primary_segment
+    || primaryIssue?.primary_segment || null;
+  if (primarySeg) {
+    histPills.push({
+      label: 'Segment',
+      value: primarySeg,
+      cls: 'pill-neutral'
+    });
+  }
+  // RGI from card_metrics
+  const histRgi = primaryIssue?.card_metrics?.avgRGI;
+  if (histRgi != null) {
+    const rgiVal = fmtIdx(histRgi);
+    histPills.push({
+      label: 'RGI',
+      value: rgiVal,
+      cls: Number(histRgi) >= 100 ? 'pill-positive' : 'pill-negative'
+    });
+  }
+  // MPI
+  const histMpi = primaryIssue?.card_metrics?.avgMPI;
+  if (histMpi != null) {
+    histPills.push({
+      label: 'MPI',
+      value: fmtIdx(histMpi),
+      cls: Number(histMpi) >= 100 ? 'pill-positive' : 'pill-warning'
+    });
+  }
+  // Trend
+  const histTrend = primaryIssue?.card_metrics?.trend_status;
+  if (histTrend) {
+    histPills.push({
+      label: 'Trend',
+      value: histTrend.charAt(0).toUpperCase() + histTrend.slice(1),
+      cls: histTrend === 'improving' ? 'pill-positive'
+        : histTrend === 'worsening' ? 'pill-negative' : 'pill-neutral'
+    });
+  }
+
+  // ── MONTHLY DETAIL ─────────────────────────────────
   const monthly = Array.isArray(engineJson?.monthly_issues)
     ? engineJson.monthly_issues : [];
-  const above = monthly.filter(m =>
-    m?.period_comparison?.direction === 'above').length;
-  const below = monthly.filter(m =>
-    m?.period_comparison?.direction === 'below').length;
+  const aboveMonths = monthly.filter(m =>
+    m?.period_comparison?.direction === 'above');
+  const belowMonths = monthly.filter(m =>
+    m?.period_comparison?.direction === 'below');
   const monthBriefParts = [];
-  if (below > 0) monthBriefParts.push(
-    `${below} month${below > 1 ? 's' : ''} underperformed`);
-  if (above > 0) monthBriefParts.push(
-    `${above} month${above > 1 ? 's' : ''} outperformed`);
+  if (belowMonths.length > 0) monthBriefParts.push(
+    `${belowMonths.length} month${belowMonths.length > 1 ? 's' : ''} underperformed`);
+  if (aboveMonths.length > 0) monthBriefParts.push(
+    `${aboveMonths.length} month${aboveMonths.length > 1 ? 's' : ''} outperformed`);
   const monthBrief = monthBriefParts.length > 0
     ? monthBriefParts.join(', ')
     : 'No monthly divergence detected';
   const monthBreaches = monthly.reduce((s, m) =>
     s + (m?.period_comparison?.breach_count || 0), 0);
 
-  // --- Mix Shift ---
+  // Pills: worst month occ delta | best month | dominant segment
+  const monthPills = [];
+  if (belowMonths.length > 0) {
+    const worst = belowMonths.reduce((a, b) =>
+      (b?.period_comparison?.breach_count || 0) >
+      (a?.period_comparison?.breach_count || 0) ? b : a);
+    monthPills.push({
+      label: 'Worst',
+      value: worst.month_label || worst.month_key || '—',
+      cls: 'pill-negative'
+    });
+    const occDelta = worst.card_metrics?.avgOcc != null &&
+      worst.period_comparison?.period_avg_occ != null
+      ? Math.abs(worst.card_metrics.avgOcc -
+          worst.period_comparison.period_avg_occ).toFixed(1)
+      : null;
+    if (occDelta) monthPills.push({
+      label: 'Occ gap',
+      value: `-${occDelta}pts`,
+      cls: 'pill-warning'
+    });
+  }
+  if (aboveMonths.length > 0) {
+    const best = aboveMonths[0];
+    monthPills.push({
+      label: 'Best',
+      value: best.month_label || best.month_key || '—',
+      cls: 'pill-positive'
+    });
+  }
+  // Dominant segment from first below month
+  const monthDomSeg = belowMonths[0]?.dominant_segment
+    || aboveMonths[0]?.dominant_segment || null;
+  if (monthDomSeg) monthPills.push({
+    label: 'Segment',
+    value: monthDomSeg,
+    cls: 'pill-neutral'
+  });
+
+  // ── MIX SHIFT ──────────────────────────────────────
   const mixShift = Array.isArray(engineJson?.mix_shift_issues)
     ? engineJson.mix_shift_issues : [];
   const mixRevTotal = mixShift.reduce((s, ms) => {
@@ -2895,30 +3038,127 @@ function computeGroupSummaries(engineJson) {
     return s + (q.revenue_cost || q.revenue_lost || 0);
   }, 0);
   const primaryMix = mixShift[0];
-  const mixBrief = primaryMix
-    ? (primaryMix.enforced_decision_line || primaryMix.title || '')
-        .toString().slice(0, 90)
-    : 'No mix shift patterns detected';
-  const mixMetric = mixRevTotal > 0 ? `£${fmt(mixRevTotal)}` : null;
+  const mixBrief = primaryMix?.pattern === 'displacement'
+    ? `${primaryMix.quantification?.loser_segment || '—'} losing share to ${primaryMix.quantification?.gainer_segment || '—'}`
+    : primaryMix?.pattern === 'rate_dilution'
+      ? `${primaryMix.quantification?.segment || '—'} ADR eroding — rate concession not compensated by volume`
+      : primaryMix?.pattern === 'concentration'
+        ? `${primaryMix.quantification?.dominant_segment || '—'} concentration risk`
+        : 'No mix shift patterns detected';
+  const mixMetric = mixRevTotal > 0 ? `€${fmt(mixRevTotal)}` : null;
 
-  // --- Forward Pace ---
+  // Pills: pattern | losing segment | gaining segment | ADR spread
+  const mixPills = [];
+  if (primaryMix) {
+    const q = primaryMix.quantification || {};
+    const patternLabel = primaryMix.pattern === 'displacement'
+      ? 'Displacement'
+      : primaryMix.pattern === 'rate_dilution' ? 'Rate dilution'
+      : primaryMix.pattern === 'concentration' ? 'Concentration'
+      : 'Mix shift';
+    mixPills.push({
+      label: 'Pattern',
+      value: patternLabel,
+      cls: 'pill-warning'
+    });
+    if (primaryMix.pattern === 'displacement') {
+      if (q.loser_segment) mixPills.push({
+        label: 'Losing',
+        value: q.loser_segment,
+        cls: 'pill-negative'
+      });
+      if (q.gainer_segment) mixPills.push({
+        label: 'Gaining',
+        value: q.gainer_segment,
+        cls: 'pill-neutral'
+      });
+      if (q.adr_spread_pct != null) mixPills.push({
+        label: 'ADR spread',
+        value: `${q.adr_spread_pct.toFixed(1)}%`,
+        cls: 'pill-warning'
+      });
+    } else if (primaryMix.pattern === 'rate_dilution') {
+      if (q.segment) mixPills.push({
+        label: 'Segment',
+        value: q.segment,
+        cls: 'pill-neutral'
+      });
+      if (q.adr_drop_pct != null) mixPills.push({
+        label: 'ADR drop',
+        value: `−${q.adr_drop_pct.toFixed(1)}%`,
+        cls: 'pill-negative'
+      });
+      if (q.rn_ty != null) mixPills.push({
+        label: 'Room nights',
+        value: Math.round(q.rn_ty).toLocaleString(),
+        cls: 'pill-neutral'
+      });
+    } else if (primaryMix.pattern === 'concentration') {
+      if (q.dominant_segment) mixPills.push({
+        label: 'Segment',
+        value: q.dominant_segment,
+        cls: 'pill-warning'
+      });
+      if (q.share_ty != null) mixPills.push({
+        label: 'Share',
+        value: `${q.share_ty.toFixed(0)}%`,
+        cls: 'pill-negative'
+      });
+    }
+  }
+
+  // ── FORWARD PACE ───────────────────────────────────
   const forward = Array.isArray(engineJson?.forward_issues)
     ? engineJson.forward_issues : [];
-  // Total room nights behind reference across all windows
   const fwdRnBehind = forward.reduce((s, f) => {
-    // Extract room nights from commercial_narrative
     const match = (f?.commercial_narrative || '')
       .match(/Currently (\d+) room nights behind/);
     return s + (match ? parseInt(match[1], 10) : 0);
   }, 0);
+  // Find worst window (most RN behind)
+  const worstFwd = forward.reduce((worst, f) => {
+    const match = (f?.commercial_narrative || '')
+      .match(/Currently (\d+) room nights behind/);
+    const rn = match ? parseInt(match[1], 10) : 0;
+    return rn > (worst.rn || 0) ? { f, rn } : worst;
+  }, { f: null, rn: 0 });
   const fwdBrief = forward.length > 0
-    ? (forward[0]?.commercial_narrative || '')
-        .split('\n')[0].slice(0, 90)
+    ? `${forward.length} forward window${forward.length > 1 ? 's' : ''} tracking behind last year`
     : 'No forward pace data';
-  const fwdMetric = fwdRnBehind > 0
-    ? `${fwdRnBehind} RN behind` : null;
+  const fwdMetric = fwdRnBehind > 0 ? `${fwdRnBehind} RN behind` : null;
 
-  // --- Forecast Gap ---
+  // Pills: worst window | primary drag segment | windows count
+  const fwdPills = [];
+  if (worstFwd.f) {
+    fwdPills.push({
+      label: 'Worst window',
+      value: worstFwd.f.window_label || worstFwd.f.title || '—',
+      cls: 'pill-negative'
+    });
+    // Extract primary segment from worst window narrative
+    const segMatch = (worstFwd.f.commercial_narrative || '')
+      .match(/([A-Z][A-Za-z /]+) is the largest drag/);
+    if (segMatch) fwdPills.push({
+      label: 'Drag',
+      value: segMatch[1].trim(),
+      cls: 'pill-warning'
+    });
+    if (worstFwd.rn > 0) fwdPills.push({
+      label: 'Gap',
+      value: `${worstFwd.rn} RN`,
+      cls: 'pill-warning'
+    });
+  }
+  // Windows behind count
+  const windowsBehind = forward.filter(f =>
+    (f?.commercial_narrative || '').includes('behind')).length;
+  if (windowsBehind > 0) fwdPills.push({
+    label: 'Windows behind',
+    value: `${windowsBehind} of ${forward.length}`,
+    cls: windowsBehind === forward.length ? 'pill-negative' : 'pill-warning'
+  });
+
+  // ── FORECAST GAP ───────────────────────────────────
   const fcGap = Array.isArray(engineJson?.forecast_gap_issues)
     ? engineJson.forecast_gap_issues : [];
   const fcRevTotal = fcGap.reduce((s, f) =>
@@ -2927,19 +3167,69 @@ function computeGroupSummaries(engineJson) {
     .map(f => f?.card_metrics?.avgOcc)
     .filter(v => v != null);
   const fcAvgOtbPct = fcOtbPcts.length > 0
-    ? Math.round(fcOtbPcts.reduce((a, b) => a + b, 0)
-        / fcOtbPcts.length)
+    ? Math.round(fcOtbPcts.reduce((a, b) => a + b, 0) / fcOtbPcts.length)
     : null;
+  const fcMetric = fcRevTotal > 0 ? `€${fmt(fcRevTotal)}` : null;
+
+  // Primary shortfall segment across all windows
+  const fcPrimarySegs = fcGap
+    .map(f => f?.primary_segment)
+    .filter(Boolean);
+  const fcSegCounts = {};
+  for (const seg of fcPrimarySegs) {
+    fcSegCounts[seg] = (fcSegCounts[seg] || 0) + 1;
+  }
+  const fcTopSeg = Object.entries(fcSegCounts)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+  // Check ADR status — gap of 0 means ADR on target
+  const fcAdrGaps = fcGap
+    .map(f => f?.quantification?.adr_gap)
+    .filter(v => v != null);
+  const fcAvgAdrGap = fcAdrGaps.length > 0
+    ? fcAdrGaps.reduce((a, b) => a + b, 0) / fcAdrGaps.length
+    : null;
+  const fcAdrStatus = fcAvgAdrGap === null ? null
+    : Math.abs(fcAvgAdrGap) < 5 ? 'ADR on target'
+    : fcAvgAdrGap > 0 ? `ADR −${fcAvgAdrGap.toFixed(0)} below plan`
+    : `ADR +${Math.abs(fcAvgAdrGap).toFixed(0)} above plan`;
+
   const fcBrief = fcAvgOtbPct != null
-    ? `OTB tracking at ${fcAvgOtbPct}% of plan across all windows`
-    : fcGap.length > 0
-      ? (fcGap[0]?.enforced_decision_line || '').slice(0, 90)
-      : 'No forecast data available';
-  const fcMetric = fcRevTotal > 0 ? `£${fmt(fcRevTotal)}` : null;
+    ? `OTB at ${fcAvgOtbPct}% of plan — ${fcRevTotal > 0 ?
+        `€${fmt(fcRevTotal)} revenue gap` : 'gap vs forecast'}`
+    : 'No forecast data available';
+
+  // Pills: OTB % of plan | primary segment | ADR status | forecast challenge
+  const fcPills = [];
+  if (fcAvgOtbPct != null) fcPills.push({
+    label: 'OTB vs plan',
+    value: `${fcAvgOtbPct}%`,
+    cls: fcAvgOtbPct < 70 ? 'pill-negative'
+      : fcAvgOtbPct < 85 ? 'pill-warning' : 'pill-positive'
+  });
+  if (fcTopSeg) fcPills.push({
+    label: 'Shortfall',
+    value: fcTopSeg,
+    cls: 'pill-warning'
+  });
+  if (fcAdrStatus) fcPills.push({
+    label: 'ADR',
+    value: fcAdrStatus,
+    cls: Math.abs(fcAvgAdrGap || 0) < 5 ? 'pill-positive' : 'pill-negative'
+  });
+  // Flag if forecast challenge detected (aggressive forecast)
+  const hasForecastChallenge = fcGap.some(f =>
+    (f?.commercial_narrative || '').includes('Forecast challenge'));
+  if (hasForecastChallenge) fcPills.push({
+    label: 'Note',
+    value: 'Forecast may be aggressive',
+    cls: 'pill-warning'
+  });
 
   return {
     historical: {
       brief: histBrief,
+      pills: histPills,
       metric: histMetric,
       metricClass: 'warning',
       metaLabel: 'revenue at risk',
@@ -2947,14 +3237,15 @@ function computeGroupSummaries(engineJson) {
     },
     monthly: {
       brief: monthBrief,
+      pills: monthPills,
       metric: monthBreaches > 0 ? `${monthBreaches}` : null,
       metricClass: '',
-      metaLabel: monthBreaches > 0
-        ? 'metric breaches' : 'no divergence',
+      metaLabel: monthBreaches > 0 ? 'metric breaches' : 'no divergence',
       count: monthly.length
     },
     mixShift: {
       brief: mixBrief,
+      pills: mixPills,
       metric: mixMetric,
       metricClass: 'negative',
       metaLabel: 'revenue impact',
@@ -2962,6 +3253,7 @@ function computeGroupSummaries(engineJson) {
     },
     forward: {
       brief: fwdBrief,
+      pills: fwdPills,
       metric: fwdMetric,
       metricClass: 'warning',
       metaLabel: 'vs last year',
@@ -2969,6 +3261,7 @@ function computeGroupSummaries(engineJson) {
     },
     forecast: {
       brief: fcBrief,
+      pills: fcPills,
       metric: fcMetric,
       metricClass: 'negative',
       metaLabel: 'vs forecast plan',
@@ -3009,7 +3302,7 @@ function renderFindings() {
   // This produces a valid, self-contained HTML string every time.
   function buildCompleteGroup(groupType, groupName, brief,
                                metric, metricClass, metaLabel,
-                               count, cardsHtml) {
+                               count, cardsHtml, pills) {
     if (!cardsHtml) return '';
     const countHtml = count > 0
       ? `<span class="group-count">${count}</span>` : '';
@@ -3019,6 +3312,18 @@ function renderFindings() {
          </div>
          <div class="group-meta">${escHtml(metaLabel || '')}</div>`
       : `<div class="group-meta">${escHtml(metaLabel || '')}</div>`;
+
+    // Build pills HTML — each pill shows label + value
+    const pillsArr = Array.isArray(pills) ? pills : [];
+    const pillsHtml = pillsArr.length > 0
+      ? `<div class="group-pills">
+          ${pillsArr.map(p => `
+            <span class="group-pill ${escHtml(p.cls || '')}">
+              <span class="pill-label">${escHtml(p.label)}</span>
+              ${escHtml(p.value)}
+            </span>`).join('')}
+        </div>`
+      : '';
 
     return `
       <div class="findings-group">
@@ -3030,6 +3335,7 @@ function renderFindings() {
               ${countHtml}
             </div>
             <div class="group-brief">${escHtml(brief)}</div>
+            ${pillsHtml}
           </div>
           <div class="group-header-right">
             ${metricHtml}
@@ -3054,7 +3360,7 @@ function renderFindings() {
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('historical', 'Historical Analysis',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml)
+        s.count, cardsHtml, s.pills)
     );
   }
 
@@ -3137,7 +3443,7 @@ function renderFindings() {
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('monthly', 'Monthly Detail',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml)
+        s.count, cardsHtml, s.pills)
     );
   }
 
@@ -3249,7 +3555,7 @@ function renderFindings() {
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('mix-shift', 'Mix Shift',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml)
+        s.count, cardsHtml, s.pills)
     );
   }
 
@@ -3262,7 +3568,7 @@ function renderFindings() {
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('forward', 'Forward Pace',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml)
+        s.count, cardsHtml, s.pills)
     );
   }
 
@@ -3305,7 +3611,7 @@ function renderFindings() {
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('forecast', 'Forecast Gap',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml)
+        s.count, cardsHtml, s.pills)
     );
   }
 
