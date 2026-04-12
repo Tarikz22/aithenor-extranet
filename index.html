@@ -2811,7 +2811,27 @@ function renderFindings() {
       finding_key:   msIssue.finding_key,
       title:         msIssue.title || 'Mix Shift',
       priority:      msIssue.priority || 'medium',
-      trigger_display: '— / — / —',
+      // Show meaningful metric in header instead of empty MPI/ARI/RGI
+      trigger_display: (() => {
+        if (msIssue.pattern === 'displacement') {
+          return msQ.revenue_cost != null
+            ? `£${new Intl.NumberFormat('en-GB',
+                { maximumFractionDigits: 0 })
+                .format(Math.round(msQ.revenue_cost))}`
+            : '—';
+        }
+        if (msIssue.pattern === 'rate_dilution') {
+          return msQ.adr_drop_pct != null
+            ? `−${msQ.adr_drop_pct.toFixed(1)}% ADR`
+            : '—';
+        }
+        if (msIssue.pattern === 'concentration') {
+          return msQ.share_ty != null
+            ? `${msQ.share_ty.toFixed(0)}% of mix`
+            : '—';
+        }
+        return '—';
+      })(),
       execution_owner: null,
       commercial_narrative:       msIssue.commercial_narrative || null,
       enforced_decision_line:     msIssue.enforced_decision_line || null,
