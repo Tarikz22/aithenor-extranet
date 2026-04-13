@@ -636,10 +636,6 @@ const CURRENT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 const supabaseClient = window.supabase.createClient('https://fpnlzpfkygsyvkettjuj.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns');
 </script>
 <script>
-// Anthropic API key for GM narrative generation (narrative-only).
-// Inject via deploy, parent page, or replace placeholder — never commit a live key.
-window.ANTHROPIC_API_KEY = window.ANTHROPIC_API_KEY || 'YOUR_ANTHROPIC_API_KEY_HERE';
-
 // --- HELPERS ---
 
 function escHtml(str) {
@@ -1332,64 +1328,38 @@ function buildBriefingContext(ej, hotelCode, periodLabel, snapshotDate) {
   return ctx;
 }
 
-/**
- * Calls the Anthropic API to generate a 3-paragraph GM narrative.
- * Passes the full context object. Claude is strictly instructed to
- * only use facts from the context — zero hallucination policy.
- * Falls back to template narrative if API fails or validation fails.
- */
 async function generateGMNarrative(ctx) {
-  const systemPrompt = `You are writing a 3-paragraph executive briefing for a General Manager of a luxury hotel.
-
-STRICT RULES — violation of any rule means the output is rejected:
-1. Use ONLY the facts provided in the data object.
-2. Do NOT add context, inference, projections, or assessments not present in the data.
-3. Do NOT invent numbers. Every figure you write must match a field in the data object exactly.
-4. If a topic has no data, do not mention it.
-5. Write in plain English. No jargon. No bullet points.
-6. Maximum 3 paragraphs. Each paragraph maximum 3 sentences.
-7. Tone: direct, professional, like a senior commercial advisor briefing a GM before a morning meeting.
-8. Do not use the word "findings". Use "signals" or "issues".
-9. Do not say "the engine detected" or "the system shows". Write as if you are the advisor.
-10. The GM will act on this. Be precise. Be assertive. Do not hedge unless the data shows uncertainty.
-
-PARAGRAPH STRUCTURE:
-Paragraph 1: Market position this period — where the hotel stands vs the competitive set (MPI, ARI, RGI, trend direction).
-Paragraph 2: The primary commercial tension — what is driving performance and what the data says to do about it. Include the most material financial consequence.
-Paragraph 3: Forward exposure — what is on the books vs plan and vs last year, and what cannot wait.`;
-
-  const userPrompt = `Write the GM briefing using this data:
-${JSON.stringify(ctx, null, 2)}
-
-Remember: only use facts from this data object.
-3 paragraphs, 3 sentences each maximum.`;
-
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Get current Supabase session token to authenticate
+    // the request to the Vercel proxy function.
+    // The proxy holds the Anthropic API key — it never
+    // appears in this file.
+    const { data: { session } } = await supabaseClient
+      .auth.getSession();
+    const token = session?.access_token || '';
+
+    const response = await fetch('/api/gm-narrative', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': window.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Authorization': 'Bearer ' + token
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 400,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      })
+      body: JSON.stringify({ context: ctx })
     });
 
-    if (!response.ok) throw new Error('API error: ' + response.status);
+    if (!response.ok) {
+      throw new Error('Proxy error: ' + response.status);
+    }
 
-    const payload = await response.json();
-    const narrative = payload?.content?.[0]?.text || '';
+    const data = await response.json();
+    const narrative = data?.narrative || '';
 
     if (!narrative || narrative.length < 100) {
       throw new Error('Narrative too short — fallback triggered');
     }
 
+    // Validation pass — key numbers from context must appear
+    // in the narrative. Allow up to 2 misses before falling back.
     const validationFails = [];
     if (ctx.mpi && !narrative.includes(ctx.mpi)) {
       validationFails.push('mpi_missing');
@@ -1398,14 +1368,13 @@ Remember: only use facts from this data object.
       validationFails.push('rgi_missing');
     }
     if (validationFails.length > 2) {
-      console.warn('Narrative validation failed:', validationFails);
       throw new Error('Validation failed — fallback triggered');
     }
 
     return { narrative, source: 'claude' };
 
   } catch (err) {
-    console.warn('Claude narrative generation failed:', err.message);
+    console.warn('GM narrative generation failed:', err.message);
     return { narrative: null, source: 'fallback' };
   }
 }
