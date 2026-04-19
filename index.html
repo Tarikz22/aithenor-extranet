@@ -3368,9 +3368,9 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
 
   const series = weeks.map(w => ({
     week_key: String(w.week_key != null ? w.week_key : '').trim() || '—',
-    mpi: pickNum(w, ['mpi', 'MPI', 'avgMPI']),
-    ari: pickNum(w, ['ari', 'ARI', 'avgARI']),
-    rgi: pickNum(w, ['rgi', 'RGI', 'avgRGI'])
+    mpi: pickNum(w, ['avg_mpi', 'mpi', 'MPI', 'avgMPI']),
+    ari: pickNum(w, ['avg_ari', 'ari', 'ARI', 'avgARI']),
+    rgi: pickNum(w, ['avg_rgi', 'rgi', 'RGI', 'avgRGI'])
   }));
 
   const allVals = [];
