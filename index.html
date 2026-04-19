@@ -3390,8 +3390,8 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
   const n = series.length;
   const vbW = 1000;
   const vbH = 260;
-  const padL = 8;
-  const padR = 8;
+  const padL = 36;
+  const padR = 36;
   const padT = 24;
   const padB = 36;
   const plotW = vbW - padL - padR;
@@ -3450,7 +3450,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
       const yp = yAt(v);
       const ty = yp + (v > 99.5 ? labelDy : -labelDy);
       out.push(
-        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#f97316" font-size="13" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#f97316" font-size="13" font-family="DM Sans, system-ui, sans-serif">${escHtml(v.toFixed(1))}</text>`
       );
     }
     return out.join('');
@@ -3464,7 +3464,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
       const yp = yAt(v);
       const ty = yp + (v > 100.5 ? -labelDy : labelDy);
       out.push(
-        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#10b981" font-size="13" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#10b981" font-size="13" font-family="DM Sans, system-ui, sans-serif">${escHtml(v.toFixed(1))}</text>`
       );
     }
     return out.join('');
