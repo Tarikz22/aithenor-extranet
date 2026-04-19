@@ -3560,15 +3560,13 @@ function buildForwardPaceChartHtml(engineJson) {
     if (!(globalMax > 0)) return '';
 
     const vbW = 900;
-    const rowH = 80;
-    const vbH = windows.length * rowH + 40;
+    const rowGroupHeight = 22 + 3 + 22 + 20 + 28;
+    const vbH = windows.length * rowGroupHeight + 60;
     const padLabel = 110;
     const padRight = 80;
     const barAreaW = vbW - padLabel - padRight;
-    const barGap = 4;
-    const colW = (barAreaW - barGap) / 2;
-    const barH = 28;
-    const topPad = 16;
+    const barH = 22;
+    const barStackGap = 3;
     const fmtRn = n => {
       const v = Math.round(Number(n));
       return Number.isFinite(v) ? String(v) : '—';
@@ -3612,12 +3610,12 @@ function buildForwardPaceChartHtml(engineJson) {
     };
 
     const rowSvg = windows.map((w, idx) => {
-      const y0 = topPad + idx * rowH;
-      const wOtb = (w.otb / globalMax) * colW;
-      const wRef = (w.ref / globalMax) * colW;
-      const xOtb = padLabel;
-      const xRef = padLabel + colW + barGap;
-      const yBar = y0;
+      const yGroupTop = 40 + idx * rowGroupHeight;
+      const yOtbBarTop = yGroupTop;
+      const yLyBarTop = yOtbBarTop + barH + barStackGap;
+      const wOtb = (w.otb / globalMax) * barAreaW;
+      const wRef = (w.ref / globalMax) * barAreaW;
+      const xBar = padLabel;
       const winLbl = extractDaysLabel(w.iss?.window_label || w.pd?.window_label || '');
       const otbTxt = fmtRn(w.otb);
       const refTxt = fmtRn(w.ref);
@@ -3628,23 +3626,27 @@ function buildForwardPaceChartHtml(engineJson) {
       const gapStr = fmtGapPct(gPct);
       const gapTextW = Math.max(52, gapStr.length * 7 + 16);
       const pillX = vbW - padRight + 4;
-      const pillY = yBar + barH / 2 - 11;
+      const barStackMidY = yOtbBarTop + (barH + barStackGap + barH) / 2;
+      const pillY = barStackMidY - 11;
       const otbAdr = fmtEur(w.pd.otb_adr ?? w.pd.otb_ADR);
       const lyAdr = fmtEur(w.pd.ly_adr ?? w.pd.reference_adr ?? w.pd.ly_ADR);
+      const adrY = yLyBarTop + barH + 8;
       let adrLine = '';
       if (otbAdr && lyAdr) {
-        adrLine = `<text x="${padLabel}" y="${yBar + barH + 14}" fill="#6b7280" font-size="10px" font-family="DM Sans, system-ui, sans-serif">ADR: OTB ${escHtml(otbAdr)} vs LY ${escHtml(lyAdr)}</text>`;
+        adrLine = `<text x="${padLabel}" y="${adrY}" fill="#6b7280" font-size="10px" font-family="DM Sans, system-ui, sans-serif">ADR: OTB ${escHtml(otbAdr)} vs LY ${escHtml(lyAdr)}</text>`;
       }
       const otbLab = otbInside
-        ? `<text x="${(xOtb + wOtb / 2).toFixed(2)}" y="${(yBar + barH / 2).toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(otbTxt)}</text>`
-        : `<text x="${(xOtb + wOtb + 6).toFixed(2)}" y="${(yBar + barH / 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(otbTxt)}</text>`;
+        ? `<text x="${(xBar + wOtb / 2).toFixed(2)}" y="${(yOtbBarTop + barH / 2).toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(otbTxt)}</text>`
+        : `<text x="${(xBar + wOtb + 6).toFixed(2)}" y="${(yOtbBarTop + barH / 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(otbTxt)}</text>`;
       const refLab = refInside
-        ? `<text x="${(xRef + wRef / 2).toFixed(2)}" y="${(yBar + barH / 2).toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(refTxt)}</text>`
-        : `<text x="${(xRef + wRef + 6).toFixed(2)}" y="${(yBar + barH / 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(refTxt)}</text>`;
+        ? `<text x="${(xBar + wRef / 2).toFixed(2)}" y="${(yLyBarTop + barH / 2).toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(refTxt)}</text>`
+        : `<text x="${(xBar + wRef + 6).toFixed(2)}" y="${(yLyBarTop + barH / 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(refTxt)}</text>`;
       return `
-    <text x="8" y="${(yBar + barH / 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#6b7280" font-size="11px" font-family="DM Sans, system-ui, sans-serif">${escHtml(winLbl)}</text>
-    <rect x="${xOtb.toFixed(2)}" y="${yBar}" width="${wOtb.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#3b82f6"/>
-    <rect x="${xRef.toFixed(2)}" y="${yBar}" width="${wRef.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
+    <text x="${(padLabel - 2).toFixed(2)}" y="${barStackMidY.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#6b7280" font-size="11px" font-family="DM Sans, system-ui, sans-serif">${escHtml(winLbl)}</text>
+    <text x="${padLabel}" y="${(yOtbBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#3b82f6" font-size="9px" font-family="DM Sans, system-ui, sans-serif">OTB</text>
+    <rect x="${xBar.toFixed(2)}" y="${yOtbBarTop}" width="${wOtb.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#3b82f6"/>
+    <text x="${padLabel}" y="${(yLyBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">LY</text>
+    <rect x="${xBar.toFixed(2)}" y="${yLyBarTop}" width="${wRef.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
     ${otbLab}
     ${refLab}
     <rect x="${pillX.toFixed(2)}" y="${pillY.toFixed(2)}" width="${gapTextW.toFixed(2)}" height="22" rx="11" ry="11" fill="${gs.bg}"/>
