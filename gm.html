@@ -163,6 +163,7 @@ body {
   max-width: 1440px;
   margin: 0 auto;
   padding: 28px;
+  padding-top: 100px;
 }
 .loading-state, .error-state, .empty-state {
   display: none;
@@ -645,6 +646,12 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function firstSentence(text) {
+  if (!text) return '';
+  const m = text.match(/^.*?(?<!\d)\.(?!\d)/);
+  return m ? m[0].trim() : text.split('\n')[0].trim();
+}
+
 function fmt(v) {
   const n = Number(v) || 0;
   if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
@@ -883,8 +890,12 @@ function renderHero(ej, hotelCode, periodLabel, snapshotDate) {
 
   const gmHeadlineEl = document.getElementById('gm-headline');
   if (gmHeadlineEl) {
-    gmHeadlineEl.closest('.headline-panel')
-      ?.style.setProperty('display', 'none');
+    const headlinePanel = gmHeadlineEl.closest('.headline-panel');
+    if (headlinePanel) {
+      headlinePanel.style.display = 'none';
+      headlinePanel.style.margin = '0';
+      headlinePanel.style.padding = '0';
+    }
   }
 }
 
@@ -941,7 +952,7 @@ function renderPriorityDecisions(issues) {
         <div class="signal-item">
           <strong>${escHtml(issue.window_label || issue.title)}:</strong>
           <div class="signal-meta">
-            ${escHtml(issue.signal.slice(0, 180))}
+            ${escHtml(firstSentence(issue.decision))}
           </div>
         </div>`).join('');
       const decisionLabel = fwdEl
@@ -958,15 +969,15 @@ function renderPriorityDecisions(issues) {
     }
   }
 
-  const forwardFriction = issues.filter(i =>
-    i.type === 'forward' || i.type === 'forecast');
+  const frictionIssues = issues.filter(i =>
+    i.type === 'historical' || i.type === 'mix_shift');
   document.getElementById('friction-list').innerHTML =
-    forwardFriction.length > 0
-    ? forwardFriction.slice(0, 2).map(issue => `
+    frictionIssues.length > 0
+    ? frictionIssues.slice(0, 2).map(issue => `
         <div class="signal-item">
-          <strong>${escHtml(issue.window_label || issue.title)}:</strong>
+          <strong>${escHtml(issue.department)}:</strong>
           <div class="signal-meta">
-            ${escHtml(issue.decision)}
+            ${escHtml(firstSentence(issue.decision))}
           </div>
         </div>`).join('')
     : `<div class="signal-item">
@@ -1059,7 +1070,7 @@ function renderFindingBriefing(issues) {
     const priority = (issue.priority || 'medium').toLowerCase();
 
     const signalSentence = issue.signal
-      ? issue.signal.split('.')[0].trim() + '.'
+      ? firstSentence(issue.signal)
       : issue.title + '.';
 
     const rnMatch = (issue.analysis || '').match(/(\d+) room nights behind/);
@@ -1072,7 +1083,7 @@ function renderFindingBriefing(issues) {
         : 'Financial impact is directional — monitor closely.';
 
     const decisionSentence = issue.decision
-      ? issue.decision.split('.')[0].trim() + '.'
+      ? firstSentence(issue.decision)
       : 'No specific decision required at this stage.';
 
     const firstAction = issue.execution?.[0] || '';
