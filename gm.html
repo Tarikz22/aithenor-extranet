@@ -709,7 +709,10 @@ function extractAllIssues(ej) {
       revenue:      revMax,
       card_metrics: issue.card_metrics || {},
       issue_family: issue.issue_family || '',
-      window_label: issue.window_label || ''
+      window_label: issue.window_label || '',
+      quantification: null,
+      primary_segment: issue.segment_attribution_summary?.primary_segment || null,
+      pace_data: null
     });
   });
 
@@ -734,7 +737,9 @@ function extractAllIssues(ej) {
       revenue:      0,
       card_metrics: issue.card_metrics || {},
       issue_family: 'pace_gap',
-      window_label: issue.window_label || ''
+      window_label: issue.window_label || '',
+      pace_data: issue.pace_data || null,
+      primary_segment: null
     });
   });
 
@@ -760,7 +765,9 @@ function extractAllIssues(ej) {
       revenue:      revGap,
       card_metrics: issue.card_metrics || {},
       issue_family: issue.issue_family || 'volume_miss',
-      window_label: issue.window_label || ''
+      window_label: issue.window_label || '',
+      quantification: issue.quantification || null,
+      primary_segment: issue.primary_segment || null
     });
   });
 
@@ -1073,44 +1080,71 @@ function renderFindingBriefing(issues) {
     issues.map(issue => {
     const priority = (issue.priority || 'medium').toLowerCase();
 
-    // Line 1: What is happening — key metrics or position signal
+    // Build a 3-part prose digest using structured data where available
+    // falling back to text parsing only when needed
+
+    // Part 1: Signal — what is happening
     const signalSentence = issue.signal
       ? firstSentence(issue.signal)
       : issue.title + '.';
 
-    // Line 2: Segment and financial context — extract from full analysis
-    // Pull the most specific data sentence available: segment name, RN gap, ADR
-    const analysisText = issue.analysis || '';
-    const segmentMatch = analysisText.match(
-      /([A-Z][A-Za-z /&]+) is the primary [^\.\n]+\./
-    );
-    const rnShortMatch = analysisText.match(/(\d[\d,]*) room nights? short/);
-    const rnBehindMatch = analysisText.match(/(\d[\d,]*) room nights? behind/);
-    const pctBehindMatch = analysisText.match(/(\d+\.?\d*)% (below|behind|ahead)/);
-    const adrMatch = analysisText.match(/ADR[^\.\n]+\./);
-
+    // Part 2: Context — segment, volume gap, rate
     let contextSentence = '';
-    if (segmentMatch) {
-      contextSentence = segmentMatch[0];
-    } else if (rnShortMatch && pctBehindMatch) {
-      contextSentence = `OTB is ${rnShortMatch[1]} room nights short (${pctBehindMatch[1]}% ${pctBehindMatch[2]} plan).`;
-    } else if (rnBehindMatch) {
-      contextSentence = `This window is ${rnBehindMatch[1]} room nights behind last year.`;
-    }
-    if (adrMatch && !contextSentence.includes('ADR')) {
-      contextSentence += (contextSentence ? ' ' : '') + adrMatch[0];
+
+    if (issue.type === 'forecast' && issue.quantification) {
+      const q = issue.quantification;
+      const seg = issue.primary_segment || null;
+      const rnGap = q.rn_gap != null ? Math.abs(Math.round(q.rn_gap)) : null;
+      const pct = q.rn_gap_pct != null ? Math.abs(q.rn_gap_pct).toFixed(1) : null;
+      const adrGap = q.adr_gap != null ? Math.round(q.adr_gap) : null;
+      const adrStatus = adrGap === null ? null
+        : Math.abs(adrGap) < 5 ? 'ADR is on target'
+        : adrGap > 0 ? `ADR is €${adrGap} below forecast`
+        : `ADR is €${Math.abs(adrGap)} above forecast`;
+      const segLine = seg ? `${seg} is the primary shortfall segment.` : '';
+      const volLine = rnGap && pct
+        ? `${new Intl.NumberFormat('en-GB').format(rnGap)} room nights short of plan (${pct}% gap).`
+        : '';
+      contextSentence = [segLine, volLine, adrStatus].filter(Boolean).join(' ');
+
+    } else if (issue.type === 'forward' && issue.pace_data) {
+      const p = issue.pace_data;
+      const rnGap = p.otb_rn != null && p.reference_rn != null
+        ? Math.abs(Math.round(p.otb_rn - p.reference_rn)) : null;
+      const pct = p.pace_gap_pct != null
+        ? Math.abs(p.pace_gap_pct).toFixed(1) : null;
+      const adrLine = p.otb_adr && p.reference_adr
+        ? `ADR OTB €${p.otb_adr} vs STLY €${p.reference_adr}.` : '';
+      const volLine = rnGap && pct
+        ? `${new Intl.NumberFormat('en-GB').format(rnGap)} room nights behind STLY (${pct}% gap).`
+        : '';
+      contextSentence = [volLine, adrLine].filter(Boolean).join(' ');
+
+    } else if (issue.type === 'historical' && issue.primary_segment) {
+      const seg = issue.primary_segment;
+      const segDisplayMap = {
+        transient_retail: 'Retail Transient',
+        transient_discount: 'Discount / OTA',
+        transient_negotiated: 'Negotiated',
+        transient_wholesale: 'Wholesale',
+        transient_qualified: 'Qualified Rate',
+        group_corporate: 'Corporate Groups',
+        group_association: 'Association & Convention',
+        group_smerf: 'SMERF',
+        group_other: 'Groups',
+        contract: 'Contract / Crew'
+      };
+      const segDisplay = segDisplayMap[seg] || seg;
+      contextSentence = `Primary segment: ${segDisplay}.`;
     }
 
-    // Line 3: Revenue consequence
+    // Part 3: Financial consequence
     const impactSentence = issue.revenue > 0
       ? `Revenue exposure: ${fmtDigest(issue.revenue)}.`
       : '';
 
-    const prose = [
-      signalSentence,
-      contextSentence,
-      impactSentence
-    ].filter(Boolean).join(' ');
+    const prose = [signalSentence, contextSentence, impactSentence]
+      .filter(Boolean).join(' ');
 
     const kickerSuffix = issue.window_label
       ? ` · ${issue.window_label}` : '';
