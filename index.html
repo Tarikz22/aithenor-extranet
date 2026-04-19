@@ -3643,9 +3643,9 @@ function buildForwardPaceChartHtml(engineJson) {
         : `<text x="${(xBar + wRef + 6).toFixed(2)}" y="${(yLyBarTop + barH / 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#1a1a18" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(refTxt)}</text>`;
       return `
     <text x="${(padLabel - 2).toFixed(2)}" y="${barStackMidY.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#6b7280" font-size="11px" font-family="DM Sans, system-ui, sans-serif">${escHtml(winLbl)}</text>
-    <text x="${padLabel}" y="${(yOtbBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#3b82f6" font-size="9px" font-family="DM Sans, system-ui, sans-serif">OTB</text>
+    <text x="${(padLabel + 4).toFixed(2)}" y="${(yOtbBarTop - 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#3b82f6" font-size="9px" font-family="DM Sans, system-ui, sans-serif">OTB</text>
     <rect x="${xBar.toFixed(2)}" y="${yOtbBarTop}" width="${wOtb.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#3b82f6"/>
-    <text x="${padLabel}" y="${(yLyBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">STLY</text>
+    <text x="${(padLabel + 4).toFixed(2)}" y="${(yLyBarTop - 2).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">STLY</text>
     <rect x="${xBar.toFixed(2)}" y="${yLyBarTop}" width="${wRef.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
     ${otbLab}
     ${refLab}
