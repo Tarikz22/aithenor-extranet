@@ -746,7 +746,11 @@ function extractAllIssues(ej) {
   // Forecast gap issues
   const sortedForecastGap = (Array.isArray(ej.forecast_gap_issues)
     ? [...ej.forecast_gap_issues] : [])
-    .sort((a, b) => (a.forward_window || 0) - (b.forward_window || 0));
+    .sort((a, b) => {
+      const fw = (a.forward_window || 99) - (b.forward_window || 99);
+      if (fw !== 0) return fw;
+      return (a.window_label || '').localeCompare(b.window_label || '');
+    });
   sortedForecastGap.forEach(issue => {
     const revGap = issue.quantification?.rev_gap || 0;
     issues.push({
@@ -767,7 +771,8 @@ function extractAllIssues(ej) {
       issue_family: issue.issue_family || 'volume_miss',
       window_label: issue.window_label || '',
       quantification: issue.quantification || null,
-      primary_segment: issue.primary_segment || null
+      primary_segment: issue.primary_segment || null,
+      forward_window: issue.forward_window || null
     });
   });
 
@@ -1098,9 +1103,9 @@ function renderFindingBriefing(issues) {
       const pct = q.rn_gap_pct != null ? Math.abs(q.rn_gap_pct).toFixed(1) : null;
       const adrGap = q.adr_gap != null ? Math.round(q.adr_gap) : null;
       const adrStatus = adrGap === null ? null
-        : Math.abs(adrGap) < 5 ? 'ADR is on target'
-        : adrGap > 0 ? `ADR is €${adrGap} below forecast`
-        : `ADR is €${Math.abs(adrGap)} above forecast`;
+        : Math.abs(adrGap) < 5 ? 'ADR is on target.'
+        : adrGap > 0 ? `ADR is €${adrGap} below forecast.`
+        : `ADR is €${Math.abs(adrGap)} above forecast.`;
       const segLine = seg ? `${seg} is the primary shortfall segment.` : '';
       const volLine = rnGap && pct
         ? `${new Intl.NumberFormat('en-GB').format(rnGap)} room nights short of plan (${pct}% gap).`
@@ -1149,11 +1154,48 @@ function renderFindingBriefing(issues) {
     const kickerSuffix = issue.window_label
       ? ` · ${issue.window_label}` : '';
 
-    const riskIfDone = issue.revenue > 0
-      ? `If no action is taken, roughly ${
-          fmtDigest(Math.round(issue.revenue / 4))
-        } revenue could remain unrealised over the next 90 days.`
-      : 'If no action is taken, this issue is likely to continue eroding commercial performance into the next cycle.';
+    const gmDecisionText = (() => {
+      const base = issue.decision || '';
+      const end = base.endsWith('.') ? '' : '.';
+
+      if (issue.type === 'forecast') {
+        const fw = issue.forward_window;
+        const suffix =
+          fw === 1 ? ' Act before the window closes — 30 days remaining.'
+          : fw === 2 ? ' Review the forecast basis this week before the window tightens.'
+          : ' Reassess forecast assumptions in the next planning cycle before committing spend.';
+        return base + end + suffix;
+      }
+
+      if (issue.type === 'forward' && issue.pace_data) {
+        const p = issue.pace_data;
+        const rnGap = p.otb_rn != null && p.reference_rn != null
+          ? Math.round(Math.abs(p.otb_rn - p.reference_rn)) : null;
+        const suffix = rnGap
+          ? ` Target: recover ${new Intl.NumberFormat('en-GB').format(rnGap)} room nights before ${p.window_end_ymd || 'window close'}.`
+          : '';
+        return base + end + suffix;
+      }
+
+      return base;
+    })();
+
+    const riskIfDone = (() => {
+      if (issue.revenue > 0) {
+        const quarterly = fmtDigest(Math.round(issue.revenue / 4));
+        if (issue.type === 'forecast') {
+          return `At current pace, the hotel is on track to miss ${fmtDigest(issue.revenue)} in revenue for this window. The forecast gap will not close without an explicit plan revision or demand intervention.`;
+        }
+        if (issue.type === 'forward') {
+          return `Without intervention, this window will close with a structural room night deficit versus last year. Rate integrity is holding — the risk is volume, not price.`;
+        }
+        return `If no action is taken, roughly ${quarterly} revenue could remain unrealised over the next 90 days.`;
+      }
+      if (issue.type === 'forward') {
+        return `Without intervention, this window will close with a structural room night deficit versus last year. Rate integrity is holding — the risk is volume, not price.`;
+      }
+      return 'If no action is taken, the current commercial trajectory is likely to persist into the next cycle — the pattern will not self-correct.';
+    })();
 
     return `
       <article class="finding-brief">
@@ -1178,7 +1220,7 @@ function renderFindingBriefing(issues) {
           </p>
           <div class="decision-note">
             <div class="info-title">GM Decision Required</div>
-            <div class="info-text">${escHtml(issue.decision)}</div>
+            <div class="info-text">${escHtml(gmDecisionText)}</div>
           </div>
           ${issue.revenue > 0 ? `
           <div style="display:grid;grid-template-columns:1fr 1fr;
