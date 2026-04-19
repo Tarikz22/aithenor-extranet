@@ -1088,15 +1088,13 @@ function renderFindingBriefing(issues) {
 
     const firstAction = issue.execution?.[0] || '';
     const ownerSentence = firstAction
-      ? `${issue.department} to action: ${firstAction
-          .split('.')[0].trim()}.`
+      ? `${issue.department} to action: ${firstSentence(firstAction)}`
       : `Owner: ${issue.department}.`;
 
     const prose = [
       signalSentence,
       impactSentence,
-      decisionSentence,
-      ownerSentence
+      decisionSentence
     ].join(' ');
 
     const kickerSuffix = issue.window_label
