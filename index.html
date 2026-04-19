@@ -3389,11 +3389,11 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
 
   const n = series.length;
   const vbW = 1000;
-  const vbH = 220;
+  const vbH = 260;
   const padL = 8;
   const padR = 8;
-  const padT = 20;
-  const padB = 32;
+  const padT = 24;
+  const padB = 36;
   const plotW = vbW - padL - padR;
   const plotH = vbH - padT - padB;
 
@@ -3435,7 +3435,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
   const labelSvg = [...labelIdx].sort((a, b) => a - b)
     .map(i => {
       const t = escHtml(series[i].week_key);
-      return `<text x="${xAt(i).toFixed(2)}" y="${vbH - 4}" text-anchor="middle" fill="#9ca3af" font-size="11" font-family="DM Sans, system-ui, sans-serif">${t}</text>`;
+      return `<text x="${xAt(i).toFixed(2)}" y="${vbH - 4}" text-anchor="middle" fill="#9ca3af" font-size="13" font-family="DM Sans, system-ui, sans-serif">${t}</text>`;
     })
     .join('');
 
@@ -3450,7 +3450,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
       const yp = yAt(v);
       const ty = yp + (v > 99.5 ? labelDy : -labelDy);
       out.push(
-        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#f97316" font-size="9px" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#f97316" font-size="13" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
       );
     }
     return out.join('');
@@ -3464,7 +3464,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
       const yp = yAt(v);
       const ty = yp + (v > 100.5 ? -labelDy : labelDy);
       out.push(
-        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#10b981" font-size="9px" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#10b981" font-size="13" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
       );
     }
     return out.join('');
@@ -3475,7 +3475,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     { val: 100, y: yAt(100) },
     { val: yMax, y: yAt(yMax) }
   ].map(({ val, y }) =>
-    `<text x="${(padL - 2).toFixed(2)}" y="${y.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">${escHtml(Number(val).toFixed(1))}</text>`
+    `<text x="${(padL - 2).toFixed(2)}" y="${y.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#9ca3af" font-size="11" font-family="DM Sans, system-ui, sans-serif">${escHtml(Number(val).toFixed(1))}</text>`
   ).join('');
 
   const linePath = (d, color, sw) => d
@@ -3506,14 +3506,14 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     ? `<path d="${ariFillPath}" fill="rgba(59,130,246,0.18)" stroke="none"/>`
     : '';
 
-  const svg = `<svg class="str-sparkline-svg" viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  const svg = `<svg class="str-sparkline-svg" viewBox="0 0 ${vbW} ${vbH}" width="100%" style="min-height:200px; display:block;" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs><clipPath id="${clipId}"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"/></clipPath></defs>
     ${ariFillEl}
     ${yAxisSvg}
     <line x1="${padL}" y1="${yRef.toFixed(2)}" x2="${vbW - padR}" y2="${yRef.toFixed(2)}" stroke="#6b7280" stroke-width="1" stroke-dasharray="4 3" fill="none" clip-path="url(#${clipId})"/>
-    ${linePath(ariD, '#3b82f6', 1.5)}
-    ${linePath(mpiD, '#f97316', 2.5)}
-    ${linePath(rgiD, '#10b981', 1.5)}
+    ${linePath(ariD, '#3b82f6', 2)}
+    ${linePath(mpiD, '#f97316', 3)}
+    ${linePath(rgiD, '#10b981', 2)}
     ${mpiLabelsSvg}
     ${rgiLabelsSvg}
     ${labelSvg}
@@ -3525,7 +3525,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#10b981"></span>RGI</span>
   </div>`;
 
-  return `<div class="str-weekly-sparkline-wrap" style="max-width:860px; margin:16px auto 0 auto; background:#fafaf7; border:1px solid #e8e8e5; border-radius:8px; padding:16px 12px 10px 12px;">${svg}${legend}</div>`;
+  return `<div class="str-weekly-sparkline-wrap" style="width:100%; margin:20px 0 0 0; background:#fafaf7; border:1px solid #e8e8e5; border-radius:8px; padding:20px 16px 12px 16px;">${svg}${legend}</div>`;
 }
 
 function renderFindings() {
