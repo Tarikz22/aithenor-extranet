@@ -3673,6 +3673,138 @@ function buildForwardPaceChartHtml(engineJson) {
   }
 }
 
+function buildForecastGapChartHtml(engineJson) {
+  try {
+    const raw = Array.isArray(engineJson?.forecast_gap_issues)
+      ? engineJson.forecast_gap_issues : [];
+    const windows = [];
+    for (const iss of raw) {
+      const q = iss?.quantification;
+      if (!q || typeof q !== 'object') continue;
+      const forecastRn = Number(q.total_forecast_rn);
+      if (!Number.isFinite(forecastRn) || forecastRn <= 0) continue;
+      windows.push({ iss, q, forecastRn });
+    }
+    if (windows.length < 1) return '';
+
+    windows.sort((a, b) => {
+      const fa = String(a.iss.forward_window ?? '');
+      const fb = String(b.iss.forward_window ?? '');
+      return fa.localeCompare(fb, undefined, { numeric: true });
+    });
+
+    const vbW = 900;
+    const rowH = 70;
+    const vbH = windows.length * rowH + 50;
+    const padL = 130;
+    const padR = 110;
+    const barAreaW = vbW - padL - padR;
+    const barHt = 28;
+    const rnFmt = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
+
+    const extractDaysLabel = wl => {
+      const s = String(wl || '');
+      const m = s.match(/Days\s*\d+\s*[–\-]\s*\d+/i);
+      return m ? m[0].replace(/\s+/g, ' ') : (s.trim().slice(0, 28) || '—');
+    };
+
+    const fillColorForPct = p => {
+      if (!Number.isFinite(p)) return '#ef4444';
+      if (p >= 100) return '#10b981';
+      if (p >= 85) return '#3b82f6';
+      if (p >= 70) return '#f97316';
+      return '#ef4444';
+    };
+
+    const fmtEurPlain = v => {
+      const n = Math.round(Number(v));
+      if (!Number.isFinite(n)) return null;
+      return `\u20AC${rnFmt.format(n)}`;
+    };
+
+    const revPillParts = revGap => {
+      const g = Number(revGap);
+      if (!Number.isFinite(g)) {
+        return { str: '—', fill: '#6b7280', bg: 'rgba(107,114,128,0.12)' };
+      }
+      if (g > 0) {
+        return {
+          str: `\u2212\u20AC${rnFmt.format(Math.round(g))}`,
+          fill: '#ef4444',
+          bg: 'rgba(239,68,68,0.12)'
+        };
+      }
+      if (g < 0) {
+        return {
+          str: `+\u20AC${rnFmt.format(Math.round(Math.abs(g)))}`,
+          fill: '#10b981',
+          bg: 'rgba(16,185,129,0.12)'
+        };
+      }
+      return { str: `\u20AC${rnFmt.format(0)}`, fill: '#6b7280', bg: 'rgba(107,114,128,0.12)' };
+    };
+
+    const rowSvg = windows.map((w, idx) => {
+      const { iss, q, forecastRn } = w;
+      const otbRn = Number(q.otb_rn ?? q.total_otb_rn ?? q.current_otb_rn);
+      const otbRnR = Number.isFinite(otbRn) ? Math.round(otbRn) : 0;
+      const forecastRnR = Math.round(forecastRn);
+      let pct = Number(iss.card_metrics?.avgOcc);
+      if (!Number.isFinite(pct) && Number.isFinite(otbRn) && forecastRn > 0) {
+        pct = (otbRn / forecastRn) * 100;
+      }
+      if (!Number.isFinite(pct)) pct = 0;
+      const fillW = Math.min(barAreaW, Math.max(0, (pct / 100) * barAreaW));
+      const fillCol = fillColorForPct(pct);
+      const yBar = 12 + idx * rowH;
+      const xBar = padL;
+      const winLbl = extractDaysLabel(iss.window_label || '');
+      const pctStr = `${Math.round(pct)}% of plan`;
+      const inside = fillW >= 60;
+      const pctTextFill = inside ? '#ffffff' : fillCol;
+      const pctX = inside ? xBar + fillW / 2 : xBar + fillW + 6;
+      const pctAnchor = inside ? 'middle' : 'start';
+
+      const rev = revPillParts(q.rev_gap);
+      const pillW = Math.max(64, rev.str.length * 6.5 + 18);
+      const pillX = vbW - padR - pillW;
+      const pillY = yBar + barHt / 2 - 11;
+
+      const otbAdr = fmtEurPlain(q.otb_adr ?? q.otb_ADR);
+      const fcAdr = fmtEurPlain(q.forecast_adr ?? q.forecast_ADR ?? q.plan_adr);
+      let subLine = `OTB: ${rnFmt.format(otbRnR)} RN vs Forecast: ${rnFmt.format(forecastRnR)} RN`;
+      if (otbAdr && fcAdr) {
+        subLine += ` — ADR OTB ${otbAdr} vs Forecast ${fcAdr}`;
+      }
+      const subY = yBar + barHt + 10;
+
+      return `
+    <text x="${(padL - 2).toFixed(2)}" y="${(yBar + barHt / 2).toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#6b7280" font-size="11px" font-family="DM Sans, system-ui, sans-serif">${escHtml(winLbl)}</text>
+    <rect x="${xBar.toFixed(2)}" y="${yBar}" width="${barAreaW.toFixed(2)}" height="${barHt}" rx="4" ry="4" fill="#e5e7eb"/>
+    <rect x="${xBar.toFixed(2)}" y="${yBar}" width="${fillW.toFixed(2)}" height="${barHt}" rx="4" ry="4" fill="${fillCol}"/>
+    <text x="${pctX.toFixed(2)}" y="${(yBar + barHt / 2).toFixed(2)}" text-anchor="${pctAnchor}" dominant-baseline="middle" fill="${pctTextFill}" font-size="12px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(pctStr)}</text>
+    <rect x="${pillX.toFixed(2)}" y="${pillY.toFixed(2)}" width="${pillW.toFixed(2)}" height="22" rx="11" ry="11" fill="${rev.bg}"/>
+    <text x="${(pillX + pillW / 2).toFixed(2)}" y="${(pillY + 11).toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="${rev.fill}" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(rev.str)}</text>
+    <text x="${padL}" y="${subY}" fill="#6b7280" font-size="10px" font-family="DM Sans, system-ui, sans-serif">${escHtml(subLine)}</text>`;
+    }).join('');
+
+    const svg = `<svg viewBox="0 0 ${vbW} ${vbH}" width="100%" style="min-height:${Math.max(120, vbH)}px;display:block;" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${rowSvg}
+  </svg>`;
+
+    const legend = `<div class="str-sparkline-legend" style="margin-top:14px;">
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#10b981"></span>On/above plan</span>
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#3b82f6"></span>On track</span>
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#f97316"></span>Behind</span>
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#ef4444"></span>Critical</span>
+  </div>`;
+
+    const wrapStyle = 'width:100%;margin:20px 0 0 0;background:#fafaf7;border:1px solid #e8e8e5;border-radius:8px;padding:20px 16px 12px 16px;';
+    return `<div class="forecast-gap-chart-wrap" style="${wrapStyle}">${svg}${legend}</div>`;
+  } catch (e) {
+    return '';
+  }
+}
+
 function renderFindings() {
   const container = document.getElementById('findings-groups-container');
   const emptyCols = document.getElementById('empty-state-columns');
@@ -4015,10 +4147,11 @@ function renderFindings() {
       }
       cardsHtml += fgHtml;
     }
+    const fcGapChartHtml = buildForecastGapChartHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('forecast', 'Forecast Gap',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml, s.pills)
+        s.count, cardsHtml, s.pills, fcGapChartHtml)
     );
   }
 
