@@ -3389,11 +3389,11 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
 
   const n = series.length;
   const vbW = 1000;
-  const vbH = 120;
+  const vbH = 160;
   const padL = 8;
   const padR = 8;
-  const padT = 10;
-  const padB = 22;
+  const padT = 16;
+  const padB = 28;
   const plotW = vbW - padL - padR;
   const plotH = vbH - padT - padB;
 
@@ -3439,16 +3439,72 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     })
     .join('');
 
-  const pathEl = (d, color) => d
-    ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#${clipId})"/>`
+  const ariBandPolys = [];
+  let runA = null;
+  for (let i = 0; i <= n; i++) {
+    const v = i < n ? series[i].ari : null;
+    const ok = v != null && Number.isFinite(v);
+    if (ok && runA === null) runA = i;
+    if (!ok && runA !== null) {
+      const a = runA;
+      const b = i - 1;
+      const x0 = xAt(a);
+      const xb = xAt(b);
+      let d = `M${x0.toFixed(2)},${yRef.toFixed(2)} L${x0.toFixed(2)},${yAt(series[a].ari).toFixed(2)}`;
+      for (let j = a + 1; j <= b; j++) {
+        d += ` L${xAt(j).toFixed(2)},${yAt(series[j].ari).toFixed(2)}`;
+      }
+      d += ` L${xb.toFixed(2)},${yRef.toFixed(2)} Z`;
+      ariBandPolys.push(d);
+      runA = null;
+    }
+  }
+
+  const labelDy = (10 * vbH) / 120;
+  const labelStep = n > 10 ? 2 : 1;
+  const pointLabels = (getter, fill) => {
+    const out = [];
+    for (let i = 0; i < n; i += labelStep) {
+      const v = getter(series[i]);
+      if (v == null || !Number.isFinite(v)) continue;
+      const x = xAt(i);
+      const yp = yAt(v);
+      const ty = yp + (v > 100 ? labelDy : -labelDy);
+      out.push(
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="${fill}" font-size="9px" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+      );
+    }
+    return out.join('');
+  };
+  const mpiLabelsSvg = pointLabels(s => s.mpi, '#f97316');
+  const rgiLabelsSvg = pointLabels(s => s.rgi, '#10b981');
+
+  const yAxisSvg = [
+    { val: yMin, y: yAt(yMin) },
+    { val: 100, y: yAt(100) },
+    { val: yMax, y: yAt(yMax) }
+  ].map(({ val, y }) =>
+    `<text x="${(padL - 2).toFixed(2)}" y="${y.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">${escHtml(Number(val).toFixed(1))}</text>`
+  ).join('');
+
+  const ariFillSvg = ariBandPolys.map(d =>
+    `<path d="${d}" fill="rgba(59,130,246,0.12)" stroke="none" clip-path="url(#${clipId})"/>`
+  ).join('');
+
+  const linePath = (d, color, sw) => d
+    ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#${clipId})"/>`
     : '';
 
   const svg = `<svg class="str-sparkline-svg" viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs><clipPath id="${clipId}"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"/></clipPath></defs>
+    ${yAxisSvg}
+    ${ariFillSvg}
     <line x1="${padL}" y1="${yRef.toFixed(2)}" x2="${vbW - padR}" y2="${yRef.toFixed(2)}" stroke="#6b7280" stroke-width="1" stroke-dasharray="4 3" fill="none" clip-path="url(#${clipId})"/>
-    ${pathEl(mpiD, '#f97316')}
-    ${pathEl(ariD, '#3b82f6')}
-    ${pathEl(rgiD, '#10b981')}
+    ${linePath(ariD, '#3b82f6', 1.5)}
+    ${linePath(mpiD, '#f97316', 2.5)}
+    ${linePath(rgiD, '#10b981', 1.5)}
+    ${mpiLabelsSvg}
+    ${rgiLabelsSvg}
     ${labelSvg}
   </svg>`;
 
