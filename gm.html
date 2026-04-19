@@ -714,8 +714,10 @@ function extractAllIssues(ej) {
   });
 
   // Forward pace issues
-  (Array.isArray(ej.forward_issues) ? ej.forward_issues : [])
-  .forEach(issue => {
+  const sortedForward = (Array.isArray(ej.forward_issues)
+    ? [...ej.forward_issues] : [])
+    .sort((a, b) => (a.forward_window || 0) - (b.forward_window || 0));
+  sortedForward.forEach(issue => {
     issues.push({
       id:           issue.finding_key || Math.random().toString(),
       type:         'forward',
@@ -737,8 +739,10 @@ function extractAllIssues(ej) {
   });
 
   // Forecast gap issues
-  (Array.isArray(ej.forecast_gap_issues) ? ej.forecast_gap_issues : [])
-  .forEach(issue => {
+  const sortedForecastGap = (Array.isArray(ej.forecast_gap_issues)
+    ? [...ej.forecast_gap_issues] : [])
+    .sort((a, b) => (a.forward_window || 0) - (b.forward_window || 0));
+  sortedForecastGap.forEach(issue => {
     const revGap = issue.quantification?.rev_gap || 0;
     issues.push({
       id:           issue.finding_key || Math.random().toString(),
@@ -1069,33 +1073,44 @@ function renderFindingBriefing(issues) {
     issues.map(issue => {
     const priority = (issue.priority || 'medium').toLowerCase();
 
+    // Line 1: What is happening — key metrics or position signal
     const signalSentence = issue.signal
       ? firstSentence(issue.signal)
       : issue.title + '.';
 
-    const rnMatch = (issue.analysis || '').match(/(\d+) room nights behind/);
+    // Line 2: Segment and financial context — extract from full analysis
+    // Pull the most specific data sentence available: segment name, RN gap, ADR
+    const analysisText = issue.analysis || '';
+    const segmentMatch = analysisText.match(
+      /([A-Z][A-Za-z /&]+) is the primary [^\.\n]+\./
+    );
+    const rnShortMatch = analysisText.match(/(\d[\d,]*) room nights? short/);
+    const rnBehindMatch = analysisText.match(/(\d[\d,]*) room nights? behind/);
+    const pctBehindMatch = analysisText.match(/(\d+\.?\d*)% (below|behind|ahead)/);
+    const adrMatch = analysisText.match(/ADR[^\.\n]+\./);
+
+    let contextSentence = '';
+    if (segmentMatch) {
+      contextSentence = segmentMatch[0];
+    } else if (rnShortMatch && pctBehindMatch) {
+      contextSentence = `OTB is ${rnShortMatch[1]} room nights short (${pctBehindMatch[1]}% ${pctBehindMatch[2]} plan).`;
+    } else if (rnBehindMatch) {
+      contextSentence = `This window is ${rnBehindMatch[1]} room nights behind last year.`;
+    }
+    if (adrMatch && !contextSentence.includes('ADR')) {
+      contextSentence += (contextSentence ? ' ' : '') + adrMatch[0];
+    }
+
+    // Line 3: Revenue consequence
     const impactSentence = issue.revenue > 0
-      ? `Revenue exposure is ${fmtDigest(issue.revenue)}.`
-      : issue.type === 'forward'
-        ? `This window is tracking behind last year with ${
-            rnMatch?.[1] || 'multiple'
-          } room nights at risk.`
-        : 'Financial impact is directional — monitor closely.';
-
-    const decisionSentence = issue.decision
-      ? firstSentence(issue.decision)
-      : 'No specific decision required at this stage.';
-
-    const firstAction = issue.execution?.[0] || '';
-    const ownerSentence = firstAction
-      ? `${issue.department} to action: ${firstSentence(firstAction)}`
-      : `Owner: ${issue.department}.`;
+      ? `Revenue exposure: ${fmtDigest(issue.revenue)}.`
+      : '';
 
     const prose = [
       signalSentence,
-      impactSentence,
-      decisionSentence
-    ].join(' ');
+      contextSentence,
+      impactSentence
+    ].filter(Boolean).join(' ');
 
     const kickerSuffix = issue.window_label
       ? ` · ${issue.window_label}` : '';
