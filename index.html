@@ -753,6 +753,44 @@ body {
   border-left: 3px solid #7C3AED;
 }
 
+/* STR weekly sparkline (Historical Analysis group, expanded only) */
+.group-cards .finding-card:has(+ .str-weekly-sparkline-wrap) {
+  border-bottom: none;
+}
+.str-weekly-sparkline-wrap {
+  border-top: 0.5px solid var(--gray-100);
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  width: 100%;
+}
+.str-weekly-sparkline-wrap .str-sparkline-svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+.str-sparkline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 18px;
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-600);
+  font-family: 'DM Sans', sans-serif;
+}
+.str-sparkline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.str-sparkline-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* empty group — hide entirely */
 .findings-group.empty {
   display: none;
@@ -3304,6 +3342,125 @@ function computeGroupSummaries(engineJson) {
   };
 }
 
+/**
+ * Inline SVG block: MPI / ARI / RGI from engineJson.str_weekly_series
+ * (weeks with day_count >= 4). Returns '' if no usable data.
+ */
+function buildStrWeeklySparklineBlockHtml(engineJson) {
+  const raw = engineJson?.str_weekly_series;
+  if (!Array.isArray(raw) || raw.length === 0) return '';
+
+  const weeks = raw.filter(w => w && Number(w.day_count) >= 4);
+  if (!weeks.length) return '';
+
+  const pickNum = (row, keys) => {
+    for (const k of keys) {
+      if (!Object.prototype.hasOwnProperty.call(row, k)) continue;
+      const v = row[k];
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (v != null && v !== '') {
+        const n = Number(v);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+    return null;
+  };
+
+  const series = weeks.map(w => ({
+    week_key: String(w.week_key != null ? w.week_key : '').trim() || '—',
+    mpi: pickNum(w, ['mpi', 'MPI', 'avgMPI']),
+    ari: pickNum(w, ['ari', 'ARI', 'avgARI']),
+    rgi: pickNum(w, ['rgi', 'RGI', 'avgRGI'])
+  }));
+
+  const allVals = [];
+  for (const s of series) {
+    if (s.mpi != null) allVals.push(s.mpi);
+    if (s.ari != null) allVals.push(s.ari);
+    if (s.rgi != null) allVals.push(s.rgi);
+  }
+  if (!allVals.length) return '';
+
+  const lowest = Math.min(...allVals);
+  const highest = Math.max(...allVals);
+  const yMin = Math.min(85, lowest - 2);
+  const yMax = Math.max(115, highest + 2);
+  if (!(yMax > yMin)) return '';
+
+  const n = series.length;
+  const vbW = 1000;
+  const vbH = 120;
+  const padL = 8;
+  const padR = 8;
+  const padT = 10;
+  const padB = 22;
+  const plotW = vbW - padL - padR;
+  const plotH = vbH - padT - padB;
+
+  const xAt = i => {
+    if (n <= 1) return padL + plotW / 2;
+    return padL + (i / (n - 1)) * plotW;
+  };
+  const yAt = v => padT + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  const pathFor = getter => {
+    const parts = [];
+    let pen = false;
+    for (let i = 0; i < n; i++) {
+      const v = getter(series[i]);
+      if (v == null || !Number.isFinite(v)) {
+        pen = false;
+        continue;
+      }
+      const x = xAt(i);
+      const y = yAt(v);
+      parts.push(pen ? `L${x.toFixed(2)},${y.toFixed(2)}`
+        : `M${x.toFixed(2)},${y.toFixed(2)}`);
+      pen = true;
+    }
+    return parts.join(' ');
+  };
+
+  const mpiD = pathFor(s => s.mpi);
+  const ariD = pathFor(s => s.ari);
+  const rgiD = pathFor(s => s.rgi);
+  if (!mpiD && !ariD && !rgiD) return '';
+
+  const yRef = yAt(100);
+  const clipId = 'str-weekly-spark-clip';
+
+  const labelIdx = new Set();
+  for (let i = 0; i < n; i += 4) labelIdx.add(i);
+  if (n > 1) labelIdx.add(n - 1);
+  const labelSvg = [...labelIdx].sort((a, b) => a - b)
+    .map(i => {
+      const t = escHtml(series[i].week_key);
+      return `<text x="${xAt(i).toFixed(2)}" y="${vbH - 4}" text-anchor="middle" fill="#9ca3af" font-size="11" font-family="DM Sans, system-ui, sans-serif">${t}</text>`;
+    })
+    .join('');
+
+  const pathEl = (d, color) => d
+    ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#${clipId})"/>`
+    : '';
+
+  const svg = `<svg class="str-sparkline-svg" viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs><clipPath id="${clipId}"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"/></clipPath></defs>
+    <line x1="${padL}" y1="${yRef.toFixed(2)}" x2="${vbW - padR}" y2="${yRef.toFixed(2)}" stroke="#6b7280" stroke-width="1" stroke-dasharray="4 3" fill="none" clip-path="url(#${clipId})"/>
+    ${pathEl(mpiD, '#f97316')}
+    ${pathEl(ariD, '#3b82f6')}
+    ${pathEl(rgiD, '#10b981')}
+    ${labelSvg}
+  </svg>`;
+
+  const legend = `<div class="str-sparkline-legend">
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#f97316"></span>MPI</span>
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#3b82f6"></span>ARI</span>
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#10b981"></span>RGI</span>
+  </div>`;
+
+  return `<div class="str-weekly-sparkline-wrap">${svg}${legend}</div>`;
+}
+
 function renderFindings() {
   const container = document.getElementById('findings-groups-container');
   const emptyCols = document.getElementById('empty-state-columns');
@@ -3336,7 +3493,8 @@ function renderFindings() {
   // This produces a valid, self-contained HTML string every time.
   function buildCompleteGroup(groupType, groupName, brief,
                                metric, metricClass, metaLabel,
-                               count, cardsHtml, pills) {
+                               count, cardsHtml, pills,
+                               extraAfterCardsHtml = '') {
     if (!cardsHtml) return '';
     const countHtml = count > 0
       ? `<span class="group-count">${count}</span>` : '';
@@ -3378,6 +3536,7 @@ function renderFindings() {
         </div>
         <div class="group-cards">
           ${cardsHtml}
+          ${extraAfterCardsHtml}
         </div>
       </div>
     `;
@@ -3391,10 +3550,11 @@ function renderFindings() {
     const cardsHtml = historicalCards
       .map(card => renderCard(card))
       .join('');
+    const histSparklineHtml = buildStrWeeklySparklineBlockHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('historical', 'Historical Analysis',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml, s.pills)
+        s.count, cardsHtml, s.pills, histSparklineHtml)
     );
   }
 
