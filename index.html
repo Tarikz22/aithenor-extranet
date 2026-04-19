@@ -3383,8 +3383,8 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
 
   const lowest = Math.min(...allVals);
   const highest = Math.max(...allVals);
-  const yMin = Math.min(85, lowest - 2);
-  const yMax = Math.max(115, highest + 2);
+  const yMin = Math.floor(lowest - 4);
+  const yMax = Math.ceil(highest + 4);
   if (!(yMax > yMin)) return '';
 
   const n = series.length;
@@ -3525,7 +3525,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#10b981"></span>RGI</span>
   </div>`;
 
-  return `<div class="str-weekly-sparkline-wrap">${svg}${legend}</div>`;
+  return `<div class="str-weekly-sparkline-wrap" style="max-width:860px; margin:16px auto 0 auto; background:#fafaf7; border:1px solid #e8e8e5; border-radius:8px; padding:16px 12px 10px 12px;">${svg}${legend}</div>`;
 }
 
 function renderFindings() {
