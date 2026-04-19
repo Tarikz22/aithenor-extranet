@@ -3569,11 +3569,15 @@ function buildForwardPaceChartHtml(engineJson) {
     const barAreaW = vbW - padLabel - padRight;
     const barH = 22;
     const barStackGap = 3;
-    const fmtRn = n => {
+    const fmtRnNum = n => {
       const v = Math.round(Number(n));
-      return Number.isFinite(v) ? String(v) : '—';
+      return Number.isFinite(v) ? v.toLocaleString('en-GB') : null;
     };
-    const rnLabelFits = (txt, barW) => barW >= Math.max(36, txt.length * 7 + 12);
+    const fmtRnBarLabel = n => {
+      const s = fmtRnNum(n);
+      return s == null ? '—' : `${s} RN`;
+    };
+    const rnLabelInsideBar = barW => barW >= 80;
 
     const extractDaysLabel = wl => {
       const s = String(wl || '');
@@ -3619,10 +3623,10 @@ function buildForwardPaceChartHtml(engineJson) {
       const wRef = (w.ref / globalMax) * barAreaW;
       const xBar = padLabel;
       const winLbl = extractDaysLabel(w.iss?.window_label || w.pd?.window_label || '');
-      const otbTxt = fmtRn(w.otb);
-      const refTxt = fmtRn(w.ref);
-      const otbInside = rnLabelFits(otbTxt, wOtb);
-      const refInside = rnLabelFits(refTxt, wRef);
+      const otbTxt = fmtRnBarLabel(w.otb);
+      const refTxt = fmtRnBarLabel(w.ref);
+      const otbInside = rnLabelInsideBar(wOtb);
+      const refInside = rnLabelInsideBar(wRef);
       const gPct = gapPctRaw(w);
       const gs = gapStyle(gPct);
       const gapStr = fmtGapPct(gPct);
