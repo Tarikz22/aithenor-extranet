@@ -3562,7 +3562,7 @@ function buildForwardPaceChartHtml(engineJson) {
     const vbW = 900;
     const rowGroupHeight = 22 + 3 + 22 + 20 + 28;
     const vbH = windows.length * rowGroupHeight + 60;
-    const padLabel = 110;
+    const padLabel = 130;
     const padRight = 80;
     const barAreaW = vbW - padLabel - padRight;
     const barH = 22;
@@ -3633,7 +3633,7 @@ function buildForwardPaceChartHtml(engineJson) {
       const adrY = yLyBarTop + barH + 8;
       let adrLine = '';
       if (otbAdr && lyAdr) {
-        adrLine = `<text x="${padLabel}" y="${adrY}" fill="#6b7280" font-size="10px" font-family="DM Sans, system-ui, sans-serif">ADR: OTB ${escHtml(otbAdr)} vs LY ${escHtml(lyAdr)}</text>`;
+        adrLine = `<text x="${padLabel}" y="${adrY}" fill="#6b7280" font-size="10px" font-family="DM Sans, system-ui, sans-serif">ADR: OTB ${escHtml(otbAdr)} vs STLY ${escHtml(lyAdr)}</text>`;
       }
       const otbLab = otbInside
         ? `<text x="${(xBar + wOtb / 2).toFixed(2)}" y="${(yOtbBarTop + barH / 2).toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="11px" font-weight="600" font-family="DM Sans, system-ui, sans-serif">${escHtml(otbTxt)}</text>`
@@ -3645,7 +3645,7 @@ function buildForwardPaceChartHtml(engineJson) {
     <text x="${(padLabel - 2).toFixed(2)}" y="${barStackMidY.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#6b7280" font-size="11px" font-family="DM Sans, system-ui, sans-serif">${escHtml(winLbl)}</text>
     <text x="${padLabel}" y="${(yOtbBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#3b82f6" font-size="9px" font-family="DM Sans, system-ui, sans-serif">OTB</text>
     <rect x="${xBar.toFixed(2)}" y="${yOtbBarTop}" width="${wOtb.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#3b82f6"/>
-    <text x="${padLabel}" y="${(yLyBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">LY</text>
+    <text x="${padLabel}" y="${(yLyBarTop - 3).toFixed(2)}" text-anchor="start" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">STLY</text>
     <rect x="${xBar.toFixed(2)}" y="${yLyBarTop}" width="${wRef.toFixed(2)}" height="${barH}" rx="4" ry="4" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
     ${otbLab}
     ${refLab}
@@ -3659,7 +3659,7 @@ function buildForwardPaceChartHtml(engineJson) {
 
     const legend = `<div class="str-sparkline-legend" style="margin-top:14px;">
     <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#3b82f6"></span>OTB</span>
-    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#e5e7eb;border:1px solid #9ca3af;box-sizing:border-box"></span>Last Year</span>
+    <span class="str-sparkline-legend-item"><span class="str-sparkline-legend-dot" style="background:#e5e7eb;border:1px solid #9ca3af;box-sizing:border-box"></span>STLY</span>
   </div>`;
 
     const wrapStyle = 'width:100%;margin:20px 0 0 0;background:#fafaf7;border:1px solid #e8e8e5;border-radius:8px;padding:20px 16px 12px 16px;';
