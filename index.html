@@ -759,7 +759,7 @@ body {
 }
 .str-weekly-sparkline-wrap {
   border-top: 0.5px solid var(--gray-100);
-  padding: 12px 14px 14px;
+  padding: 16px 8px 8px 8px;
   box-sizing: border-box;
   width: 100%;
 }
@@ -3389,11 +3389,11 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
 
   const n = series.length;
   const vbW = 1000;
-  const vbH = 160;
+  const vbH = 220;
   const padL = 8;
   const padR = 8;
-  const padT = 16;
-  const padB = 28;
+  const padT = 20;
+  const padB = 32;
   const plotW = vbW - padL - padR;
   const plotH = vbH - padT - padB;
 
@@ -3449,35 +3449,49 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
       const a = runA;
       const b = i - 1;
       const x0 = xAt(a);
-      const xb = xAt(b);
-      let d = `M${x0.toFixed(2)},${yRef.toFixed(2)} L${x0.toFixed(2)},${yAt(series[a].ari).toFixed(2)}`;
+      let d = `M${x0.toFixed(2)},${yAt(series[a].ari).toFixed(2)}`;
       for (let j = a + 1; j <= b; j++) {
         d += ` L${xAt(j).toFixed(2)},${yAt(series[j].ari).toFixed(2)}`;
       }
-      d += ` L${xb.toFixed(2)},${yRef.toFixed(2)} Z`;
+      for (let j = b; j >= a; j--) {
+        d += ` L${xAt(j).toFixed(2)},${yRef.toFixed(2)}`;
+      }
+      d += ' Z';
       ariBandPolys.push(d);
       runA = null;
     }
   }
 
-  const labelDy = (10 * vbH) / 120;
-  const labelStep = n > 10 ? 2 : 1;
-  const pointLabels = (getter, fill) => {
+  const labelDy = (14 * vbH) / 120;
+  const labelStep = n > 8 ? 3 : 1;
+  const mpiLabelsSvg = (() => {
     const out = [];
     for (let i = 0; i < n; i += labelStep) {
-      const v = getter(series[i]);
+      const v = series[i].mpi;
       if (v == null || !Number.isFinite(v)) continue;
       const x = xAt(i);
       const yp = yAt(v);
-      const ty = yp + (v > 100 ? labelDy : -labelDy);
+      const ty = yp + (v > 99.5 ? labelDy : -labelDy);
       out.push(
-        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="${fill}" font-size="9px" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#f97316" font-size="9px" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
       );
     }
     return out.join('');
-  };
-  const mpiLabelsSvg = pointLabels(s => s.mpi, '#f97316');
-  const rgiLabelsSvg = pointLabels(s => s.rgi, '#10b981');
+  })();
+  const rgiLabelsSvg = (() => {
+    const out = [];
+    for (let i = 0; i < n; i += labelStep) {
+      const v = series[i].rgi;
+      if (v == null || !Number.isFinite(v)) continue;
+      const x = xAt(i);
+      const yp = yAt(v);
+      const ty = yp + (v > 100.5 ? -labelDy : labelDy);
+      out.push(
+        `<text x="${x.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle" dominant-baseline="middle" fill="#10b981" font-size="9px" font-family="DM Sans, system-ui, sans-serif" clip-path="url(#${clipId})">${escHtml(v.toFixed(1))}</text>`
+      );
+    }
+    return out.join('');
+  })();
 
   const yAxisSvg = [
     { val: yMin, y: yAt(yMin) },
@@ -3488,7 +3502,7 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
   ).join('');
 
   const ariFillSvg = ariBandPolys.map(d =>
-    `<path d="${d}" fill="rgba(59,130,246,0.12)" stroke="none" clip-path="url(#${clipId})"/>`
+    `<path d="${d}" fill="rgba(59,130,246,0.15)" stroke="none" clip-path="url(#${clipId})"/>`
   ).join('');
 
   const linePath = (d, color, sw) => d
@@ -3497,8 +3511,8 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
 
   const svg = `<svg class="str-sparkline-svg" viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs><clipPath id="${clipId}"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"/></clipPath></defs>
-    ${yAxisSvg}
     ${ariFillSvg}
+    ${yAxisSvg}
     <line x1="${padL}" y1="${yRef.toFixed(2)}" x2="${vbW - padR}" y2="${yRef.toFixed(2)}" stroke="#6b7280" stroke-width="1" stroke-dasharray="4 3" fill="none" clip-path="url(#${clipId})"/>
     ${linePath(ariD, '#3b82f6', 1.5)}
     ${linePath(mpiD, '#f97316', 2.5)}
