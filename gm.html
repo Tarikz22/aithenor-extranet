@@ -1508,6 +1508,8 @@ async function loadBriefing() {
       ? JSON.parse(data.engine_json)
       : (data.engine_json || {});
 
+    window._ej = ej; // debug only — remove before production
+
     const allIssues = extractAllIssues(ej);
 
     if (!allIssues.length) {
