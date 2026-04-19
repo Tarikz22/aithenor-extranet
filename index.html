@@ -3439,29 +3439,6 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     })
     .join('');
 
-  const ariBandPolys = [];
-  let runA = null;
-  for (let i = 0; i <= n; i++) {
-    const v = i < n ? series[i].ari : null;
-    const ok = v != null && Number.isFinite(v);
-    if (ok && runA === null) runA = i;
-    if (!ok && runA !== null) {
-      const a = runA;
-      const b = i - 1;
-      const x0 = xAt(a);
-      let d = `M${x0.toFixed(2)},${yAt(series[a].ari).toFixed(2)}`;
-      for (let j = a + 1; j <= b; j++) {
-        d += ` L${xAt(j).toFixed(2)},${yAt(series[j].ari).toFixed(2)}`;
-      }
-      for (let j = b; j >= a; j--) {
-        d += ` L${xAt(j).toFixed(2)},${yRef.toFixed(2)}`;
-      }
-      d += ' Z';
-      ariBandPolys.push(d);
-      runA = null;
-    }
-  }
-
   const labelDy = (14 * vbH) / 120;
   const labelStep = n > 8 ? 3 : 1;
   const mpiLabelsSvg = (() => {
@@ -3501,17 +3478,37 @@ function buildStrWeeklySparklineBlockHtml(engineJson) {
     `<text x="${(padL - 2).toFixed(2)}" y="${y.toFixed(2)}" text-anchor="end" dominant-baseline="middle" fill="#9ca3af" font-size="9px" font-family="DM Sans, system-ui, sans-serif">${escHtml(Number(val).toFixed(1))}</text>`
   ).join('');
 
-  const ariFillSvg = ariBandPolys.map(d =>
-    `<path d="${d}" fill="rgba(59,130,246,0.15)" stroke="none" clip-path="url(#${clipId})"/>`
-  ).join('');
-
   const linePath = (d, color, sw) => d
     ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#${clipId})"/>`
     : '';
 
+  // Build ARI fill polygon: ARI line forward + y=100 line backward = closed shape
+  // This creates the filled band showing rate positioning vs fair share
+  const ariFillPoints = [];
+  for (let i = 0; i < n; i++) {
+    const v = series[i].ari;
+    if (v != null && Number.isFinite(v)) {
+      ariFillPoints.push({ x: xAt(i), y: yAt(v), i });
+    }
+  }
+  let ariFillPath = '';
+  if (ariFillPoints.length >= 2) {
+    const forward = ariFillPoints.map((p, idx) =>
+      idx === 0 ? `M${p.x.toFixed(2)},${p.y.toFixed(2)}`
+        : `L${p.x.toFixed(2)},${p.y.toFixed(2)}`
+    ).join(' ');
+    const backward = [...ariFillPoints].reverse().map(p =>
+      `L${p.x.toFixed(2)},${yRef.toFixed(2)}`
+    ).join(' ');
+    ariFillPath = `${forward} ${backward} Z`;
+  }
+  const ariFillEl = ariFillPath
+    ? `<path d="${ariFillPath}" fill="rgba(59,130,246,0.18)" stroke="none"/>`
+    : '';
+
   const svg = `<svg class="str-sparkline-svg" viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs><clipPath id="${clipId}"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"/></clipPath></defs>
-    ${ariFillSvg}
+    ${ariFillEl}
     ${yAxisSvg}
     <line x1="${padL}" y1="${yRef.toFixed(2)}" x2="${vbW - padR}" y2="${yRef.toFixed(2)}" stroke="#6b7280" stroke-width="1" stroke-dasharray="4 3" fill="none" clip-path="url(#${clipId})"/>
     ${linePath(ariD, '#3b82f6', 1.5)}
