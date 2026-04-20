@@ -679,8 +679,16 @@ function buildGMDecision(issue) {
     const rnGap = p.otb_rn != null && p.reference_rn != null
       ? Math.round(Math.abs(p.otb_rn - p.reference_rn)) : null;
     const adrOk = p.otb_adr && p.reference_adr && Math.abs(p.otb_adr - p.reference_adr) < 15;
-    const deadline = p.window_end_ymd
-      ? p.window_end_ymd.split('-').reverse().slice(0, 2).join(' ') : 'window close';
+    const deadline = (() => {
+      if (!p.window_end_ymd) return 'window close';
+      const parts = p.window_end_ymd.split('-');
+      if (parts.length < 3) return p.window_end_ymd;
+      const months = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+      const day = parseInt(parts[2], 10);
+      const month = months[parseInt(parts[1], 10) - 1] || parts[1];
+      return `${day} ${month} ${parts[0]}`;
+    })();
     const rateNote = adrOk
       ? 'Rate is holding — do not discount to recover volume.'
       : 'Review rate positioning alongside volume recovery.';
@@ -793,9 +801,14 @@ function extractAllIssues(ej) {
   const sortedForecastGap = (Array.isArray(ej.forecast_gap_issues)
     ? [...ej.forecast_gap_issues] : [])
     .sort((a, b) => {
-      const fw = (a.forward_window || 99) - (b.forward_window || 99);
-      if (fw !== 0) return fw;
-      return (a.window_label || '').localeCompare(b.window_label || '');
+      // Sort by window_start date ascending — Days 1-30 first, 31-60 second, 61-90 third
+      const aStart = a.window_start || a.window_label || '';
+      const bStart = b.window_start || b.window_label || '';
+      // Extract lead day number from window_label as fallback (e.g. "Days 1–30" → 1)
+      const aLead = parseInt((a.window_label || '').replace(/Days?\s+/i, ''), 10) || 999;
+      const bLead = parseInt((b.window_label || '').replace(/Days?\s+/i, ''), 10) || 999;
+      if (aLead !== bLead) return aLead - bLead;
+      return aStart.localeCompare(bStart);
     });
   sortedForecastGap.forEach(issue => {
     const revGap = issue.quantification?.rev_gap || 0;
@@ -816,6 +829,7 @@ function extractAllIssues(ej) {
       card_metrics: issue.card_metrics || {},
       issue_family: issue.issue_family || 'volume_miss',
       window_label: issue.window_label || '',
+      window_start: issue.window_start || null,
       quantification: issue.quantification || null,
       primary_segment: issue.primary_segment || null,
       forward_window: issue.forward_window || null
