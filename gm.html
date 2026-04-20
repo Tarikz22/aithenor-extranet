@@ -781,7 +781,7 @@ function extractAllIssues(ej) {
   // Forward pace issues
   const sortedForward = (Array.isArray(ej.forward_issues)
     ? [...ej.forward_issues] : [])
-    .sort((a, b) => (a.forward_window || 0) - (b.forward_window || 0));
+    .sort((a, b) => (a.forward_window || 99) - (b.forward_window || 99));
   sortedForward.forEach(issue => {
     issues.push({
       id:           issue.finding_key || Math.random().toString(),
@@ -808,15 +808,7 @@ function extractAllIssues(ej) {
   // Forecast gap issues
   const sortedForecastGap = (Array.isArray(ej.forecast_gap_issues)
     ? [...ej.forecast_gap_issues] : [])
-    .sort((a, b) => {
-      const aDate = a.window_start || '';
-      const bDate = b.window_start || '';
-      if (aDate && bDate) return aDate.localeCompare(bDate);
-      // Fallback: extract first number from window_label
-      const aNum = parseInt((a.window_label || '').replace(/\D/g, ''), 10) || 999;
-      const bNum = parseInt((b.window_label || '').replace(/\D/g, ''), 10) || 999;
-      return aNum - bNum;
-    });
+    .sort((a, b) => (a.forward_window || 99) - (b.forward_window || 99));
   sortedForecastGap.forEach(issue => {
     const revGap = issue.quantification?.rev_gap || 0;
     issues.push({
@@ -839,7 +831,13 @@ function extractAllIssues(ej) {
       window_start: issue.window_start || null,
       quantification: issue.quantification || null,
       primary_segment: issue.primary_segment || null,
-      forward_window: issue.forward_window || null
+      forward_window: issue.forward_window != null
+        ? Number(issue.forward_window)
+        : (() => {
+            const label = issue.window_label || '';
+            const n = parseInt(label.replace(/\D/g, ''), 10);
+            return n < 30 ? 1 : n < 60 ? 2 : 3;
+          })()
     });
   });
 
@@ -1026,8 +1024,9 @@ function renderPriorityDecisions(issues) {
           </div>`;
       }).join('');
 
-  const fwdIssues = issues.filter(i =>
-    i.type === 'forward' || i.type === 'forecast');
+  const fwdIssues = issues
+    .filter(i => i.type === 'forward' || i.type === 'forecast')
+    .sort((a, b) => (a.forward_window || 99) - (b.forward_window || 99));
   const fwdEl = document.getElementById('decision-list');
   if (fwdEl) {
     if (fwdIssues.length > 0) {
