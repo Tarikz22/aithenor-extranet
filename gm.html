@@ -893,6 +893,14 @@ function extractAllIssues(ej) {
   return issues.sort((a, b) => {
     const pd = priorityOrder(b.priority) - priorityOrder(a.priority);
     if (pd !== 0) return pd;
+    // Within same priority: forecast and forward cards sort by window ascending
+    // so Days 1-30 always appears before Days 31-60 before Days 61-90
+    const aIsFwd = a.type === 'forecast' || a.type === 'forward';
+    const bIsFwd = b.type === 'forecast' || b.type === 'forward';
+    if (aIsFwd && bIsFwd) {
+      return (a.forward_window || 99) - (b.forward_window || 99);
+    }
+    // Non-forward cards sort by revenue descending
     return b.revenue - a.revenue;
   });
 }
