@@ -652,6 +652,52 @@ function firstSentence(text) {
   return m ? m[0].trim() : text.split('\n')[0].trim();
 }
 
+function buildGMDecision(issue) {
+  const base = issue.decision || '';
+  const seg = issue.primary_segment || null;
+  const fw = issue.forward_window || null;
+
+  if (issue.type === 'forecast' && issue.quantification) {
+    const q = issue.quantification;
+    const rnGap = q.rn_gap != null ? Math.abs(Math.round(q.rn_gap)) : null;
+    const pct = q.rn_gap_pct != null ? Math.abs(q.rn_gap_pct).toFixed(1) : null;
+    const isForecastChallenge = (issue.analysis || '').includes('Forecast challenge')
+      || (issue.analysis || '').includes('aggressive plan');
+    const urgency =
+      fw === 1 ? 'This window closes in 30 days.'
+      : fw === 2 ? 'The window tightens over the next two weeks.'
+      : 'This window is your longest lead — but the gap compounds if left unchallenged.';
+
+    if (isForecastChallenge) {
+      return `Before committing to any demand generation spend, validate whether this forecast was achievable. OTB is tracking close to last year — the gap is in the plan, not in the market. ${urgency} If after review the forecast is confirmed as realistic, activate ${seg || 'the primary shortfall segment'} first — it represents the bulk of the room night deficit.`;
+    }
+    return `${seg || 'The primary segment'} needs to close ${rnGap ? new Intl.NumberFormat('en-GB').format(rnGap) + ' room nights' : 'the gap'} (${pct || '?'}% of plan). ${urgency} Do not discount across all inventory — target ${seg || 'the shortfall segment'} specifically and hold rate on segments that are tracking to plan.`;
+  }
+
+  if (issue.type === 'forward' && issue.pace_data) {
+    const p = issue.pace_data;
+    const rnGap = p.otb_rn != null && p.reference_rn != null
+      ? Math.round(Math.abs(p.otb_rn - p.reference_rn)) : null;
+    const adrOk = p.otb_adr && p.reference_adr && Math.abs(p.otb_adr - p.reference_adr) < 15;
+    const deadline = p.window_end_ymd
+      ? p.window_end_ymd.split('-').reverse().slice(0, 2).join(' ') : 'window close';
+    const rateNote = adrOk
+      ? 'Rate is holding — do not discount to recover volume.'
+      : 'Review rate positioning alongside volume recovery.';
+    return `${rnGap ? new Intl.NumberFormat('en-GB').format(rnGap) + ' room nights' : 'Volume'} need to be recovered before ${deadline}. ${rateNote} Set a weekly OTB checkpoint and escalate if pace does not improve within 10 days.`;
+  }
+
+  if (issue.type === 'historical') {
+    const isHold = base.toLowerCase().includes('hold') || base.toLowerCase().includes('do not correct');
+    if (isHold) {
+      return `Hold current rate positioning. The trend is self-correcting — intervening now risks resetting the recovery. Monitor MPI weekly and only act if the improvement stalls for two consecutive weeks.`;
+    }
+    return base;
+  }
+
+  return base;
+}
+
 function fmt(v) {
   const n = Number(v) || 0;
   if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
@@ -1154,47 +1200,25 @@ function renderFindingBriefing(issues) {
     const kickerSuffix = issue.window_label
       ? ` · ${issue.window_label}` : '';
 
-    const gmDecisionText = (() => {
-      const base = issue.decision || '';
-      const end = base.endsWith('.') ? '' : '.';
-
-      if (issue.type === 'forecast') {
-        const fw = issue.forward_window;
-        const suffix =
-          fw === 1 ? ' Act before the window closes — 30 days remaining.'
-          : fw === 2 ? ' Review the forecast basis this week before the window tightens.'
-          : ' Reassess forecast assumptions in the next planning cycle before committing spend.';
-        return base + end + suffix;
-      }
-
-      if (issue.type === 'forward' && issue.pace_data) {
-        const p = issue.pace_data;
-        const rnGap = p.otb_rn != null && p.reference_rn != null
-          ? Math.round(Math.abs(p.otb_rn - p.reference_rn)) : null;
-        const suffix = rnGap
-          ? ` Target: recover ${new Intl.NumberFormat('en-GB').format(rnGap)} room nights before ${p.window_end_ymd || 'window close'}.`
-          : '';
-        return base + end + suffix;
-      }
-
-      return base;
-    })();
-
     const riskIfDone = (() => {
-      if (issue.revenue > 0) {
-        const quarterly = fmtDigest(Math.round(issue.revenue / 4));
-        if (issue.type === 'forecast') {
-          return `At current pace, the hotel is on track to miss ${fmtDigest(issue.revenue)} in revenue for this window. The forecast gap will not close without an explicit plan revision or demand intervention.`;
+      if (issue.type === 'forecast' && issue.quantification) {
+        const q = issue.quantification;
+        const rev = fmtDigest(issue.revenue);
+        const isForecastChallenge = (issue.analysis || '').includes('aggressive plan')
+          || (issue.analysis || '').includes('Forecast challenge');
+        if (isForecastChallenge) {
+          return `If the forecast is not revised and demand generation is activated without validating the plan basis, spend will be misallocated against an unrealistic target. The real risk is not the gap — it is acting on a flawed plan.`;
         }
-        if (issue.type === 'forward') {
-          return `Without intervention, this window will close with a structural room night deficit versus last year. Rate integrity is holding — the risk is volume, not price.`;
-        }
-        return `If no action is taken, roughly ${quarterly} revenue could remain unrealised over the next 90 days.`;
+        return `The window will close with ${rev ? 'up to ' + rev + ' in' : 'material'} unrecovered revenue. Unlike historical underperformance, forward gaps are recoverable — but only while booking lead time remains.`;
       }
       if (issue.type === 'forward') {
-        return `Without intervention, this window will close with a structural room night deficit versus last year. Rate integrity is holding — the risk is volume, not price.`;
+        return `This window will close with a room night deficit versus last year. The rate story is intact — the damage is volume only. Every week of inaction narrows the recovery window.`;
       }
-      return 'If no action is taken, the current commercial trajectory is likely to persist into the next cycle — the pattern will not self-correct.';
+      if (issue.type === 'historical' && issue.revenue > 0) {
+        const quarterly = fmtDigest(Math.round(issue.revenue / 4));
+        return `The current trajectory costs approximately ${quarterly} per quarter. This is not a one-off — the pattern repeats each cycle until the underlying commercial lever is addressed.`;
+      }
+      return `The current commercial trajectory will persist into the next cycle. This issue does not self-correct without a deliberate intervention.`;
     })();
 
     return `
@@ -1220,7 +1244,7 @@ function renderFindingBriefing(issues) {
           </p>
           <div class="decision-note">
             <div class="info-title">GM Decision Required</div>
-            <div class="info-text">${escHtml(gmDecisionText)}</div>
+            <div class="info-text">${escHtml(buildGMDecision(issue))}</div>
           </div>
           ${issue.revenue > 0 ? `
           <div style="display:grid;grid-template-columns:1fr 1fr;
