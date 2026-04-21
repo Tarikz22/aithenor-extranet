@@ -862,7 +862,7 @@ function runValidation() {
 
   const rnTy = getValues('rn_ty').map(parseNumber);
   const rnLy = getValues('rn_ly').map(parseNumber);
-  const rnOk = [...rnTy, ...rnLy].every((n) => n !== null && n >= 0 && Number.isInteger(n));
+  const rnOk = [...rnTy, ...rnLy].every((n) => n !== null && n >= 0 && Number.isFinite(n));
   state.validationResults.push(validateField(
     'Room nights fields',
     rnOk && (rnTy.length + rnLy.length > 0),
