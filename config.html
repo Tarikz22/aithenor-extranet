@@ -381,7 +381,7 @@ function clearError() {
 }
 
 function getJwtClaimHotelCode(session) {
-  const claimFromMeta = session?.user?.user_metadata?.hotel_code || session?.user?.user_metadata?.hotel || session?.user?.app_metadata?.hotel_code;
+  const claimFromMeta = session?.user?.user_metadata?.hotel || session?.user?.user_metadata?.hotel_code || session?.user?.app_metadata?.hotel_code;
   if (claimFromMeta) return claimFromMeta;
   const token = session?.access_token;
   if (!token) return '';
