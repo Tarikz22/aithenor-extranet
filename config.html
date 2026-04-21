@@ -552,9 +552,19 @@ async function handleFile(file) {
         const ws = workbook.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
         const limitedRows = rows.slice(0, 500);
-        state.sheetRowsPreview[sheetName] = limitedRows;
-        const firstRow = limitedRows[0] || [];
-        const headers = firstRow.map((h) => (h || '').toString().trim()).filter(Boolean);
+        // Scan the first 5 rows to find the actual header row.
+        // The header row is the first row that has 3 or more non-empty string cells.
+        // This handles sheets where row 0 is a title or blank line above the real headers.
+        let headers = [];
+        for (let i = 0; i < Math.min(5, limitedRows.length); i++) {
+          const candidate = (limitedRows[i] || []).map((h) => (h || '').toString().trim()).filter(Boolean);
+          if (candidate.length >= 3) {
+            headers = candidate;
+            // Trim the preview rows to start from the row after the header row
+            state.sheetRowsPreview[sheetName] = limitedRows.slice(i);
+            break;
+          }
+        }
         state.sheetsWithHeaders[sheetName] = headers;
         console.log('Sheet:', sheetName, '| Headers found:', headers);
       }
