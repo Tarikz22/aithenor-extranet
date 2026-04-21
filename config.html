@@ -556,6 +556,7 @@ async function handleFile(file) {
         const firstRow = limitedRows[0] || [];
         const headers = firstRow.map((h) => (h || '').toString().trim()).filter(Boolean);
         state.sheetsWithHeaders[sheetName] = headers;
+        console.log('Sheet:', sheetName, '| Headers found:', headers);
       }
       for (const tab of TAB_TYPES) {
         state.tabMapping[tab.key] = suggestTabMatch(tab.key, state.sheetNames);
