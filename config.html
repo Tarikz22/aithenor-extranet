@@ -277,13 +277,13 @@ const CANONICAL_FIELDS = {
     ['sector', 'Sector'], ['rn_fy_ly', 'Room Nights Full Year LY'], ['rn_actual_ytd', 'Room Nights Actual YTD'],
     ['rev_actual_ytd', 'Revenue Actual YTD'], ['adr_actual_ytd', 'ADR Actual YTD'],
     ['rn_otb_forecast', 'Room Nights OTB Forecast'], ['rev_otb_forecast', 'Revenue OTB Forecast'],
-    ['rn_full_year_projected', 'Room Nights Full Year Projected'], ['variance_vs_ly', 'Variance in Room Nights vs Last Year'],
+    ['rn_full_year_projected', 'Room Nights Full Year Projected'], ['variance_vs_ly', 'Projected Room Nights vs Prior Year (e.g. Projected RN vs 2025)'],
     ['comments', 'Comments']
   ],
   groups: [
     ['group_name', 'Group Name'], ['market_segment', 'Market Segment'], ['revenue_type', 'Revenue Type'],
     ['owner_name', 'Owner Name'], ['arrival_date', 'Arrival Date'], ['status', 'Status'],
-    ['date_definite', 'Date Definite'], ['date_tentative', 'Date Tentative'], ['room_nights', 'Room Nights (Total for Group)'],
+    ['date_definite', 'Date Definite'], ['date_tentative', 'Date Tentative'], ['room_nights', 'Total Room Nights for this Group (e.g. Blended Roomnights)'],
     ['room_revenue', 'Room Revenue (Total for Group)'], ['food_revenue', 'Food Revenue'], ['beverage_revenue', 'Beverage Revenue'],
     ['event_revenue', 'Event Revenue'], ['total_revenue', 'Total Revenue (Rooms + F&B + Events)'], ['lost_reason', 'Lost Reason'],
     ['lost_to_competitor', 'Lost To Competitor'], ['country', 'Country']
@@ -323,14 +323,14 @@ const ALIASES = {
     adr_actual_ytd: ['adr actual ytd', 'ytd adr'], rn_otb_forecast: ['rn otb forecast', 'forecast rn otb'],
     rev_otb_forecast: ['rev otb forecast', 'forecast revenue otb'],
     rn_full_year_projected: ['rn full year projected', 'projected rn', 'full year projected'],
-    variance_vs_ly: ['variance vs ly', 'variance ly', 'vs ly'], comments: ['comments', 'notes', 'remarks']
+    variance_vs_ly: ['variance vs ly', 'variance ly', 'vs ly', 'projected rn vs', 'projected vs', 'variance rn'], comments: ['comments', 'notes', 'remarks']
   },
   groups: {
     group_name: ['group name', 'name', 'account'], market_segment: ['market segment', 'segment'],
     revenue_type: ['revenue type', 'type'], owner_name: ['owner', 'sales manager', 'account manager'],
     arrival_date: ['arrival date', 'check in', 'arrival'], status: ['status'],
     date_definite: ['date definite', 'definite date'], date_tentative: ['date tentative', 'tentative date'],
-    room_nights: ['room nights', 'rn', 'rooms'], room_revenue: ['room revenue', 'rooms revenue'],
+    room_nights: ['room nights', 'rn', 'rooms', 'blended roomnights', 'blended room nights', 'total roomnights'], room_revenue: ['room revenue', 'rooms revenue'],
     food_revenue: ['food revenue', 'f&b revenue', 'food'], beverage_revenue: ['beverage revenue', 'bev revenue'],
     event_revenue: ['event revenue', 'events', 'meeting revenue'], total_revenue: ['total revenue', 'total'],
     lost_reason: ['lost reason', 'reason lost'], lost_to_competitor: ['lost to', 'competitor', 'lost to competitor'],
