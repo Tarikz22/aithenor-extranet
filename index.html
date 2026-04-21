@@ -574,6 +574,157 @@ body {
 .group-accent.mix-shift   { background: #0F6E56; }
 .group-accent.forward     { background: #185FA5; }
 .group-accent.forecast    { background: #7C3AED; }
+.group-accent.forward-intel { background: #0e7490; }
+
+/* Forward Intelligence cards (additive; does not alter existing card rules) */
+.fi-collapsible-card:not(.open) .finding-body {
+  display: none !important;
+}
+.fi-collapsible-card .finding-header {
+  cursor: pointer;
+}
+.fi-signal-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+.fi-signal-pill.fi-pill-red {
+  background: var(--red-light);
+  color: var(--red);
+}
+.fi-signal-pill.fi-pill-green {
+  background: var(--green-light);
+  color: var(--green);
+}
+.fi-signal-pill.fi-pill-blue {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.fi-intel-card .priority-stripe.medium {
+  background: #2563eb;
+}
+.fi-intel-card .priority-badge.medium {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.fi-weekly-pickup-card {
+  border-left: 3px solid #b91c1c;
+}
+.fi-corporate-risk-card {
+  border-left: 3px solid var(--red);
+}
+.fi-corporate-opp-card {
+  border-left: 3px solid var(--green);
+}
+.fi-pipeline-card {
+  border-left: 3px solid #185FA5;
+}
+.group-cards .finding-card.fi-weekly-pickup-card {
+  border-left: 3px solid #b91c1c;
+}
+.group-cards .finding-card.fi-corporate-risk-card {
+  border-left: 3px solid var(--red);
+}
+.group-cards .finding-card.fi-corporate-opp-card {
+  border-left: 3px solid var(--green);
+}
+.group-cards .finding-card.fi-pipeline-card {
+  border-left: 3px solid #185FA5;
+}
+.group-cards .fi-weekly-pickup-card,
+.group-cards .fi-corporate-risk-card,
+.group-cards .fi-corporate-opp-card,
+.group-cards .fi-pipeline-card {
+  margin-left: 0;
+}
+.fi-progress-wrap {
+  margin-top: 4px;
+}
+.fi-progress-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 6px;
+}
+.fi-progress-track {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--gray-100);
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+}
+.fi-progress-fill {
+  height: 100%;
+  border-radius: 6px 0 0 6px;
+  transition: width 0.25s ease;
+}
+.fi-progress-caption {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-top: 6px;
+}
+.fi-account-table-wrap {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+table.fi-account-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.fi-account-table th,
+table.fi-account-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100);
+}
+table.fi-account-table th {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  font-weight: 700;
+}
+.fi-status-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.fi-status-pill.tentative {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.fi-status-pill.prospect {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+.fi-var-neg { color: var(--red); font-weight: 600; }
+.fi-var-pos { color: var(--green); font-weight: 600; }
+.fi-opp-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--gray-900);
+}
+.fi-decision-block {
+  background: var(--gold-pale);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.fi-decision-block .decision-line {
+  margin: 0;
+}
 
 .group-header-body {
   padding: 12px 14px;
@@ -3805,6 +3956,463 @@ function buildForecastGapChartHtml(engineJson) {
   }
 }
 
+// ── Forward Intelligence (additive cards; engine_json issue arrays) ──
+function toggleFiCard(headerEl) {
+  const card = headerEl && headerEl.closest('.fi-collapsible-card');
+  if (card) card.classList.toggle('open');
+}
+
+function fiSafeNum(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : null;
+}
+
+function fiPct01Or100(r) {
+  const x = fiSafeNum(r);
+  if (x == null) return null;
+  return x <= 1 ? x * 100 : x;
+}
+
+function fiFmtEuroAmt(n) {
+  const x = fiSafeNum(n);
+  if (x == null) return '—';
+  return '€' + x.toLocaleString();
+}
+
+function fiFmtRnVal(n) {
+  const x = fiSafeNum(n);
+  if (x == null) return '—';
+  return `${x.toLocaleString()} RN`;
+}
+
+function fiFmtPct1FromRatio(r) {
+  const p = fiPct01Or100(r);
+  if (p == null) return '—';
+  return `${p.toFixed(1)}%`;
+}
+
+function fiUrgencyRank(u) {
+  const x = normalize(u || '');
+  if (x === 'critical') return 0;
+  if (x === 'high') return 1;
+  if (x === 'medium') return 2;
+  return 3;
+}
+
+function fiPipelineWindowSortKey(card) {
+  const k = (card.window_key || card.window_id || '').toString();
+  const m = k.match(/(\d+)/);
+  if (m) return parseInt(m[1], 10);
+  const wl = (card.window_label || '').toString();
+  const m2 = wl.match(/(\d+)/);
+  return m2 ? parseInt(m2[1], 10) : 999;
+}
+
+function fiProgressBarHtml(pct, fillHex, labelTop, caption) {
+  const w = Math.min(100, Math.max(0, fiSafeNum(pct) ?? 0));
+  return `
+    <div class="fi-progress-wrap">
+      <div class="fi-progress-label">${labelTop}</div>
+      <div class="fi-progress-track">
+        <div class="fi-progress-fill" style="width:${w.toFixed(2)}%;background:${fillHex};"></div>
+      </div>
+      <div class="fi-progress-caption">${caption}</div>
+    </div>`;
+}
+
+function fiCorpAccountRow(acc) {
+  const name = acc.account_name || acc.name || acc.account || acc.company_name || '—';
+  const sector = acc.sector || acc.segment || acc.industry || '—';
+  const manager = acc.manager || acc.account_manager || acc.owner || '—';
+  const fy25 = fiSafeNum(acc.fy_2025_rn ?? acc.rn_fy2025 ?? acc.fy25_rn ?? acc.rn_2025);
+  const p26 = fiSafeNum(acc.projected_2026_rn ?? acc.rn_projected_2026 ?? acc.rn_2026_projected);
+  const vari = fiSafeNum(acc.variance_rn ?? acc.variance ?? acc.rn_variance);
+  let varCell = '—';
+  let varCls = '';
+  if (vari != null) {
+    const vRounded = Math.abs(vari - Math.round(vari)) < 1e-6 ? Math.round(vari).toLocaleString() : vari.toFixed(1);
+    varCell = (vari > 0 ? '+' : '') + vRounded;
+    varCls = vari < 0 ? 'fi-var-neg' : vari > 0 ? 'fi-var-pos' : '';
+  }
+  const fyStr = fy25 != null ? `${Math.round(fy25).toLocaleString()} RN` : '—';
+  const p26Str = p26 != null ? `${Math.round(p26).toLocaleString()} RN` : '—';
+  return `<tr>
+    <td>${escHtml(name)}</td>
+    <td>${escHtml(sector)}</td>
+    <td>${escHtml(manager)}</td>
+    <td>${escHtml(fyStr)}</td>
+    <td>${escHtml(p26Str)}</td>
+    <td class="${escHtml(varCls)}">${escHtml(varCell)}</td>
+  </tr>`;
+}
+
+function renderWeeklyPickupDeltaIssueCard(card, snapshotDate, index) {
+  const id = `WPD_${index}_${snapshotDate || ''}`;
+  const urg = (card.urgency || 'medium').toString().toLowerCase();
+  const gd = normalize(card.gap_direction);
+  const widen = gd === 'widening';
+  const closing = gd === 'closing';
+  const pillCls = widen ? 'fi-pill-red' : closing ? 'fi-pill-green' : 'fi-pill-blue';
+  const dirLabel = widen ? '▼ Widening' : closing ? '▲ Closing' : 'Pickup delta';
+  const win = (card.window_label || '').toString().trim() || '—';
+  const title = `Days ${win} — Pickup ${dirLabel}`;
+  const collapsedLines = [
+    `Pickup this week: ${fiFmtRnVal(card.pickup_this_week)}`,
+    `Required: ${fiFmtRnVal(card.required_weekly_pickup)}/week`,
+    `Gap to forecast: ${fiFmtRnVal(card.gap_to_forecast)}`
+  ].join('\n');
+  const pvr = fiSafeNum(card.pickup_vs_required) ?? 0;
+  const barPct = Math.min(100, pvr * 100);
+  const barCol = pvr >= 1 ? '#10b981' : pvr >= 0.5 ? '#f59e0b' : '#ef4444';
+  const pThis = fiSafeNum(card.pickup_this_week);
+  const pReq = fiSafeNum(card.required_weekly_pickup);
+  const capBar = fiProgressBarHtml(
+    barPct,
+    barCol,
+    'Weekly pickup vs required rate',
+    `${pThis != null ? Math.round(pThis).toLocaleString() : '—'} RN of ${pReq != null ? Math.round(pReq).toLocaleString() : '—'} RN needed`
+  );
+  const situation = (card.situation || '').toString().trim();
+  const decision = (card.decision || '').toString().trim();
+  const heroGap = fiFmtRnVal(card.gap_to_forecast);
+  return `
+    <div class="finding-card forward-card fi-intel-card fi-weekly-pickup-card fi-collapsible-card" data-id="${escHtml(id)}">
+      <div class="finding-header" onclick="toggleFiCard(this)">
+        <div class="priority-stripe ${escHtml(urg)}"></div>
+        <div class="finding-center">
+          <div><span class="fi-signal-pill ${pillCls}">PICKUP DELTA</span></div>
+          <div class="finding-title">${escHtml(title)}</div>
+          <div class="finding-oneliner" style="white-space:pre-line;">${escHtml(collapsedLines)}</div>
+        </div>
+        <div class="finding-right">
+          <div class="trigger-metric-value">${heroGap}</div>
+          <div class="trigger-metric-label">Gap to forecast</div>
+          <div class="badges-row">
+            <span class="priority-badge ${escHtml(urg)}">${escHtml(capitalize(urg))}</span>
+          </div>
+        </div>
+      </div>
+      <div class="finding-body">
+        ${situation ? `
+        <div class="finding-section">
+          <div class="section-label">SITUATION</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
+        </div>` : ''}
+        <div class="finding-section">
+          <div class="section-label">PICKUP VS REQUIRED</div>
+          ${capBar}
+        </div>
+        <div class="finding-section">
+          <div class="section-label">DECISION</div>
+          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCorporatePaceRiskIssueCard(card, snapshotDate, riskIndex) {
+  const id = `CPR_${riskIndex}_${snapshotDate || ''}`;
+  const accounts = Array.isArray(card.accounts_at_risk) ? card.accounts_at_risk : [];
+  const n = accounts.length;
+  const revAtRisk = fiSafeNum(card.total_revenue_at_risk);
+  const title = `${n} Accounts Behind Pace — ${fiFmtEuroAmt(revAtRisk)} at Risk`;
+  const collapsedLines = [
+    `Total RN shortfall: ${fiFmtRnVal(card.total_rn_at_risk)}`,
+    `Accounts affected: ${n}`
+  ].join('\n');
+  const situation = (card.situation || '').toString().trim();
+  const diagnosis = (card.diagnosis || '').toString().trim();
+  const decision = (card.decision || '').toString().trim();
+  const maxRows = 10;
+  const rows = accounts.slice(0, maxRows).map(fiCorpAccountRow).join('');
+  const more = n > maxRows ? `<div class="impact-meta" style="margin-top:8px;">and ${n - maxRows} more accounts</div>` : '';
+  return `
+    <div class="finding-card forward-card fi-intel-card fi-corporate-risk-card fi-collapsible-card" data-id="${escHtml(id)}">
+      <div class="finding-header" onclick="toggleFiCard(this)">
+        <div class="priority-stripe critical"></div>
+        <div class="finding-center">
+          <div><span class="fi-signal-pill fi-pill-red">CORPORATE RISK</span></div>
+          <div class="finding-title">${escHtml(title)}</div>
+          <div class="finding-oneliner" style="white-space:pre-line;">${escHtml(collapsedLines)}</div>
+        </div>
+        <div class="finding-right">
+          <div class="trigger-metric-value">${escHtml(String(n))}</div>
+          <div class="trigger-metric-label">Accounts at risk</div>
+          <div class="badges-row">
+            <span class="priority-badge critical">${escHtml(capitalize('critical'))}</span>
+          </div>
+        </div>
+      </div>
+      <div class="finding-body">
+        ${situation ? `
+        <div class="finding-section">
+          <div class="section-label">SITUATION</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
+        </div>` : ''}
+        <div class="finding-section">
+          <div class="section-label">ACCOUNTS</div>
+          <div class="fi-account-table-wrap">
+            <table class="fi-account-table">
+              <thead><tr>
+                <th>Account</th><th>Sector</th><th>Manager</th>
+                <th>2025 FY RN</th><th>2026 Projected</th><th>Variance</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          ${more}
+        </div>
+        ${diagnosis ? `
+        <div class="finding-section">
+          <div class="section-label">DIAGNOSIS</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(diagnosis)}</div>
+        </div>` : ''}
+        <div class="finding-section">
+          <div class="section-label">DECISION</div>
+          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCorporatePaceOpportunityIssueCard(card, snapshotDate, oppIndex) {
+  const id = `CPO_${oppIndex}_${snapshotDate || ''}`;
+  const accounts = Array.isArray(card.accounts_ahead) ? card.accounts_ahead : [];
+  const n = accounts.length;
+  const title = `${n} Accounts Ahead of Pace — Protect These`;
+  const collapsedLines = `Accounts ahead: ${n}`;
+  const situation = (card.situation || '').toString().trim();
+  const decision = (card.decision || '').toString().trim();
+  const listItems = accounts.map(a => {
+    const name = a.account_name || a.name || a.account || '—';
+    const manager = a.manager || a.account_manager || '—';
+    const vari = fiSafeNum(a.variance_rn ?? a.variance ?? a.rn_variance);
+    let vStr = '—';
+    if (vari != null) {
+      const vRounded = Math.abs(vari - Math.round(vari)) < 1e-6 ? Math.round(vari).toLocaleString() : vari.toFixed(1);
+      vStr = (vari > 0 ? '+' : '') + vRounded;
+    }
+    return `<li><strong>${escHtml(name)}</strong> — variance ${escHtml(vStr)} — ${escHtml(manager)}</li>`;
+  }).join('');
+  return `
+    <div class="finding-card forward-card fi-intel-card fi-corporate-opp-card fi-collapsible-card" data-id="${escHtml(id)}">
+      <div class="finding-header" onclick="toggleFiCard(this)">
+        <div class="priority-stripe medium"></div>
+        <div class="finding-center">
+          <div><span class="fi-signal-pill fi-pill-green">CORPORATE OPPORTUNITY</span></div>
+          <div class="finding-title">${escHtml(title)}</div>
+          <div class="finding-oneliner">${escHtml(collapsedLines)}</div>
+        </div>
+        <div class="finding-right">
+          <div class="trigger-metric-value">${escHtml(String(n))}</div>
+          <div class="trigger-metric-label">Accounts ahead</div>
+          <div class="badges-row">
+            <span class="dept-badge">Opportunity</span>
+          </div>
+        </div>
+      </div>
+      <div class="finding-body">
+        ${situation ? `
+        <div class="finding-section">
+          <div class="section-label">SITUATION</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
+        </div>` : ''}
+        <div class="finding-section">
+          <div class="section-label">ACCOUNTS</div>
+          <ul class="fi-opp-list">${listItems}</ul>
+        </div>
+        <div class="finding-section">
+          <div class="section-label">DECISION</div>
+          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderGroupPipelineIssueCard(card, snapshotDate, index) {
+  const id = `GPG_${index}_${snapshotDate || ''}`;
+  const urg = (card.urgency || 'medium').toString().toLowerCase();
+  const win = (card.window_label || '').toString().trim() || '—';
+  const gPct = fiPct01Or100(card.gap_closure_pct);
+  const gPct0 = gPct != null ? gPct.toFixed(0) : '—';
+  const title = `Days ${win} — Pipeline covers ${gPct0}% of Forecast Gap`;
+  const covDisp = fiFmtPct1FromRatio(card.gap_closure_pct);
+  const collapsedLines = [
+    `Tentative RN: ${fiFmtRnVal(card.tentative_rn)}`,
+    `Prospect RN: ${fiFmtRnVal(card.prospect_rn)}`,
+    `Gap coverage: ${covDisp}`
+  ].join('\n');
+  const groups = Array.isArray(card.pipeline_groups) ? card.pipeline_groups : [];
+  const maxRows = 8;
+  const rows = groups.slice(0, maxRows).map(g => {
+    const gname = g.group_name || g.name || g.group || '—';
+    const seg = g.segment || g.segment_label || '—';
+    const stRaw = (g.status || '').toString().toLowerCase();
+    const isTent = stRaw.includes('tent');
+    const pillCls = isTent ? 'tentative' : 'prospect';
+    const pillText = isTent ? 'Tentative' : 'Prospect';
+    const arrival = (g.arrival || g.arrival_date || g.arrival_window || '—').toString();
+    const eventOnly = g.is_event_only === true;
+    const rnCell = eventOnly ? 'Event only' : fiFmtRnVal(g.rn ?? g.room_nights ?? g.tentative_rn ?? g.prospect_rn);
+    const rr = fiSafeNum(g.room_revenue ?? g.revenue ?? g.rev);
+    const rrStr = rr != null ? fiFmtEuroAmt(rr) : '—';
+    return `<tr>
+      <td>${escHtml(gname)}</td>
+      <td>${escHtml(seg)}</td>
+      <td><span class="fi-status-pill ${pillCls}">${escHtml(pillText)}</span></td>
+      <td>${escHtml(arrival)}</td>
+      <td>${escHtml(rnCell)}</td>
+      <td>${escHtml(rrStr)}</td>
+    </tr>`;
+  }).join('');
+  const totalPipe = fiSafeNum(card.total_pipeline_rn);
+  const gapRn = fiSafeNum(card.forecast_gap_rn);
+  const barPct = Math.min(100, fiPct01Or100(card.gap_closure_pct) ?? 0);
+  const bPct = fiPct01Or100(card.gap_closure_pct) ?? 0;
+  const barCol = bPct >= 75 ? '#10b981' : bPct >= 40 ? '#f59e0b' : '#ef4444';
+  const gapBar = fiProgressBarHtml(
+    barPct,
+    barCol,
+    'Pipeline vs forecast gap',
+    `${totalPipe != null ? Math.round(totalPipe).toLocaleString() : '—'} RN pipeline vs ${gapRn != null ? Math.round(gapRn).toLocaleString() : '—'} RN gap`
+  );
+  const situation = (card.situation || '').toString().trim();
+  const decision = (card.decision || '').toString().trim();
+  return `
+    <div class="finding-card forward-card fi-intel-card fi-pipeline-card fi-collapsible-card" data-id="${escHtml(id)}">
+      <div class="finding-header" onclick="toggleFiCard(this)">
+        <div class="priority-stripe ${escHtml(urg)}"></div>
+        <div class="finding-center">
+          <div><span class="fi-signal-pill fi-pill-blue">GROUP PIPELINE</span></div>
+          <div class="finding-title">${escHtml(title)}</div>
+          <div class="finding-oneliner" style="white-space:pre-line;">${escHtml(collapsedLines)}</div>
+        </div>
+        <div class="finding-right">
+          <div class="trigger-metric-value">${escHtml(covDisp)}</div>
+          <div class="trigger-metric-label">Gap coverage</div>
+          <div class="badges-row">
+            <span class="priority-badge ${escHtml(urg)}">${escHtml(capitalize(urg))}</span>
+          </div>
+        </div>
+      </div>
+      <div class="finding-body">
+        ${situation ? `
+        <div class="finding-section">
+          <div class="section-label">SITUATION</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
+        </div>` : ''}
+        <div class="finding-section">
+          <div class="section-label">PIPELINE GROUPS</div>
+          <div class="fi-account-table-wrap">
+            <table class="fi-account-table">
+              <thead><tr>
+                <th>Group Name</th><th>Segment</th><th>Status</th>
+                <th>Arrival</th><th>RN</th><th>Room Revenue</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="finding-section">
+          <div class="section-label">GAP COVERAGE</div>
+          ${gapBar}
+        </div>
+        <div class="finding-section">
+          <div class="section-label">DECISION</div>
+          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
+  const weeklyPickupIssues = Array.isArray(engineJson?.weekly_pickup_delta_issues)
+    ? engineJson.weekly_pickup_delta_issues : [];
+  const corporatePaceIssues = Array.isArray(engineJson?.corporate_account_pace_issues)
+    ? engineJson.corporate_account_pace_issues : [];
+  const groupPipelineIssues = Array.isArray(engineJson?.group_pipeline_issues)
+    ? engineJson.group_pipeline_issues : [];
+
+  if (!weeklyPickupIssues.length && !corporatePaceIssues.length &&
+      !groupPipelineIssues.length) {
+    return { cardsHtml: '', count: 0, insightPills: [] };
+  }
+
+  const sortedWeekly = [...weeklyPickupIssues].sort(
+    (a, b) => fiUrgencyRank(a.urgency) - fiUrgencyRank(b.urgency)
+  );
+  const corpRiskCards = corporatePaceIssues.filter(
+    c => normalize(c.card_type) === normalize('corporate_pace_risk')
+  );
+  const corpOppCards = corporatePaceIssues.filter(
+    c => normalize(c.card_type) === normalize('corporate_pace_opportunity')
+  );
+  const sortedPipeline = [...groupPipelineIssues].sort(
+    (a, b) => fiPipelineWindowSortKey(a) - fiPipelineWindowSortKey(b)
+  );
+
+  let html = '';
+  sortedWeekly.forEach((c, i) => {
+    html += renderWeeklyPickupDeltaIssueCard(c, snapshotDate, i);
+  });
+  corpRiskCards.forEach((c, i) => {
+    html += renderCorporatePaceRiskIssueCard(c, snapshotDate, i);
+  });
+  sortedPipeline.forEach((c, i) => {
+    html += renderGroupPipelineIssueCard(c, snapshotDate, i);
+  });
+  corpOppCards.forEach((c, i) => {
+    html += renderCorporatePaceOpportunityIssueCard(c, snapshotDate, i);
+  });
+
+  const count = sortedWeekly.length + corpRiskCards.length +
+    sortedPipeline.length + corpOppCards.length;
+
+  const insightParts = [];
+  let widenRn = 0;
+  for (const w of weeklyPickupIssues) {
+    if (normalize(w.gap_direction) === 'widening') {
+      const g = fiSafeNum(w.gap_to_forecast);
+      if (g != null) widenRn += g;
+    }
+  }
+  if (weeklyPickupIssues.length) {
+    if (widenRn > 0) {
+      insightParts.push(`${Math.round(widenRn)} RN gap widening`);
+    } else {
+      let closeRn = 0;
+      for (const w of weeklyPickupIssues) {
+        if (normalize(w.gap_direction) === 'closing') {
+          const g = fiSafeNum(w.gap_to_forecast);
+          if (g != null) closeRn += Math.abs(g);
+        }
+      }
+      if (closeRn > 0) insightParts.push(`${Math.round(closeRn)} RN gap closing`);
+      else insightParts.push(`${weeklyPickupIssues.length} pickup watch`);
+    }
+  }
+  let accBehind = 0;
+  for (const c of corpRiskCards) {
+    accBehind += Array.isArray(c.accounts_at_risk) ? c.accounts_at_risk.length : 0;
+  }
+  if (accBehind > 0) {
+    insightParts.push(`${accBehind} account${accBehind === 1 ? '' : 's'} behind`);
+  }
+  let grpConvert = 0;
+  for (const p of groupPipelineIssues) {
+    grpConvert += Array.isArray(p.pipeline_groups) ? p.pipeline_groups.length : 0;
+  }
+  if (grpConvert > 0) {
+    insightParts.push(`${grpConvert} group${grpConvert === 1 ? '' : 's'} to convert`);
+  }
+
+  const pills = insightParts.length
+    ? [{ label: 'Insight', value: insightParts.join(' · '), cls: 'pill-neutral' }]
+    : [];
+
+  return { cardsHtml: html, count, insightPills: pills };
+}
+
 function renderFindings() {
   const container = document.getElementById('findings-groups-container');
   const emptyCols = document.getElementById('empty-state-columns');
@@ -3821,10 +4429,18 @@ function renderFindings() {
     ? engineJson.mix_shift_issues : [];
   const forecastGapIssues = Array.isArray(engineJson.forecast_gap_issues)
     ? engineJson.forecast_gap_issues : [];
+  const weeklyPickupIssues = Array.isArray(engineJson.weekly_pickup_delta_issues)
+    ? engineJson.weekly_pickup_delta_issues : [];
+  const corporatePaceIssues = Array.isArray(engineJson.corporate_account_pace_issues)
+    ? engineJson.corporate_account_pace_issues : [];
+  const groupPipelineIssues = Array.isArray(engineJson.group_pipeline_issues)
+    ? engineJson.group_pipeline_issues : [];
 
   const hasAny = historicalCards.length || forwardCards.length ||
     monthlyIssues.length || mixShiftIssues.length ||
-    forecastGapIssues.length;
+    forecastGapIssues.length ||
+    weeklyPickupIssues.length || corporatePaceIssues.length ||
+    groupPipelineIssues.length;
 
   if (!hasAny) {
     emptyCols.style.display = 'block';
@@ -4108,6 +4724,25 @@ function renderFindings() {
       buildCompleteGroup('forward', 'Forward Pace',
         s.brief, s.metric, s.metricClass, s.metaLabel,
         s.count, cardsHtml, s.pills, fwdPaceChartHtml)
+    );
+  }
+
+  // ── Forward Intelligence (after Forward Pace, before Forecast Gap) ──
+  const fiSnap = (currentEngineRow?.snapshot_date || '').toString();
+  const fiPack = buildForwardIntelligenceCardsHtml(engineJson, fiSnap);
+  if (fiPack.cardsHtml) {
+    container.insertAdjacentHTML('beforeend',
+      buildCompleteGroup(
+        'forward-intel',
+        'Forward Intelligence',
+        'Pickup velocity · Corporate accounts · Group pipeline',
+        null,
+        '',
+        '',
+        fiPack.count,
+        fiPack.cardsHtml,
+        fiPack.insightPills
+      )
     );
   }
 
