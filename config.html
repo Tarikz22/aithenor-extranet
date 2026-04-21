@@ -262,9 +262,9 @@ const TAB_TYPES = [
 const CANONICAL_FIELDS = {
   pms: [
     ['date', 'Date'], ['segment_code', 'Segment Code'], ['segment_name', 'Segment Name'],
-    ['rn_ty', 'Room Nights TY'], ['rn_ly', 'Room Nights LY'], ['rn_stly', 'Room Nights STLY'],
-    ['rev_ty', 'Revenue TY'], ['rev_ly', 'Revenue LY'], ['rev_stly', 'Revenue STLY'],
-    ['rn_forecast', 'Forecast Room Nights'], ['rev_forecast', 'Forecast Revenue'],
+    ['rn_ty', 'Room Nights This Year (Actual / OTB)'], ['rn_ly', 'Room Nights Last Year Actual'], ['rn_stly', 'Room Nights Same Time Last Year'],
+    ['rev_ty', 'Room Revenue This Year (Actual / OTB)'], ['rev_ly', 'Room Revenue Last Year Actual'], ['rev_stly', 'Room Revenue Same Time Last Year'],
+    ['rn_forecast', 'Forecasted Room Nights This Year'], ['rev_forecast', 'Forecasted Room Revenue This Year'],
     ['adr_ty', 'ADR TY'], ['adr_ly', 'ADR LY'], ['adr_stly', 'ADR STLY']
   ],
   str: [
@@ -277,15 +277,15 @@ const CANONICAL_FIELDS = {
     ['sector', 'Sector'], ['rn_fy_ly', 'Room Nights Full Year LY'], ['rn_actual_ytd', 'Room Nights Actual YTD'],
     ['rev_actual_ytd', 'Revenue Actual YTD'], ['adr_actual_ytd', 'ADR Actual YTD'],
     ['rn_otb_forecast', 'Room Nights OTB Forecast'], ['rev_otb_forecast', 'Revenue OTB Forecast'],
-    ['rn_full_year_projected', 'Room Nights Full Year Projected'], ['variance_vs_ly', 'Variance vs LY'],
+    ['rn_full_year_projected', 'Room Nights Full Year Projected'], ['variance_vs_ly', 'Variance in Room Nights vs Last Year'],
     ['comments', 'Comments']
   ],
   groups: [
     ['group_name', 'Group Name'], ['market_segment', 'Market Segment'], ['revenue_type', 'Revenue Type'],
     ['owner_name', 'Owner Name'], ['arrival_date', 'Arrival Date'], ['status', 'Status'],
-    ['date_definite', 'Date Definite'], ['date_tentative', 'Date Tentative'], ['room_nights', 'Room Nights'],
-    ['room_revenue', 'Room Revenue'], ['food_revenue', 'Food Revenue'], ['beverage_revenue', 'Beverage Revenue'],
-    ['event_revenue', 'Event Revenue'], ['total_revenue', 'Total Revenue'], ['lost_reason', 'Lost Reason'],
+    ['date_definite', 'Date Definite'], ['date_tentative', 'Date Tentative'], ['room_nights', 'Room Nights (Total for Group)'],
+    ['room_revenue', 'Room Revenue (Total for Group)'], ['food_revenue', 'Food Revenue'], ['beverage_revenue', 'Beverage Revenue'],
+    ['event_revenue', 'Event Revenue'], ['total_revenue', 'Total Revenue (Rooms + F&B + Events)'], ['lost_reason', 'Lost Reason'],
     ['lost_to_competitor', 'Lost To Competitor'], ['country', 'Country']
   ]
 };
