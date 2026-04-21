@@ -4253,10 +4253,17 @@ function renderCorporatePaceOpportunityIssueCard(card, snapshotDate, oppIndex) {
 function renderGroupPipelineIssueCard(card, snapshotDate, index) {
   const id = `GPG_${index}_${snapshotDate || ''}`;
   const urg = (card.urgency || 'medium').toString().toLowerCase();
-  const win = (card.window_label || '').toString().trim() || '—';
-  const gPct = fiPct01Or100(card.gap_closure_pct);
-  const gPct0 = gPct != null ? gPct.toFixed(0) : '—';
-  const title = `Days ${win} — Pipeline covers ${gPct0}% of Forecast Gap`;
+  const windowLabels = {
+    window_1: '1–30',
+    window_2: '31–60',
+    window_3: '61–90',
+    beyond: '91+'
+  };
+  const windowLabel = windowLabels[card.window_class] || card.window_class || '—';
+  const titlePctStr = card.gap_closure_pct != null && Number.isFinite(Number(card.gap_closure_pct))
+    ? (Number(card.gap_closure_pct) * 100).toFixed(0)
+    : '—';
+  const title = `Days ${windowLabel} — Pipeline covers ${titlePctStr}% of Forecast Gap`;
   const covDisp = fiFmtPct1FromRatio(card.gap_closure_pct);
   const collapsedLines = [
     `Tentative RN: ${fiFmtRnVal(card.tentative_rn)}`,
@@ -4297,7 +4304,15 @@ function renderGroupPipelineIssueCard(card, snapshotDate, index) {
     'Pipeline vs forecast gap',
     `${totalPipe != null ? Math.round(totalPipe).toLocaleString() : '—'} RN pipeline vs ${gapRn != null ? Math.round(gapRn).toLocaleString() : '—'} RN gap`
   );
-  const situation = (card.situation || '').toString().trim();
+  let situation = (card.situation || '').toString().trim();
+  if (situation) {
+    ['window_1', 'window_2', 'window_3', 'window_beyond'].forEach(k => {
+      if (situation.includes(k) && (windowLabels[k] || windowLabels.beyond)) {
+        const repl = k === 'window_beyond' ? windowLabels.beyond : windowLabels[k];
+        situation = situation.split(k).join(repl);
+      }
+    });
+  }
   const decision = (card.decision || '').toString().trim();
   return `
     <div class="finding-card forward-card fi-intel-card fi-pipeline-card fi-collapsible-card" data-id="${escHtml(id)}">
