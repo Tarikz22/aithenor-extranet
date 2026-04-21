@@ -671,6 +671,23 @@ function autoBadge() {
   </span>`;
 }
 
+function getFirstDataValue(typeKey, headerName) {
+  if (!headerName) return null;
+  const rows = getSelectedSheetRows(typeKey);
+  if (rows.length < 2) return null;
+  const headers = rows[0] || [];
+  const idx = headers.findIndex((h) => h === headerName);
+  if (idx < 0) return null;
+  // Find the first non-empty value from data rows
+  for (let i = 1; i < Math.min(rows.length, 6); i++) {
+    const val = rows[i]?.[idx];
+    if (val !== null && val !== undefined && val.toString().trim() !== '') {
+      return val.toString().trim();
+    }
+  }
+  return null;
+}
+
 function renderColumnStep() {
   const body = document.getElementById('step-body');
   const blocks = [];
@@ -693,10 +710,13 @@ function renderColumnStep() {
             ${highConfidence ? autoBadge() : '<small style="color:#8d6506;">Needs review</small>'}
           </div>
           <div>
-            <select data-type="${key}" data-canonical="${canonical}">
+            <select data-type="${key}" data-canonical="${canonical}" data-sheet="${key}">
               <option value="">Not in my file</option>
               ${headers.map((h) => `<option ${mapped === h ? 'selected' : ''} value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('')}
             </select>
+            <small id="preview-${key}-${canonical}" style="color:var(--gray-600); margin-top:3px; display:block; font-style:italic;">
+              ${mapped ? (() => { const v = getFirstDataValue(key, mapped); return v ? `First value: ${escapeHtml(v)}` : ''; })() : ''}
+            </small>
           </div>
         </div>
       `;
@@ -723,7 +743,18 @@ function renderColumnStep() {
     el.addEventListener('change', (e) => {
       const type = e.target.dataset.type;
       const canonical = e.target.dataset.canonical;
-      state.columnMapping[`${type}_columns`][canonical] = e.target.value || '';
+      const selectedHeader = e.target.value || '';
+      state.columnMapping[`${type}_columns`][canonical] = selectedHeader;
+      // Update the preview line live
+      const previewEl = document.getElementById(`preview-${type}-${canonical}`);
+      if (previewEl) {
+        if (selectedHeader) {
+          const v = getFirstDataValue(type, selectedHeader);
+          previewEl.textContent = v ? `First value: ${v}` : '';
+        } else {
+          previewEl.textContent = '';
+        }
+      }
     });
   });
   body.querySelectorAll('button[data-toggle-auto]').forEach((el) => {
