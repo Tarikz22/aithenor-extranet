@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Data Mapping Configuration</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --navy-light: #243F72;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --gold-pale: #FBF6EA;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --amber: #B8860B;
+  --amber-light: #FEF9E7;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--gray-900);
+  min-height: 100vh;
+}
+
+.wrap { max-width: 720px; margin: 40px auto 60px; padding: 0 16px; }
+.title {
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--navy);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+.subtle { color: var(--gray-600); font-size: 13px; line-height: 1.45; }
+.card {
+  margin-top: 18px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 22px;
+}
+.step-line {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--navy-mid);
+}
+.step-desc {
+  margin-top: 6px;
+  font-size: 20px;
+  color: var(--navy);
+  font-family: 'Cormorant Garamond', serif;
+}
+.progress {
+  width: 100%;
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: 999px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.progress > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+}
+.section-title {
+  margin-top: 18px;
+  margin-bottom: 8px;
+  color: var(--navy);
+  font-size: 15px;
+  font-weight: 600;
+}
+.hint { font-size: 12px; color: var(--gray-600); line-height: 1.45; margin-bottom: 12px; }
+
+.dropzone {
+  border: 2px dashed var(--gray-300);
+  border-radius: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  transition: all 0.15s;
+  background: #fcfcfa;
+}
+.dropzone.dragover {
+  border-color: var(--gold);
+  background: var(--gold-pale);
+}
+.dropzone input { display: none; }
+.btn {
+  border: none;
+  border-radius: 4px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+.btn-primary { background: var(--gold); color: var(--navy); }
+.btn-primary:hover { background: var(--gold-light); }
+.btn-secondary {
+  background: transparent;
+  color: var(--gray-600);
+  border: 1px solid var(--gray-300);
+}
+.btn-secondary:hover { border-color: var(--navy); color: var(--navy); }
+.btn-ghost { background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200); }
+
+.actions { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.actions .right { display: flex; gap: 8px; }
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.field-row select, .field-row input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+}
+.field-row small { color: var(--gray-600); display: block; margin-top: 3px; font-size: 11px; }
+
+.warn-row {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}
+.auto-row {
+  background: #f8faf8;
+  border-color: #dde8df;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--gray-600);
+  background: #f4f5f2;
+  border: 1px solid var(--gray-200);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.check-icon { width: 12px; height: 12px; }
+.toggle-link {
+  background: none;
+  border: none;
+  color: var(--navy-mid);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  margin: 8px 0 10px;
+}
+
+.status-ok, .status-warn {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.status-ok { background: var(--green-light); border: 1px solid #cde7d8; color: #155e38; }
+.status-warn { background: var(--amber-light); border: 1px solid #f1d99b; color: #8d6506; }
+.dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.status-ok .dot { background: #d8f0e3; color: #145d36; }
+.status-warn .dot { background: #ffe8ba; color: #8d6506; }
+
+.table-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.8fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.table-head {
+  color: var(--gray-600);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+.hidden { display: none !important; }
+.error-msg { color: #b42318; background: #fef3f2; border: 1px solid #fecdca; padding: 10px; border-radius: 8px; font-size: 12px; margin-top: 10px; }
+.success-box { text-align: center; padding: 24px 10px; }
+.success-title { color: var(--green); font-size: 20px; font-family: 'Cormorant Garamond', serif; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="title">Data Mapping Wizard</h1>
+    <p class="subtle">Configure your PMS and related file structure once. Future uploads will be mapped automatically.</p>
+
+    <div class="card">
+      <div class="step-line" id="step-line"></div>
+      <div class="step-desc" id="step-desc"></div>
+      <div class="progress"><div id="progress-fill"></div></div>
+
+      <div id="step-body"></div>
+
+      <div id="global-error" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+<script>
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STEPS = [
+  { title: 'Upload your file' },
+  { title: 'Identify your tabs' },
+  { title: 'Match your columns' },
+  { title: 'Map your segment codes' },
+  { title: 'Validate and save' }
+];
+
+const TAB_TYPES = [
+  { key: 'pms', label: 'PMS Market Segment data', hints: ['segment', 'market', 'pms'] },
+  { key: 'str', label: 'STR Daily Report', hints: ['str', 'daily', 'report'] },
+  { key: 'corporate', label: 'Corporate Account Production', hints: ['corporate', 'account', 'production'] },
+  { key: 'groups', label: 'Delphi Groups Pipeline', hints: ['group', 'delphi', 'pipeline'] }
+];
+
+const CANONICAL_FIELDS = {
+  pms: [
+    ['date', 'Date'], ['segment_code', 'Segment Code'], ['segment_name', 'Segment Name'],
+    ['rn_ty', 'Room Nights TY'], ['rn_ly', 'Room Nights LY'], ['rn_stly', 'Room Nights STLY'],
+    ['rev_ty', 'Revenue TY'], ['rev_ly', 'Revenue LY'], ['rev_stly', 'Revenue STLY'],
+    ['rn_forecast', 'Forecast Room Nights'], ['rev_forecast', 'Forecast Revenue'],
+    ['adr_ty', 'ADR TY'], ['adr_ly', 'ADR LY'], ['adr_stly', 'ADR STLY']
+  ],
+  str: [
+    ['date', 'Date'], ['hotel_occ', 'Hotel Occupancy'], ['comp_occ', 'Comp Occupancy'], ['mpi', 'MPI'],
+    ['hotel_adr', 'Hotel ADR'], ['comp_adr', 'Comp ADR'], ['ari', 'ARI'],
+    ['hotel_revpar', 'Hotel RevPAR'], ['comp_revpar', 'Comp RevPAR'], ['rgi', 'RGI']
+  ],
+  corporate: [
+    ['company_name', 'Company Name'], ['account_type', 'Account Type'], ['account_manager', 'Account Manager'],
+    ['sector', 'Sector'], ['rn_fy_ly', 'Room Nights Full Year LY'], ['rn_actual_ytd', 'Room Nights Actual YTD'],
+    ['rev_actual_ytd', 'Revenue Actual YTD'], ['adr_actual_ytd', 'ADR Actual YTD'],
+    ['rn_otb_forecast', 'Room Nights OTB Forecast'], ['rev_otb_forecast', 'Revenue OTB Forecast'],
+    ['rn_full_year_projected', 'Room Nights Full Year Projected'], ['variance_vs_ly', 'Variance vs LY'],
+    ['comments', 'Comments']
+  ],
+  groups: [
+    ['group_name', 'Group Name'], ['market_segment', 'Market Segment'], ['revenue_type', 'Revenue Type'],
+    ['owner_name', 'Owner Name'], ['arrival_date', 'Arrival Date'], ['status', 'Status'],
+    ['date_definite', 'Date Definite'], ['date_tentative', 'Date Tentative'], ['room_nights', 'Room Nights'],
+    ['room_revenue', 'Room Revenue'], ['food_revenue', 'Food Revenue'], ['beverage_revenue', 'Beverage Revenue'],
+    ['event_revenue', 'Event Revenue'], ['total_revenue', 'Total Revenue'], ['lost_reason', 'Lost Reason'],
+    ['lost_to_competitor', 'Lost To Competitor'], ['country', 'Country']
+  ]
+};
+
+const ALIASES = {
+  pms: {
+    date: ['date', 'occupancy date', 'stay date', 'arrival date'],
+    segment_code: ['segment code', 'market segment code', 'seg code'],
+    segment_name: ['segment name', 'market segment name', 'market segment', 'segment'],
+    rn_ty: ['room nights ty', 'room nights this year', 'occupancy on books this year', 'rn ty', 'otb ty'],
+    rn_ly: ['room nights ly', 'room nights last year', 'occupancy on books last year', 'rn ly'],
+    rn_stly: ['room nights stly', 'stly', 'occupancy on books stly'],
+    rev_ty: ['revenue ty', 'booked room revenue this year', 'rev ty', 'room revenue ty'],
+    rev_ly: ['revenue ly', 'booked room revenue last year', 'rev ly'],
+    rev_stly: ['revenue stly', 'booked room revenue stly', 'rev stly'],
+    rn_forecast: ['forecasted room nights', 'forecast rn', 'occupancy forecast this year'],
+    rev_forecast: ['forecasted revenue', 'forecast revenue', 'forecasted room revenue this year'],
+    adr_ty: ['adr ty', 'adr this year', 'average rate ty'],
+    adr_ly: ['adr ly', 'adr last year', 'average rate ly'],
+    adr_stly: ['adr stly', 'average rate stly']
+  },
+  str: {
+    date: ['date', 'stay date'], hotel_occ: ['hotel occ', 'my occ', 'subject occ', 'hotel occupancy'],
+    comp_occ: ['comp occ', 'compset occ', 'competitive occ'], mpi: ['mpi', 'market penetration index'],
+    hotel_adr: ['hotel adr', 'my adr', 'subject adr'], comp_adr: ['comp adr', 'compset adr'],
+    ari: ['ari', 'average rate index'], hotel_revpar: ['hotel revpar', 'my revpar', 'subject revpar'],
+    comp_revpar: ['comp revpar', 'compset revpar'], rgi: ['rgi', 'revenue generation index']
+  },
+  corporate: {
+    company_name: ['company', 'account name', 'company name'], account_type: ['account type', 'type'],
+    account_manager: ['account manager', 'manager', 'owner'], sector: ['sector', 'industry', 'vertical'],
+    rn_fy_ly: ['rn fy ly', 'full year ly', '2025 room nights', 'baseline rn'],
+    rn_actual_ytd: ['rn actual ytd', 'actual rn ytd', 'ytd room nights'],
+    rev_actual_ytd: ['rev actual ytd', 'actual revenue ytd', 'ytd revenue'],
+    adr_actual_ytd: ['adr actual ytd', 'ytd adr'], rn_otb_forecast: ['rn otb forecast', 'forecast rn otb'],
+    rev_otb_forecast: ['rev otb forecast', 'forecast revenue otb'],
+    rn_full_year_projected: ['rn full year projected', 'projected rn', 'full year projected'],
+    variance_vs_ly: ['variance vs ly', 'variance ly', 'vs ly'], comments: ['comments', 'notes', 'remarks']
+  },
+  groups: {
+    group_name: ['group name', 'name', 'account'], market_segment: ['market segment', 'segment'],
+    revenue_type: ['revenue type', 'type'], owner_name: ['owner', 'sales manager', 'account manager'],
+    arrival_date: ['arrival date', 'check in', 'arrival'], status: ['status'],
+    date_definite: ['date definite', 'definite date'], date_tentative: ['date tentative', 'tentative date'],
+    room_nights: ['room nights', 'rn', 'rooms'], room_revenue: ['room revenue', 'rooms revenue'],
+    food_revenue: ['food revenue', 'f&b revenue', 'food'], beverage_revenue: ['beverage revenue', 'bev revenue'],
+    event_revenue: ['event revenue', 'events', 'meeting revenue'], total_revenue: ['total revenue', 'total'],
+    lost_reason: ['lost reason', 'reason lost'], lost_to_competitor: ['lost to', 'competitor', 'lost to competitor'],
+    country: ['country', 'nationality']
+  }
+};
+
+const SEGMENT_SUGGESTIONS = {
+  NEG: ['Negotiated Corporate', '2', false], NEG_QY: ['Negotiated Corporate', '2', false],
+  CTR: ['Negotiated Corporate', '2', false], GAH: ['Negotiated Corporate', '2', false],
+  OTA: ['OTA / Wholesale', '3', false], WHO: ['OTA / Wholesale', '3', false],
+  PKG: ['Package', '3', false], BAR: ['Best Available Rate', '1', false],
+  BPL: ['Best Price Loyalty', '1', false], CAT: ['Corporate Direct / Preferred', '2', false],
+  CDP: ['Corporate Direct / Preferred', '2', false], DIS: ['Discounted', '3', false],
+  GCE: ['Group', '3', false], GCO: ['Group', '3', false], GDP: ['Group', '3', false],
+  CMP: ['Complimentary / House Use', '4', true], HSE: ['Complimentary / House Use', '4', true]
+};
+
+const state = {
+  currentStep: 1,
+  hotelCode: '',
+  workbook: null,
+  fileName: '',
+  sheetNames: [],
+  sheetsWithHeaders: {},
+  sheetRowsPreview: {},
+  tabMapping: { pms: null, str: null, corporate: null, groups: null },
+  columnMapping: { pms_columns: {}, str_columns: {}, corporate_columns: {}, groups_columns: {} },
+  autoMeta: { pms: {}, str: {}, corporate: {}, groups: {} },
+  showAuto: { pms: false, str: false, corporate: false, groups: false },
+  segmentMapping: {},
+  validationResults: [],
+  detectedDateFormat: ''
+};
+
+function norm(v) {
+  return (v || '').toString().trim().toLowerCase().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
+}
+
+function showError(message) {
+  const el = document.getElementById('global-error');
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function clearError() {
+  document.getElementById('global-error').classList.add('hidden');
+}
+
+function getJwtClaimHotelCode(session) {
+  const claimFromMeta = session?.user?.user_metadata?.hotel_code || session?.user?.user_metadata?.hotel || session?.user?.app_metadata?.hotel_code;
+  if (claimFromMeta) return claimFromMeta;
+  const token = session?.access_token;
+  if (!token) return '';
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.hotel_code || payload.hotel || '';
+  } catch {
+    return '';
+  }
+}
+
+function bestHeaderMatch(headers, aliases) {
+  let best = { header: null, score: 0 };
+  for (const header of headers) {
+    const nHeader = norm(header);
+    for (const alias of aliases) {
+      const nAlias = norm(alias);
+      let score = 0;
+      if (nHeader === nAlias) score = 1;
+      else if (nHeader.includes(nAlias) || nAlias.includes(nHeader)) score = 0.86;
+      else {
+        const headerWords = new Set(nHeader.split(' '));
+        const aliasWords = nAlias.split(' ');
+        const overlap = aliasWords.filter((w) => headerWords.has(w)).length;
+        score = overlap / Math.max(aliasWords.length, 1);
+      }
+      if (score > best.score) best = { header, score };
+    }
+  }
+  return best;
+}
+
+function suggestTabMatch(key, sheetNames) {
+  const hints = TAB_TYPES.find((t) => t.key === key).hints;
+  let top = { name: null, score: 0 };
+  for (const sheetName of sheetNames) {
+    const ns = norm(sheetName);
+    const score = hints.reduce((acc, h) => acc + (ns.includes(h) ? 1 : 0), 0);
+    if (score > top.score) top = { name: sheetName, score };
+  }
+  return top.score > 0 ? top.name : null;
+}
+
+function parseNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return value;
+  const cleaned = value.toString().replace(/[^0-9.\-]/g, '');
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : null;
+}
+
+function excelSerialToDate(serial) {
+  const base = new Date(Date.UTC(1899, 11, 30));
+  return new Date(base.getTime() + serial * 86400000);
+}
+
+function parseDateValue(value) {
+  if (value === null || value === undefined || value === '') return { ok: false, format: null };
+  if (typeof value === 'number' && value > 25000 && value < 70000) {
+    const d = excelSerialToDate(value);
+    return Number.isNaN(d.getTime()) ? { ok: false, format: null } : { ok: true, format: 'Excel Serial', date: d };
+  }
+  const s = value.toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? { ok: false, format: null } : { ok: true, format: 'YYYY-MM-DD', date: d };
+  }
+  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const a = Number(slash[1]);
+    const b = Number(slash[2]);
+    const y = Number(slash[3]);
+    if (a > 12) return { ok: true, format: 'DD/MM/YYYY', date: new Date(Date.UTC(y, b - 1, a)) };
+    if (b > 12) return { ok: true, format: 'MM/DD/YYYY', date: new Date(Date.UTC(y, a - 1, b)) };
+    return { ok: true, format: 'DD/MM/YYYY', date: new Date(Date.UTC(y, b - 1, a)) };
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? { ok: false, format: null } : { ok: true, format: 'YYYY-MM-DD', date: d };
+}
+
+function stepMeta() {
+  return STEPS[state.currentStep - 1];
+}
+
+function setStep(step) {
+  state.currentStep = step;
+  renderStep();
+}
+
+function getSelectedSheetRows(typeKey) {
+  const sheetName = state.tabMapping[typeKey];
+  if (!sheetName) return [];
+  return state.sheetRowsPreview[sheetName] || [];
+}
+
+function mappedHeader(typeKey, canonical) {
+  return state.columnMapping[`${typeKey}_columns`][canonical] || null;
+}
+
+function renderStep() {
+  clearError();
+  document.getElementById('step-line').textContent = `Step ${state.currentStep} of 5`;
+  document.getElementById('step-desc').textContent = stepMeta().title;
+  document.getElementById('progress-fill').style.width = `${(state.currentStep / 5) * 100}%`;
+  if (state.currentStep === 1) renderUploadStep();
+  if (state.currentStep === 2) renderTabStep();
+  if (state.currentStep === 3) renderColumnStep();
+  if (state.currentStep === 4) renderSegmentStep();
+  if (state.currentStep === 5) renderValidationStep();
+}
+
+function renderUploadStep() {
+  const body = document.getElementById('step-body');
+  body.innerHTML = `
+    <div class="section-title">Upload PMS workbook</div>
+    <p class="hint">Accepted formats: .xlsx and .xlsm. We will only read sheet names, headers, and up to the first 500 rows for mapping setup.</p>
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="file-input" accept=".xlsx,.xlsm" />
+      <div style="font-size:13px; color:var(--gray-600); margin-bottom:8px;">Drop file here or click to browse</div>
+      <button class="btn btn-primary" type="button" id="choose-file-btn">Choose file</button>
+      <div id="file-status" style="margin-top:10px; font-size:12px; color:var(--gray-600);"></div>
+    </label>
+  `;
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('file-input');
+  const chooseBtn = document.getElementById('choose-file-btn');
+  const status = document.getElementById('file-status');
+  chooseBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+  ['dragenter', 'dragover'].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+  }));
+  dropzone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  if (state.fileName) {
+    status.textContent = `Loaded: ${state.fileName} (${state.sheetNames.length} sheets found)`;
+  }
+}
+
+async function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx', 'xlsm'].includes(ext)) {
+    showError('Please upload a valid .xlsx or .xlsm file.');
+    return;
+  }
+  clearError();
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const workbook = XLSX.read(evt.target.result, { type: 'array' });
+      state.workbook = workbook;
+      state.fileName = file.name;
+      state.sheetNames = workbook.SheetNames || [];
+      state.sheetsWithHeaders = {};
+      state.sheetRowsPreview = {};
+      for (const sheetName of state.sheetNames) {
+        const ws = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+        const limitedRows = rows.slice(0, 500);
+        state.sheetRowsPreview[sheetName] = limitedRows;
+        const firstRow = limitedRows[0] || [];
+        const headers = firstRow.map((h) => (h || '').toString().trim()).filter(Boolean);
+        state.sheetsWithHeaders[sheetName] = headers;
+      }
+      for (const tab of TAB_TYPES) {
+        state.tabMapping[tab.key] = suggestTabMatch(tab.key, state.sheetNames);
+      }
+      setStep(2);
+    } catch {
+      showError('We could not read this workbook. Please verify the file is a valid Excel export.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderTabStep() {
+  const body = document.getElementById('step-body');
+  const options = (selected) => `
+    <option value="">Not in my file</option>
+    ${state.sheetNames.map((name) => `<option ${selected === name ? 'selected' : ''} value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}
+  `;
+  body.innerHTML = `
+    <div class="section-title">Identify each data tab</div>
+    <p class="hint">We pre-selected likely matches. Confirm or adjust before continuing.</p>
+    ${TAB_TYPES.map((t) => `
+      <div class="field-row">
+        <div><strong>${t.label}</strong></div>
+        <div><select data-tab-key="${t.key}">${options(state.tabMapping[t.key])}</select></div>
+      </div>
+    `).join('')}
+    <div class="actions">
+      <div></div>
+      <div class="right">
+        <button class="btn btn-primary" id="next-step2">Continue</button>
+      </div>
+    </div>
+  `;
+  body.querySelectorAll('select[data-tab-key]').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      state.tabMapping[e.target.dataset.tabKey] = e.target.value || null;
+    });
+  });
+  document.getElementById('next-step2').addEventListener('click', () => {
+    autoPopulateColumnMappings();
+    setStep(3);
+  });
+}
+
+function autoPopulateColumnMappings() {
+  for (const tab of TAB_TYPES) {
+    const key = tab.key;
+    const selectedSheet = state.tabMapping[key];
+    const targetMapping = {};
+    const targetMeta = {};
+    if (!selectedSheet) {
+      state.columnMapping[`${key}_columns`] = {};
+      state.autoMeta[key] = {};
+      continue;
+    }
+    const headers = state.sheetsWithHeaders[selectedSheet] || [];
+    for (const [canonical] of CANONICAL_FIELDS[key]) {
+      const aliases = ALIASES[key][canonical] || [canonical];
+      const best = bestHeaderMatch(headers, aliases);
+      if (best.header && best.score >= 0.86) {
+        targetMapping[canonical] = best.header;
+      } else {
+        targetMapping[canonical] = '';
+      }
+      targetMeta[canonical] = { score: best.score };
+    }
+    state.columnMapping[`${key}_columns`] = targetMapping;
+    state.autoMeta[key] = targetMeta;
+  }
+}
+
+function autoBadge() {
+  return `<span class="pill">
+    <svg class="check-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17L4 12" stroke="#6B6B67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Auto-matched
+  </span>`;
+}
+
+function renderColumnStep() {
+  const body = document.getElementById('step-body');
+  const blocks = [];
+  for (const tab of TAB_TYPES) {
+    const key = tab.key;
+    const sheetName = state.tabMapping[key];
+    if (!sheetName) continue;
+    const headers = state.sheetsWithHeaders[sheetName] || [];
+    const rows = [];
+    const autoRows = [];
+    for (const [canonical, label] of CANONICAL_FIELDS[key]) {
+      const mapped = state.columnMapping[`${key}_columns`][canonical] || '';
+      const score = state.autoMeta[key]?.[canonical]?.score || 0;
+      const highConfidence = mapped && score >= 0.86;
+      const html = `
+        <div class="field-row ${highConfidence ? 'auto-row' : 'warn-row'}">
+          <div>
+            <strong>${escapeHtml(canonical)}</strong>
+            <small>${escapeHtml(label)}</small>
+            ${highConfidence ? autoBadge() : '<small style="color:#8d6506;">Needs review</small>'}
+          </div>
+          <div>
+            <select data-type="${key}" data-canonical="${canonical}">
+              <option value="">Not in my file</option>
+              ${headers.map((h) => `<option ${mapped === h ? 'selected' : ''} value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      `;
+      if (highConfidence) autoRows.push(html);
+      else rows.push(html);
+    }
+    blocks.push(`
+      <div class="section-title">${tab.label} <span class="subtle">(${escapeHtml(sheetName)})</span></div>
+      <p class="hint">Match Aithenor fields to this tab's actual headers.</p>
+      ${rows.join('') || '<div class="hint">No uncertain rows found.</div>'}
+      ${autoRows.length ? `<button class="toggle-link" data-toggle-auto="${key}">${state.showAuto[key] ? 'Hide' : 'Review'} auto-matched fields (${autoRows.length})</button>` : ''}
+      <div class="${state.showAuto[key] ? '' : 'hidden'}" id="auto-${key}">${autoRows.join('')}</div>
+    `);
+  }
+  body.innerHTML = `
+    ${blocks.join('') || '<div class="hint">No tabs selected in Step 2.</div>'}
+    <div class="actions">
+      <button class="btn btn-secondary" id="back-step3">Back</button>
+      <div class="right"><button class="btn btn-primary" id="next-step3">Continue</button></div>
+    </div>
+  `;
+
+  body.querySelectorAll('select[data-type]').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const type = e.target.dataset.type;
+      const canonical = e.target.dataset.canonical;
+      state.columnMapping[`${type}_columns`][canonical] = e.target.value || '';
+    });
+  });
+  body.querySelectorAll('button[data-toggle-auto]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const key = e.target.dataset.toggleAuto;
+      state.showAuto[key] = !state.showAuto[key];
+      renderColumnStep();
+    });
+  });
+  document.getElementById('back-step3').addEventListener('click', () => setStep(2));
+  document.getElementById('next-step3').addEventListener('click', () => {
+    prepareSegmentRows();
+    if (!state.tabMapping.pms) {
+      setStep(5);
+      runValidation();
+      return;
+    }
+    setStep(4);
+  });
+}
+
+function prepareSegmentRows() {
+  state.segmentMapping = {};
+  const pmsSheet = state.tabMapping.pms;
+  if (!pmsSheet) return;
+  const segmentHeader = mappedHeader('pms', 'segment_code');
+  if (!segmentHeader) return;
+  const rows = getSelectedSheetRows('pms');
+  const headers = rows[0] || [];
+  const idx = headers.findIndex((h) => h === segmentHeader);
+  if (idx < 0) return;
+  const uniqueCodes = new Set();
+  for (const row of rows.slice(1, 500)) {
+    const code = (row[idx] || '').toString().trim();
+    if (code) uniqueCodes.add(code);
+  }
+  for (const code of Array.from(uniqueCodes).sort()) {
+    const suggestion = SEGMENT_SUGGESTIONS[code.toUpperCase()];
+    state.segmentMapping[code] = {
+      canonical_name: suggestion ? suggestion[0] : '',
+      tier: suggestion ? suggestion[1] : '',
+      exclude: suggestion ? suggestion[2] : false
+    };
+  }
+}
+
+function renderSegmentStep() {
+  const body = document.getElementById('step-body');
+  const entries = Object.entries(state.segmentMapping);
+  body.innerHTML = `
+    <div class="section-title">Map PMS segment codes</div>
+    <p class="hint">Each code is mapped to a canonical segment and tier. Unknown codes are highlighted for review.</p>
+    <div class="table-grid table-head">
+      <div>Raw code</div><div>Canonical name</div><div>Tier</div><div>Exclude</div>
+    </div>
+    ${entries.map(([code, v]) => `
+      <div class="table-grid ${(!v.canonical_name || !v.tier) ? 'warn-row' : ''}">
+        <div><strong>${escapeHtml(code)}</strong></div>
+        <div><input type="text" value="${escapeHtml(v.canonical_name)}" data-code="${escapeHtml(code)}" data-field="name"></div>
+        <div>
+          <select data-code="${escapeHtml(code)}" data-field="tier">
+            <option value="">Select tier</option>
+            <option value="1" ${v.tier === '1' ? 'selected' : ''}>Tier 1 Premium</option>
+            <option value="2" ${v.tier === '2' ? 'selected' : ''}>Tier 2 Negotiated</option>
+            <option value="3" ${v.tier === '3' ? 'selected' : ''}>Tier 3 Discounted</option>
+            <option value="4" ${v.tier === '4' ? 'selected' : ''}>Tier 4 Lowest Value</option>
+          </select>
+        </div>
+        <div style="text-align:center;"><input type="checkbox" ${v.exclude ? 'checked' : ''} data-code="${escapeHtml(code)}" data-field="exclude"></div>
+      </div>
+    `).join('') || '<div class="hint">No segment codes found from the first 500 PMS rows.</div>'}
+    <div class="actions">
+      <button class="btn btn-secondary" id="back-step4">Back</button>
+      <div class="right"><button class="btn btn-primary" id="next-step4">Continue</button></div>
+    </div>
+  `;
+  body.querySelectorAll('input[data-field="name"]').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      state.segmentMapping[e.target.dataset.code].canonical_name = e.target.value;
+    });
+  });
+  body.querySelectorAll('select[data-field="tier"]').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      state.segmentMapping[e.target.dataset.code].tier = e.target.value;
+    });
+  });
+  body.querySelectorAll('input[data-field="exclude"]').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      state.segmentMapping[e.target.dataset.code].exclude = !!e.target.checked;
+    });
+  });
+  document.getElementById('back-step4').addEventListener('click', () => setStep(3));
+  document.getElementById('next-step4').addEventListener('click', () => {
+    setStep(5);
+    runValidation();
+  });
+}
+
+function validateField(name, ok, warnText) {
+  return { name, ok, text: ok ? `${name} looks valid.` : warnText };
+}
+
+function average(arr) {
+  if (!arr.length) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function runValidation() {
+  state.validationResults = [];
+  state.detectedDateFormat = '';
+  const pmsSheet = state.tabMapping.pms;
+  if (!pmsSheet) {
+    state.validationResults.push({ name: 'PMS validation', ok: true, text: 'No PMS tab selected. Mapping can still be saved.' });
+    renderValidationStep();
+    return;
+  }
+  const rows = getSelectedSheetRows('pms');
+  if (rows.length < 2) {
+    state.validationResults.push({ name: 'PMS sample data', ok: false, text: 'No PMS sample rows were found for validation in the first 500 rows.' });
+    renderValidationStep();
+    return;
+  }
+
+  const headers = rows[0];
+  const sample = rows.slice(1, 11);
+  const getValues = (canonical) => {
+    const header = mappedHeader('pms', canonical);
+    if (!header) return [];
+    const idx = headers.findIndex((h) => h === header);
+    if (idx < 0) return [];
+    return sample.map((r) => r[idx]).filter((v) => v !== '' && v !== null && v !== undefined);
+  };
+
+  const dateVals = getValues('date');
+  const dateParsed = dateVals.map(parseDateValue);
+  const validDateCount = dateParsed.filter((d) => d.ok).length;
+  const dateFormats = dateParsed.filter((d) => d.ok && d.format).map((d) => d.format);
+  const formatFreq = {};
+  for (const fmt of dateFormats) formatFreq[fmt] = (formatFreq[fmt] || 0) + 1;
+  state.detectedDateFormat = Object.entries(formatFreq).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  state.validationResults.push(validateField(
+    'Date field',
+    validDateCount === dateVals.length && dateVals.length > 0,
+    'Some date values could not be parsed. Please verify your date column mapping.'
+  ));
+
+  const rnTy = getValues('rn_ty').map(parseNumber);
+  const rnLy = getValues('rn_ly').map(parseNumber);
+  const rnOk = [...rnTy, ...rnLy].every((n) => n !== null && n >= 0 && Number.isInteger(n));
+  state.validationResults.push(validateField(
+    'Room nights fields',
+    rnOk && (rnTy.length + rnLy.length > 0),
+    'Room nights include non-numeric values. Please confirm rn_ty and rn_ly mappings.'
+  ));
+
+  const revTy = getValues('rev_ty').map(parseNumber);
+  const revLy = getValues('rev_ly').map(parseNumber);
+  const revOk = [...revTy, ...revLy].every((n) => n !== null && n >= 0);
+  state.validationResults.push(validateField(
+    'Revenue fields',
+    revOk && (revTy.length + revLy.length > 0),
+    'Revenue values include non-numeric entries. Please confirm rev_ty and rev_ly mappings.'
+  ));
+
+  const adrTy = getValues('adr_ty').map(parseNumber).filter((n) => n !== null);
+  const adrLy = getValues('adr_ly').map(parseNumber).filter((n) => n !== null);
+  const adrVals = [...adrTy, ...adrLy];
+  const adrWithin = adrVals.every((v) => v >= 10 && v <= 10000);
+  const avgAdr = average(adrVals);
+  state.validationResults.push(validateField(
+    'ADR fields',
+    adrVals.length > 0 && adrWithin,
+    `ADR values appear unusual — average is €${Math.round(avgAdr || 0)}. Please confirm ADR and revenue mappings.`
+  ));
+
+  renderValidationStep();
+}
+
+function renderValidationStep() {
+  const body = document.getElementById('step-body');
+  const warnings = state.validationResults.filter((r) => !r.ok);
+  body.innerHTML = `
+    <div class="section-title">Validation results</div>
+    <p class="hint">Checks are based on the first 10 PMS data rows using your selected mappings.</p>
+    ${state.validationResults.map((r) => `
+      <div class="${r.ok ? 'status-ok' : 'status-warn'}">
+        <span class="dot">${r.ok ? '✓' : '!'}</span>
+        <div><strong>${escapeHtml(r.name)}:</strong> ${escapeHtml(r.text)}</div>
+      </div>
+    `).join('')}
+    <div class="actions">
+      <button class="btn btn-secondary" id="back-step5">${state.tabMapping.pms ? 'Back' : 'Back to column mapping'}</button>
+      <div class="right">
+        ${warnings.length ? '<button class="btn btn-ghost" id="save-anyway">Save anyway</button>' : ''}
+        <button class="btn btn-primary" id="save-confirm">Confirm and save</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('back-step5').addEventListener('click', () => setStep(state.tabMapping.pms ? 4 : 3));
+  if (document.getElementById('save-anyway')) {
+    document.getElementById('save-anyway').addEventListener('click', () => saveMapping());
+  }
+  document.getElementById('save-confirm').addEventListener('click', () => saveMapping());
+}
+
+function buildPayload() {
+  const segmentMapping = {};
+  for (const [code, v] of Object.entries(state.segmentMapping)) {
+    segmentMapping[code] = {
+      canonical_name: v.canonical_name || '',
+      tier: v.tier ? Number(v.tier) : null
+    };
+  }
+  const excludeSegments = Object.entries(state.segmentMapping).filter(([, v]) => v.exclude).map(([code]) => code);
+  return {
+    hotel_code: state.hotelCode,
+    tab_mapping: state.tabMapping,
+    column_mapping: state.columnMapping,
+    segment_mapping: segmentMapping,
+    exclude_segments: excludeSegments,
+    date_format: state.detectedDateFormat || null,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function saveMapping() {
+  clearError();
+  const payload = buildPayload();
+  if (!payload.hotel_code) {
+    showError('Hotel code is missing from your authenticated session.');
+    return;
+  }
+  const { error } = await supabaseClient.from('hotel_mappings').upsert(payload, { onConflict: 'hotel_code' });
+  if (error) {
+    showError('Could not save mapping right now. Please try again in a moment.');
+    return;
+  }
+  renderSuccess();
+}
+
+function renderSuccess() {
+  const body = document.getElementById('step-body');
+  document.getElementById('step-line').textContent = 'Configuration complete';
+  document.getElementById('step-desc').textContent = 'Mapping saved';
+  document.getElementById('progress-fill').style.width = '100%';
+  body.innerHTML = `
+    <div class="success-box">
+      <div class="success-title">Your data mapping is saved.</div>
+      <p class="subtle">Future uploads will be processed automatically.</p>
+      <div style="margin-top:16px;">
+        <button class="btn btn-primary" id="return-dashboard">Return to dashboard</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('return-dashboard').addEventListener('click', () => {
+    window.location.href = './index.html';
+  });
+}
+
+function escapeHtml(value) {
+  return (value || '').toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function boot() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    window.location.href = './index.html';
+    return;
+  }
+  state.hotelCode = getJwtClaimHotelCode(session);
+  if (!state.hotelCode) {
+    showError('No hotel_code claim found in your session. Please contact your administrator.');
+  }
+  renderStep();
+}
+
+boot();
+</script>
+</body>
+</html>
