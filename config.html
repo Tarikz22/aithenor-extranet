@@ -498,12 +498,12 @@ function renderUploadStep() {
   body.innerHTML = `
     <div class="section-title">Upload PMS workbook</div>
     <p class="hint">Accepted formats: .xlsx and .xlsm. We will only read sheet names, headers, and up to the first 500 rows for mapping setup.</p>
-    <label class="dropzone" id="dropzone">
-      <input type="file" id="file-input" accept=".xlsx,.xlsm" />
-      <div style="font-size:13px; color:var(--gray-600); margin-bottom:8px;">Drop file here or click to browse</div>
+    <div class="dropzone" id="dropzone">
+      <div style="font-size:13px; color:var(--gray-600); margin-bottom:12px;">Drop file here or click to browse</div>
       <button class="btn btn-primary" type="button" id="choose-file-btn">Choose file</button>
+      <input type="file" id="file-input" accept=".xlsx,.xlsm" style="display:none;" />
       <div id="file-status" style="margin-top:10px; font-size:12px; color:var(--gray-600);"></div>
-    </label>
+    </div>
   `;
 
   const dropzone = document.getElementById('dropzone');
