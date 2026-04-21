@@ -4000,12 +4000,17 @@ function fiUrgencyRank(u) {
 }
 
 function fiPipelineWindowSortKey(card) {
-  const k = (card.window_key || card.window_id || '').toString();
+  const k = (card.window_key || card.window_id || card.window_class || '').toString();
   const m = k.match(/(\d+)/);
   if (m) return parseInt(m[1], 10);
   const wl = (card.window_label || '').toString();
   const m2 = wl.match(/(\d+)/);
   return m2 ? parseInt(m2[1], 10) : 999;
+}
+
+/** Normalize corporate / pipeline card_type for comparison (hyphens, underscores, case). */
+function fiCardTypeCanon(raw) {
+  return normalize(String(raw || '').replace(/[-_]+/g, ' '));
 }
 
 function fiProgressBarHtml(pct, fillHex, labelTop, caption) {
@@ -4049,32 +4054,48 @@ function fiCorpAccountRow(acc) {
 function renderWeeklyPickupDeltaIssueCard(card, snapshotDate, index) {
   const id = `WPD_${index}_${snapshotDate || ''}`;
   const urg = (card.urgency || 'medium').toString().toLowerCase();
-  const gd = normalize(card.gap_direction);
-  const widen = gd === 'widening';
-  const closing = gd === 'closing';
-  const pillCls = widen ? 'fi-pill-red' : closing ? 'fi-pill-green' : 'fi-pill-blue';
-  const dirLabel = widen ? '▼ Widening' : closing ? '▲ Closing' : 'Pickup delta';
-  const win = (card.window_label || '').toString().trim() || '—';
-  const title = `Days ${win} — Pickup ${dirLabel}`;
+  const sig = card.signal && typeof card.signal === 'object' ? card.signal : {};
+  const windowLabels = {
+    window_1: '1–30',
+    window_2: '31–60',
+    window_3: '61–90'
+  };
+  const windowLabel = windowLabels[card.window_class] ||
+    (card.window_class != null && String(card.window_class).trim() !== ''
+      ? String(card.window_class)
+      : '—');
+  const direction = sig.gap_direction === 'closing' ? '▲ Closing' : '▼ Widening';
+  const title = `Days ${windowLabel} — Pickup ${direction}`;
+  const closing = sig.gap_direction === 'closing';
+  const pillCls = closing ? 'fi-pill-green' : 'fi-pill-red';
   const collapsedLines = [
-    `Pickup this week: ${fiFmtRnVal(card.pickup_this_week)}`,
-    `Required: ${fiFmtRnVal(card.required_weekly_pickup)}/week`,
-    `Gap to forecast: ${fiFmtRnVal(card.gap_to_forecast)}`
+    `Pickup this week: ${sig.pickup_this_week ?? '—'}`,
+    `Required: ${sig.required_weekly_pickup != null && Number.isFinite(Number(sig.required_weekly_pickup))
+      ? `${Math.round(Number(sig.required_weekly_pickup))} RN/week`
+      : '—'}`,
+    `Gap to forecast: ${sig.gap_to_forecast != null && Number.isFinite(Number(sig.gap_to_forecast))
+      ? `${Math.round(Number(sig.gap_to_forecast))} RN`
+      : '—'}`
   ].join('\n');
-  const pvr = fiSafeNum(card.pickup_vs_required) ?? 0;
-  const barPct = Math.min(100, pvr * 100);
-  const barCol = pvr >= 1 ? '#10b981' : pvr >= 0.5 ? '#f59e0b' : '#ef4444';
-  const pThis = fiSafeNum(card.pickup_this_week);
-  const pReq = fiSafeNum(card.required_weekly_pickup);
+  const pvrRaw = sig.pickup_vs_required;
+  const pvrNum = Number(pvrRaw);
+  const barPct = pvrRaw != null && Number.isFinite(pvrNum)
+    ? Math.min(100, pvrNum * 100)
+    : 0;
+  const barCol = pvrRaw != null && Number.isFinite(pvrNum) && pvrNum >= 1 ? '#10b981'
+    : pvrRaw != null && Number.isFinite(pvrNum) && pvrNum >= 0.5 ? '#f59e0b'
+      : '#ef4444';
   const capBar = fiProgressBarHtml(
     barPct,
     barCol,
     'Weekly pickup vs required rate',
-    `${pThis != null ? Math.round(pThis).toLocaleString() : '—'} RN of ${pReq != null ? Math.round(pReq).toLocaleString() : '—'} RN needed`
+    `${sig.pickup_this_week ?? 0} RN of ${Math.round(Number(sig.required_weekly_pickup ?? 0))} RN needed`
   );
   const situation = (card.situation || '').toString().trim();
   const decision = (card.decision || '').toString().trim();
-  const heroGap = fiFmtRnVal(card.gap_to_forecast);
+  const heroGap = sig.gap_to_forecast != null && Number.isFinite(Number(sig.gap_to_forecast))
+    ? `${Math.round(Number(sig.gap_to_forecast)).toLocaleString()} RN`
+    : '—';
   return `
     <div class="finding-card forward-card fi-intel-card fi-weekly-pickup-card fi-collapsible-card" data-id="${escHtml(id)}">
       <div class="finding-header" onclick="toggleFiCard(this)">
@@ -4333,6 +4354,12 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
   const groupPipelineIssues = Array.isArray(engineJson?.group_pipeline_issues)
     ? engineJson.group_pipeline_issues : [];
 
+  console.log('WPD cards:', engineJson?.weekly_pickup_delta_issues?.length);
+  console.log('Corporate cards:', engineJson?.corporate_account_pace_issues?.length);
+  console.log('Group pipeline cards:', engineJson?.group_pipeline_issues?.length);
+  console.log('Corporate sample:', engineJson?.corporate_account_pace_issues?.[0]);
+  console.log('Group sample:', engineJson?.group_pipeline_issues?.[0]);
+
   if (!weeklyPickupIssues.length && !corporatePaceIssues.length &&
       !groupPipelineIssues.length) {
     return { cardsHtml: '', count: 0, insightPills: [] };
@@ -4341,12 +4368,26 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
   const sortedWeekly = [...weeklyPickupIssues].sort(
     (a, b) => fiUrgencyRank(a.urgency) - fiUrgencyRank(b.urgency)
   );
-  const corpRiskCards = corporatePaceIssues.filter(
-    c => normalize(c.card_type) === normalize('corporate_pace_risk')
-  );
-  const corpOppCards = corporatePaceIssues.filter(
-    c => normalize(c.card_type) === normalize('corporate_pace_opportunity')
-  );
+  const corpRiskCards = corporatePaceIssues.filter(c => {
+    const t = (c.card_type || '').toString().trim();
+    const hasRisk = Array.isArray(c.accounts_at_risk) && c.accounts_at_risk.length > 0;
+    if (fiCardTypeCanon(t) === fiCardTypeCanon('corporate_pace_opportunity')) return false;
+    if (!t) return hasRisk;
+    return fiCardTypeCanon(t) === fiCardTypeCanon('corporate_pace_risk')
+      || (fiCardTypeCanon(t).includes('corporate') && fiCardTypeCanon(t).includes('risk'));
+  });
+  const corpOppCards = corporatePaceIssues.filter(c => {
+    const t = (c.card_type || '').toString().trim();
+    const hasRisk = Array.isArray(c.accounts_at_risk) && c.accounts_at_risk.length > 0;
+    const hasOpp = Array.isArray(c.accounts_ahead) && c.accounts_ahead.length > 0;
+    if (!t) return hasOpp && !hasRisk;
+    if (fiCardTypeCanon(t) === fiCardTypeCanon('corporate_pace_risk') &&
+        !fiCardTypeCanon(t).includes('opportunity')) {
+      return false;
+    }
+    return fiCardTypeCanon(t) === fiCardTypeCanon('corporate_pace_opportunity')
+      || fiCardTypeCanon(t).includes('opportunity');
+  });
   const sortedPipeline = [...groupPipelineIssues].sort(
     (a, b) => fiPipelineWindowSortKey(a) - fiPipelineWindowSortKey(b)
   );
@@ -4371,8 +4412,9 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
   const insightParts = [];
   let widenRn = 0;
   for (const w of weeklyPickupIssues) {
-    if (normalize(w.gap_direction) === 'widening') {
-      const g = fiSafeNum(w.gap_to_forecast);
+    const ws = w.signal && typeof w.signal === 'object' ? w.signal : {};
+    if (normalize(ws.gap_direction) === 'widening') {
+      const g = fiSafeNum(ws.gap_to_forecast);
       if (g != null) widenRn += g;
     }
   }
@@ -4382,8 +4424,9 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
     } else {
       let closeRn = 0;
       for (const w of weeklyPickupIssues) {
-        if (normalize(w.gap_direction) === 'closing') {
-          const g = fiSafeNum(w.gap_to_forecast);
+        const ws = w.signal && typeof w.signal === 'object' ? w.signal : {};
+        if (normalize(ws.gap_direction) === 'closing') {
+          const g = fiSafeNum(ws.gap_to_forecast);
           if (g != null) closeRn += Math.abs(g);
         }
       }
