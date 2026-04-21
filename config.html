@@ -978,7 +978,7 @@ async function saveMapping() {
   }
   const { error } = await supabaseClient.from('hotel_mappings').upsert(payload, { onConflict: 'hotel_code' });
   if (error) {
-    showError('Could not save mapping right now. Please try again in a moment.');
+    showError('Could not save mapping: ' + (error.message || JSON.stringify(error)));
     return;
   }
   renderSuccess();
