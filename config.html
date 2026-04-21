@@ -338,15 +338,40 @@ const ALIASES = {
   }
 };
 
+const USALI_SEGMENTS = [
+  { key: 'transient_retail',        label: 'Transient — Retail',                   group: 'Transient' },
+  { key: 'transient_discount',      label: 'Transient — Discount',                 group: 'Transient' },
+  { key: 'transient_negotiated',    label: 'Transient — Negotiated',               group: 'Transient' },
+  { key: 'transient_qualified',     label: 'Transient — Qualified',                group: 'Transient' },
+  { key: 'transient_wholesale',     label: 'Transient — Wholesale',                group: 'Transient' },
+  { key: 'group_corporate',         label: 'Group — Corporate',                    group: 'Group' },
+  { key: 'group_association',       label: 'Group — Association / Convention',     group: 'Group' },
+  { key: 'group_government',        label: 'Group — Government',                   group: 'Group' },
+  { key: 'group_tour_wholesale',    label: 'Group — Tour / Wholesale',             group: 'Group' },
+  { key: 'group_smerf',             label: 'Group — SMERF',                        group: 'Group' },
+  { key: 'contract',                label: 'Contract',                             group: 'Contract' },
+  { key: 'na',                      label: 'N/A — Not applicable',                 group: 'Other' },
+  { key: 'exclude',                 label: 'Exclude — Comp / House Use / OOO',     group: 'Other' }
+];
+
 const SEGMENT_SUGGESTIONS = {
-  NEG: ['Negotiated Corporate', '2', false], NEG_QY: ['Negotiated Corporate', '2', false],
-  CTR: ['Negotiated Corporate', '2', false], GAH: ['Negotiated Corporate', '2', false],
-  OTA: ['OTA / Wholesale', '3', false], WHO: ['OTA / Wholesale', '3', false],
-  PKG: ['Package', '3', false], BAR: ['Best Available Rate', '1', false],
-  BPL: ['Best Price Loyalty', '1', false], CAT: ['Corporate Direct / Preferred', '2', false],
-  CDP: ['Corporate Direct / Preferred', '2', false], DIS: ['Discounted', '3', false],
-  GCE: ['Group', '3', false], GCO: ['Group', '3', false], GDP: ['Group', '3', false],
-  CMP: ['Complimentary / House Use', '4', true], HSE: ['Complimentary / House Use', '4', true]
+  BAR:    'transient_retail',
+  BPL:    'transient_retail',
+  DIS:    'transient_discount',
+  OTA:    'transient_discount',
+  NEG:    'transient_negotiated',
+  NEG_QY: 'transient_negotiated',
+  CTR:    'transient_negotiated',
+  CAT:    'transient_negotiated',
+  CDP:    'transient_negotiated',
+  GAH:    'transient_qualified',
+  PKG:    'transient_discount',
+  WHO:    'transient_wholesale',
+  GCE:    'group_corporate',
+  GCO:    'group_corporate',
+  GDP:    'group_corporate',
+  CMP:    'exclude',
+  HSE:    'exclude'
 };
 
 const state = {
@@ -736,11 +761,9 @@ function prepareSegmentRows() {
     if (code) uniqueCodes.add(code);
   }
   for (const code of Array.from(uniqueCodes).sort()) {
-    const suggestion = SEGMENT_SUGGESTIONS[code.toUpperCase()];
+    const suggested = SEGMENT_SUGGESTIONS[code.toUpperCase()] || 'na';
     state.segmentMapping[code] = {
-      canonical_name: suggestion ? suggestion[0] : '',
-      tier: suggestion ? suggestion[1] : '',
-      exclude: suggestion ? suggestion[2] : false
+      usali_key: suggested
     };
   }
 }
@@ -748,26 +771,27 @@ function prepareSegmentRows() {
 function renderSegmentStep() {
   const body = document.getElementById('step-body');
   const entries = Object.entries(state.segmentMapping);
+
+  const usaliOptions = USALI_SEGMENTS.map((s) =>
+    `<option value="${s.key}">${s.label}</option>`
+  ).join('');
+
   body.innerHTML = `
-    <div class="section-title">Map PMS segment codes</div>
-    <p class="hint">Each code is mapped to a canonical segment and tier. Unknown codes are highlighted for review.</p>
-    <div class="table-grid table-head">
-      <div>Raw code</div><div>Canonical name</div><div>Tier</div><div>Exclude</div>
+    <div class="section-title">Map your segment codes to USALI</div>
+    <p class="hint">Each code detected in your PMS file is mapped to the USALI standard segmentation. Review and adjust where needed. Select "Exclude" for complimentary, house use, or out-of-order rooms.</p>
+    <div class="table-grid table-head" style="grid-template-columns: 0.6fr 1fr;">
+      <div>Your PMS code</div><div>USALI segment</div>
     </div>
     ${entries.map(([code, v]) => `
-      <div class="table-grid ${(!v.canonical_name || !v.tier) ? 'warn-row' : ''}">
+      <div class="table-grid ${v.usali_key === 'na' ? 'warn-row' : ''}" style="grid-template-columns: 0.6fr 1fr;">
         <div><strong>${escapeHtml(code)}</strong></div>
-        <div><input type="text" value="${escapeHtml(v.canonical_name)}" data-code="${escapeHtml(code)}" data-field="name"></div>
         <div>
-          <select data-code="${escapeHtml(code)}" data-field="tier">
-            <option value="">Select tier</option>
-            <option value="1" ${v.tier === '1' ? 'selected' : ''}>Tier 1 Premium</option>
-            <option value="2" ${v.tier === '2' ? 'selected' : ''}>Tier 2 Negotiated</option>
-            <option value="3" ${v.tier === '3' ? 'selected' : ''}>Tier 3 Discounted</option>
-            <option value="4" ${v.tier === '4' ? 'selected' : ''}>Tier 4 Lowest Value</option>
+          <select data-code="${escapeHtml(code)}" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:4px; font-size:12px;">
+            ${USALI_SEGMENTS.map((s) =>
+              `<option value="${s.key}" ${v.usali_key === s.key ? 'selected' : ''}>${s.label}</option>`
+            ).join('')}
           </select>
         </div>
-        <div style="text-align:center;"><input type="checkbox" ${v.exclude ? 'checked' : ''} data-code="${escapeHtml(code)}" data-field="exclude"></div>
       </div>
     `).join('') || '<div class="hint">No segment codes found from the first 500 PMS rows.</div>'}
     <div class="actions">
@@ -775,19 +799,10 @@ function renderSegmentStep() {
       <div class="right"><button class="btn btn-primary" id="next-step4">Continue</button></div>
     </div>
   `;
-  body.querySelectorAll('input[data-field="name"]').forEach((el) => {
-    el.addEventListener('input', (e) => {
-      state.segmentMapping[e.target.dataset.code].canonical_name = e.target.value;
-    });
-  });
-  body.querySelectorAll('select[data-field="tier"]').forEach((el) => {
+
+  body.querySelectorAll('select[data-code]').forEach((el) => {
     el.addEventListener('change', (e) => {
-      state.segmentMapping[e.target.dataset.code].tier = e.target.value;
-    });
-  });
-  body.querySelectorAll('input[data-field="exclude"]').forEach((el) => {
-    el.addEventListener('change', (e) => {
-      state.segmentMapping[e.target.dataset.code].exclude = !!e.target.checked;
+      state.segmentMapping[e.target.dataset.code].usali_key = e.target.value;
     });
   });
   document.getElementById('back-step4').addEventListener('click', () => setStep(3));
@@ -907,12 +922,11 @@ function renderValidationStep() {
 function buildPayload() {
   const segmentMapping = {};
   for (const [code, v] of Object.entries(state.segmentMapping)) {
-    segmentMapping[code] = {
-      canonical_name: v.canonical_name || '',
-      tier: v.tier ? Number(v.tier) : null
-    };
+    segmentMapping[code] = { usali_key: v.usali_key };
   }
-  const excludeSegments = Object.entries(state.segmentMapping).filter(([, v]) => v.exclude).map(([code]) => code);
+  const excludeSegments = Object.entries(state.segmentMapping)
+    .filter(([, v]) => v.usali_key === 'exclude')
+    .map(([code]) => code);
   return {
     hotel_code: state.hotelCode,
     tab_mapping: state.tabMapping,
