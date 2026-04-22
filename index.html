@@ -5440,15 +5440,27 @@ async function loadDashboard() {
       ? (actions || []).filter(a => (a.period_label || a.period) === currentPeriod)
       : (actions || []);
 
-    const built = buildCardsFromData(engineRow, recommendationsForPeriod, actionsForPeriod);
+    let engineJson =
+      typeof engineRow.engine_json === 'string'
+        ? JSON.parse(engineRow.engine_json)
+        : (engineRow.engine_json || {});
+    const innerEngine = engineJson?.engine;
+    if (innerEngine != null && typeof innerEngine === 'object' && !Array.isArray(innerEngine)) {
+      engineJson = innerEngine;
+    }
+    console.log('engineJson keys:', Object.keys(engineJson || {}));
+    console.log('has demand_calendar:', !!engineJson?.demand_calendar);
+
+    const built = buildCardsFromData(
+      { ...engineRow, engine_json: engineJson },
+      recommendationsForPeriod,
+      actionsForPeriod
+    );
     dashboardCards = built.cards;
     dashboardMeta = built.meta;
 
     currentEngineRow = engineRow;
-    currentEngineJson =
-      typeof engineRow.engine_json === 'string'
-        ? JSON.parse(engineRow.engine_json)
-        : (engineRow.engine_json || {});
+    currentEngineJson = engineJson;
 
     renderDashboard();
     showLoading(false);
