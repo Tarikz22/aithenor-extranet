@@ -5015,6 +5015,10 @@ function renderFindings() {
     );
   }
 
+  console.log('DEBUG demand_calendar:',
+    engineJson?.demand_calendar,
+    'renderable:', isDemandCalendarRenderable(
+      engineJson?.demand_calendar));
   const demandIntelHtml = buildDemandIntelligenceGroupHtml(engineJson);
   if (demandIntelHtml) {
     container.insertAdjacentHTML('beforeend', demandIntelHtml);
