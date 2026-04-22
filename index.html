@@ -575,6 +575,131 @@ body {
 .group-accent.forward     { background: #185FA5; }
 .group-accent.forecast    { background: #7C3AED; }
 .group-accent.forward-intel { background: #0e7490; }
+.group-accent.demand-intel { background: #0369a1; }
+
+.demand-intel-subtitle {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.demand-intel-panel-body {
+  padding: 14px 16px 16px;
+}
+.demand-intel-subsection {
+  margin-bottom: 18px;
+}
+.demand-intel-subsection:last-child {
+  margin-bottom: 0;
+}
+.demand-intel-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin-bottom: 8px;
+}
+.demand-intel-outlook-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gray-900);
+}
+.demand-intel-muted {
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.55;
+}
+ul.demand-holiday-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--gray-900);
+}
+.demand-holiday-list-item {
+  margin-bottom: 4px;
+}
+.demand-news-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.demand-news-row:last-child {
+  border-bottom: none;
+}
+.demand-news-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.demand-news-pill-positive {
+  background: var(--green-light);
+  color: var(--green);
+}
+.demand-news-pill-negative {
+  background: var(--red-light);
+  color: var(--red);
+}
+.demand-news-pill-mixed {
+  background: var(--amber-light);
+  color: var(--amber);
+}
+.demand-news-main {
+  flex: 1;
+  min-width: 0;
+}
+.demand-news-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.35;
+}
+.demand-news-source {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-top: 2px;
+}
+.demand-displacement-badge {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--gold-pale);
+  color: var(--amber);
+  border: 1px solid var(--gray-200);
+}
+.demand-context-info-box {
+  background: #E6F1FB;
+  color: var(--navy);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  border: 1px solid rgba(24, 95, 165, 0.15);
+}
+.demand-context-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.demand-context-holiday-line,
+.demand-context-signal-line {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-900);
+}
 
 /* Forward Intelligence cards (additive; does not alter existing card rules) */
 .fi-collapsible-card:not(.open) .finding-body {
@@ -1405,6 +1530,123 @@ function formatDate(dateStr) {
   } catch {
     return dateStr;
   }
+}
+
+function isDemandCalendarRenderable(dc) {
+  return dc != null && typeof dc === 'object' && !dc.error;
+}
+
+function demandNewsImpactPillClass(impact) {
+  const i = String(impact || '').toLowerCase();
+  if (i === 'positive') return 'demand-news-pill-positive';
+  if (i === 'negative') return 'demand-news-pill-negative';
+  return 'demand-news-pill-mixed';
+}
+
+function buildDemandIntelligenceGroupHtml(engineJson) {
+  const dc = engineJson?.demand_calendar;
+  if (!isDemandCalendarRenderable(dc)) return '';
+
+  const city = (dc.city != null ? String(dc.city) : '').trim() || '—';
+  const holidayCount = Number(dc.holiday_count) || 0;
+  const outlookRaw = dc.demand_outlook != null ? String(dc.demand_outlook) : '';
+  const outlook = outlookRaw.trim();
+
+  const sortedHolidays = Array.isArray(dc.public_holidays)
+    ? [...dc.public_holidays].sort((a, b) => {
+        const da = Number(a?.days_from_snapshot);
+        const db = Number(b?.days_from_snapshot);
+        const na = Number.isFinite(da) ? da : 9999;
+        const nb = Number.isFinite(db) ? db : 9999;
+        return na - nb;
+      }).slice(0, 8)
+    : [];
+
+  const newsSignals = Array.isArray(dc.news_signals)
+    ? dc.news_signals.slice(0, 5)
+    : [];
+
+  const subtitle = `${city} · ${holidayCount} upcoming events`;
+
+  const section1 = `
+      <div class="demand-intel-subsection">
+        <div class="demand-intel-section-label">Demand Outlook</div>
+        <div class="demand-intel-outlook-text">${escHtml(outlook)}</div>
+      </div>`;
+
+  let section2 = '';
+  if (holidayCount > 0) {
+    const rows = sortedHolidays.map(h => {
+      const name = (h?.name != null ? String(h.name) : '').trim() || '—';
+      const dateStr = (h?.date != null ? String(h.date) : '').trim() || '—';
+      const days = h?.days_from_snapshot;
+      const daysNum = Number(days);
+      const timing = Number.isFinite(daysNum)
+        ? `${daysNum} days away`
+        : '—';
+      const line = `${name} — ${dateStr} (${timing})`;
+      return `<li class="demand-holiday-list-item">${escHtml(line)}</li>`;
+    }).join('');
+    section2 = `
+      <div class="demand-intel-subsection">
+        <div class="demand-intel-section-label">Upcoming Public Holidays</div>
+        <ul class="demand-holiday-list">${rows || ''}</ul>
+      </div>`;
+  }
+
+  let section3Inner = '';
+  if (newsSignals.length > 0) {
+    section3Inner = newsSignals.map(sig => {
+      const pillCls = demandNewsImpactPillClass(sig?.impact);
+      const impactLabel = String(sig?.impact || 'mixed');
+      const titleRaw = sig?.title != null ? String(sig.title) : '';
+      const titleDisp = titleRaw.length > 80 ? titleRaw.slice(0, 77) + '...' : titleRaw;
+      const source = sig?.source != null ? String(sig.source) : '';
+      const dispBadge = sig?.displacement_opportunity === true
+        ? '<span class="demand-displacement-badge">DISPLACEMENT OPPORTUNITY</span>'
+        : '';
+      return `<div class="demand-news-row">
+          <span class="demand-news-pill ${pillCls}">${escHtml(impactLabel)}</span>
+          <div class="demand-news-main">
+            <div class="demand-news-title">${escHtml(titleDisp)}</div>
+            <div class="demand-news-source">${escHtml(source)}</div>
+          </div>
+          ${dispBadge}
+        </div>`;
+    }).join('');
+  } else {
+    section3Inner = `<div class="demand-intel-muted">News intelligence not configured. Add NEWS_API_KEY to enable macro signals.</div>`;
+  }
+
+  const section3 = `
+      <div class="demand-intel-subsection">
+        <div class="demand-intel-section-label">News Signals</div>
+        ${section3Inner}
+      </div>`;
+
+  const expandedBody = `<div class="demand-intel-panel-body">${section1}${section2}${section3}</div>`;
+
+  return `
+      <div class="findings-group">
+        <div class="group-header" onclick="toggleGroup(this)">
+          <div class="group-accent demand-intel"></div>
+          <div class="group-header-body">
+            <div class="group-header-top">
+              <span class="group-name">DEMAND INTELLIGENCE</span>
+            </div>
+            <div class="demand-intel-subtitle">${escHtml(subtitle)}</div>
+            <div class="group-brief">${escHtml(outlook)}</div>
+          </div>
+          <div class="group-header-right">
+            <div class="group-meta"></div>
+            <span class="group-chevron">▼</span>
+          </div>
+        </div>
+        <div class="group-cards">
+          ${expandedBody}
+        </div>
+      </div>
+    `;
 }
 
 function showLoading(show) {
@@ -2605,7 +2847,8 @@ function buildForwardCards(engineRow, engineJson) {
     execution_owner: 'Revenue',
     snapshot_date: engineRow.snapshot_date,
     period_label: engineRow.period_label,
-    department: 'Revenue'
+    department: 'Revenue',
+    demand_context: issue.demand_context || null
   }));
 }
 
@@ -4494,11 +4737,12 @@ function renderFindings() {
   const groupPipelineIssues = Array.isArray(engineJson.group_pipeline_issues)
     ? engineJson.group_pipeline_issues : [];
 
+  const demandCalendarOk = isDemandCalendarRenderable(engineJson?.demand_calendar);
   const hasAny = historicalCards.length || forwardCards.length ||
     monthlyIssues.length || mixShiftIssues.length ||
     forecastGapIssues.length ||
     weeklyPickupIssues.length || corporatePaceIssues.length ||
-    groupPipelineIssues.length;
+    groupPipelineIssues.length || demandCalendarOk;
 
   if (!hasAny) {
     emptyCols.style.display = 'block';
@@ -4771,6 +5015,11 @@ function renderFindings() {
     );
   }
 
+  const demandIntelHtml = buildDemandIntelligenceGroupHtml(engineJson);
+  if (demandIntelHtml) {
+    container.insertAdjacentHTML('beforeend', demandIntelHtml);
+  }
+
   // ── GROUP 4: Forward Pace ─────────────────────────────
   if (forwardCards.length > 0) {
     const s = summaries.forward;
@@ -5011,6 +5260,38 @@ function renderForwardCard(card) {
         .filter(Boolean);
   const executionList = executionActions.map(item => `<li>${escHtml(item)}</li>`).join('');
 
+  const dctx = card.demand_context;
+  const dctxHol = Number(dctx?.holiday_count) || 0;
+  const dctxDisp = Array.isArray(dctx?.displacement_signals)
+    ? dctx.displacement_signals.length
+    : 0;
+  const showDemandContext = dctx && (dctxHol > 0 || dctxDisp > 0);
+  let demandContextHtml = '';
+  if (showDemandContext) {
+    const noteRaw = dctx.context_note != null ? String(dctx.context_note).trim() : '';
+    const noteBox = noteRaw
+      ? `<div class="demand-context-info-box">${escHtml(noteRaw)}</div>`
+      : '';
+    const holWin = Array.isArray(dctx.holidays_in_window) ? dctx.holidays_in_window : [];
+    const holLines = holWin.slice(0, 3).map(h => {
+      const hn = (h?.name != null ? String(h.name) : '').trim() || '—';
+      const hd = (h?.date != null ? String(h.date) : '').trim() || '—';
+      return `<div class="demand-context-holiday-line">📅 ${escHtml(hn)} on ${escHtml(hd)}</div>`;
+    }).join('');
+    const sigLine = dctxDisp > 0
+      ? `<div class="demand-context-signal-line">⚡ ${dctxDisp} macro signal(s) suggest potential displacement demand toward this market</div>`
+      : '';
+    demandContextHtml = `
+        <div class="finding-section">
+          <div class="section-label">DEMAND CONTEXT</div>
+          <div class="demand-context-body">
+            ${noteBox}
+            ${holLines}
+            ${sigLine}
+          </div>
+        </div>`;
+  }
+
   return `
     <div class="finding-card forward-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
       <div class="finding-header">
@@ -5059,6 +5340,7 @@ function renderForwardCard(card) {
             </button>
           </div>
         </div>
+        ${demandContextHtml}
       </div>
     </div>
   `;
