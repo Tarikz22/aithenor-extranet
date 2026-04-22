@@ -5015,10 +5015,12 @@ function renderFindings() {
     );
   }
 
-  console.log('DEBUG demand_calendar:',
-    engineJson?.demand_calendar,
-    'renderable:', isDemandCalendarRenderable(
-      engineJson?.demand_calendar));
+  console.log('DEBUG demand_calendar check:', {
+    hasEngineJson: !!engineJson,
+    engineJsonKeys: engineJson ? Object.keys(engineJson) : [],
+    hasDemandCalendar: !!engineJson?.demand_calendar,
+    demandCalendar: engineJson?.demand_calendar
+  });
   const demandIntelHtml = buildDemandIntelligenceGroupHtml(engineJson);
   if (demandIntelHtml) {
     container.insertAdjacentHTML('beforeend', demandIntelHtml);
