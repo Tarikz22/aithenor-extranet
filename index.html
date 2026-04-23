@@ -1846,8 +1846,9 @@ function buildNLContext(targetDate = null) {
     })),
     str_daily_sample: (() => {
       const strRows =
-        ej.workbook_ingestion?.rows?.str ||
-        ej.workbook_ingestion?.str_rows || [];
+        ej.workbook_ingestion?.str ||
+        ej.workbook_ingestion?.rows?.str || [];
+      console.log('DEBUG str daily rows:', strRows.length, 'first:', strRows[0]);
 
       if (!strRows.length) return [];
 
