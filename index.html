@@ -1726,7 +1726,7 @@ function resetNLConversation() {
   if (thread) thread.innerHTML = '';
 }
 
-function buildNLContext() {
+function buildNLContext(targetDate = null) {
   const ej = currentEngineJson || {};
   const snap = currentEngineRow?.snapshot_date || 'unknown';
   const hotelCode = currentEngineRow?.hotel_code || 'unknown';
@@ -1955,7 +1955,10 @@ function buildNLContext() {
       }
 
       const sortedDates = Object.keys(byDate).sort();
-      const sampledDates = sortedDates.filter((_, i) => i % 7 === 0);
+      const sampledDates = sortedDates.filter((_, i) => {
+        if (targetDate && sortedDates[i] === targetDate) return true;
+        return i % 7 === 0;
+      });
 
       const result = [];
       for (const date of sampledDates.slice(0, 52)) {
@@ -2012,7 +2015,7 @@ ANSWER RULES:
 
 DATA COVERAGE:
 - str_weekly_series: full weekly STR metrics for the period
-- pms_daily_sample: PMS segment data sampled every 7 days (not every day — for specific daily questions use the closest available date or note the limitation)
+- pms_daily_sample: PMS segment data sampled every 7 days PLUS any specifically requested dates are always included in full
 - corporate_accounts_full: all corporate accounts with full production detail
 - group_pipeline_full: all groups with status, dates, room nights and revenue
 - For questions about a specific date not in the sample, use the closest available date and note it
@@ -2122,7 +2125,28 @@ function toggleNLPanel() {
 }
 
 async function sendNLQuery(userMessage, conversationHistory) {
-  const context = buildNLContext();
+  const detectQueryIntent = message => ({
+    hasDate: /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}[,\s]+\d{4}\b/i.test(message || '')
+  });
+  const intent = detectQueryIntent(userMessage);
+
+  let targetDate = null;
+  if (intent.hasDate) {
+    const dateMatch = userMessage.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})[,\s]+(\d{4})/i);
+    if (dateMatch) {
+      const months = {
+        january: '01', february: '02', march: '03', april: '04',
+        may: '05', june: '06', july: '07', august: '08',
+        september: '09', october: '10', november: '11',
+        december: '12'
+      };
+      const m = months[dateMatch[1].toLowerCase()];
+      const d = dateMatch[2].padStart(2, '0');
+      targetDate = `${dateMatch[3]}-${m}-${d}`;
+    }
+  }
+
+  const context = buildNLContext(targetDate);
   const system = buildNLSystemPrompt(context);
   const clippedHistory = Array.isArray(conversationHistory)
     ? conversationHistory.slice(-10)
