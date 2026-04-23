@@ -2278,110 +2278,151 @@ function demandNewsImpactPillClass(impact) {
   return 'demand-news-pill-mixed';
 }
 
-function buildDemandIntelligenceGroupHtml(engineJson) {
-  const dc = engineJson?.demand_calendar;
-  if (!isDemandCalendarRenderable(dc)) return '';
+/** GM-facing urgency within findings groups (All / High / Medium). */
+let findingsUrgencyFilter = 'all';
 
-  const city = (dc.city != null ? String(dc.city) : '').trim() || '—';
-  const holidayCount = Number(dc.holiday_count) || 0;
-  const outlookRaw = dc.demand_outlook != null ? String(dc.demand_outlook) : '';
-  const outlook = outlookRaw.trim();
+function findingsUrgencyMatches(filter, priorityRaw) {
+  const p = (priorityRaw != null ? String(priorityRaw) : 'medium').toLowerCase().trim();
+  if (filter === 'all') return true;
+  if (filter === 'high') return p === 'high' || p === 'critical';
+  if (filter === 'medium') return p === 'medium';
+  return true;
+}
 
-  const sortedHolidays = Array.isArray(dc.public_holidays)
-    ? [...dc.public_holidays].sort((a, b) => {
-        const da = Number(a?.days_from_snapshot);
-        const db = Number(b?.days_from_snapshot);
-        const na = Number.isFinite(da) ? da : 9999;
-        const nb = Number.isFinite(db) ? db : 9999;
-        return na - nb;
-      }).slice(0, 8)
-    : [];
+function buildCommercialVerdictBlockHtml(cv) {
+  if (!cv || typeof cv !== 'object') return '';
+  const verdictText = (cv.verdict_text != null ? String(cv.verdict_text) : '').trim();
+  if (!verdictText) return '';
 
-  const newsSignals = Array.isArray(dc.news_signals)
-    ? dc.news_signals.slice(0, 5)
-    : [];
+  const rawHeadlines = Array.isArray(cv.headline_numbers) ? cv.headline_numbers : [];
+  const headlines = rawHeadlines.slice(0, 4);
+  while (headlines.length < 4) headlines.push(null);
 
-  const subtitle = `${city} · ${holidayCount} upcoming events`;
-
-  const section1 = `
-      <div class="demand-intel-subsection">
-        <div class="demand-intel-section-label">Demand Outlook</div>
-        <div class="demand-intel-outlook-text">${escHtml(outlook)}</div>
+  const headlineCells = headlines.map(h => {
+    if (!h || typeof h !== 'object') {
+      return `<div style="flex:1;min-width:0;text-align:center;padding:0 6px;">
+        <div style="font-size:18px;font-weight:500;color:var(--gray-600);">—</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:4px;">—</div>
       </div>`;
+    }
+    const val = h.value != null ? String(h.value) : '—';
+    const lab = h.label != null ? String(h.label) : '—';
+    const dir = String(h.direction || '').toLowerCase();
+    const valColor = dir === 'negative' ? 'var(--red)'
+      : dir === 'positive' ? 'var(--green)' : 'var(--navy)';
+    return `<div style="flex:1;min-width:0;text-align:center;padding:0 6px;">
+      <div style="font-size:18px;font-weight:500;color:${valColor};">${escHtml(val)}</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:4px;">${escHtml(lab)}</div>
+    </div>`;
+  }).join('');
 
-  let section2 = '';
-  if (holidayCount > 0) {
-    const rows = sortedHolidays.map(h => {
-      const name = (h?.name != null ? String(h.name) : '').trim() || '—';
-      const dateStr = (h?.date != null ? String(h.date) : '').trim() || '—';
-      const days = h?.days_from_snapshot;
-      const daysNum = Number(days);
-      const timing = Number.isFinite(daysNum)
-        ? `${daysNum} days away`
-        : '—';
-      const line = `${name} — ${dateStr} (${timing})`;
-      return `<li class="demand-holiday-list-item">${escHtml(line)}</li>`;
-    }).join('');
-    section2 = `
-      <div class="demand-intel-subsection">
-        <div class="demand-intel-section-label">Upcoming Public Holidays</div>
-        <ul class="demand-holiday-list">${rows || ''}</ul>
-      </div>`;
-  }
+  const primaryDecision = (cv.primary_decision != null ? String(cv.primary_decision) : '').trim();
+  const decisionBlock = primaryDecision
+    ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200);font-size:13px;font-style:italic;color:var(--gray-600);line-height:1.6;">${escHtml(primaryDecision)}</div>`
+    : '';
 
-  let section3Inner = '';
-  if (newsSignals.length > 0) {
-    section3Inner = newsSignals.map(sig => {
-      const pillCls = demandNewsImpactPillClass(sig?.impact);
-      const impactLabel = String(sig?.impact || 'mixed');
-      const titleRaw = sig?.title != null ? String(sig.title) : '';
-      const titleDisp = titleRaw.length > 80 ? titleRaw.slice(0, 77) + '...' : titleRaw;
-      const source = sig?.source != null ? String(sig.source) : '';
-      const dispBadge = sig?.displacement_opportunity === true
-        ? '<span class="demand-displacement-badge">DISPLACEMENT OPPORTUNITY</span>'
-        : '';
-      return `<div class="demand-news-row">
-          <span class="demand-news-pill ${pillCls}">${escHtml(impactLabel)}</span>
-          <div class="demand-news-main">
-            <div class="demand-news-title">${escHtml(titleDisp)}</div>
-            <div class="demand-news-source">${escHtml(source)}</div>
-          </div>
-          ${dispBadge}
-        </div>`;
-    }).join('');
-  } else {
-    section3Inner = `<div class="demand-intel-muted">News intelligence not configured. Add NEWS_API_KEY to enable macro signals.</div>`;
-  }
+  return `<div class="commercial-verdict-block" style="margin-bottom:16px;padding:16px 18px 18px 20px;background:var(--white);border:1px solid var(--gray-200);border-radius:10px;border-left:3px solid #D85A30;">
+    <div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gray-400);font-weight:600;margin-bottom:8px;">COMMERCIAL VERDICT</div>
+    <div style="font-size:14px;line-height:1.7;color:var(--gray-900);">${escHtml(verdictText)}</div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-200);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;">${headlineCells}</div>
+    ${decisionBlock}
+  </div>`;
+}
 
-  const section3 = `
-      <div class="demand-intel-subsection">
-        <div class="demand-intel-section-label">News Signals</div>
-        ${section3Inner}
-      </div>`;
-
-  const expandedBody = `<div class="demand-intel-panel-body">${section1}${section2}${section3}</div>`;
-
+function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
+  const id = `SYN_${index}_${snapshotDate || ''}`;
+  const title = (card.title != null && String(card.title).trim())
+    ? String(card.title).trim()
+    : 'Cross-segment synthesis';
+  const pr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
+  const priorityStripe = ['critical', 'high', 'medium', 'low'].includes(pr) ? pr : 'medium';
+  const trigger = (card.trigger_display != null ? String(card.trigger_display) : '—').trim() || '—';
+  const situation = (card.situation != null ? String(card.situation) : '').trim();
+  const diagnosis = (card.diagnosis != null ? String(card.diagnosis) : '').trim();
+  const strVal = (card.str_validation != null ? String(card.str_validation) : '').trim();
+  const decision = (card.decision != null ? String(card.decision) : '').trim();
+  const finImpact = (card.financial_impact != null ? String(card.financial_impact) : '').trim();
   return `
-      <div class="findings-group">
-        <div class="group-header" onclick="toggleGroup(this)">
-          <div class="group-accent demand-intel"></div>
-          <div class="group-header-body">
-            <div class="group-header-top">
-              <span class="group-name">DEMAND INTELLIGENCE</span>
-            </div>
-            <div class="demand-intel-subtitle">${escHtml(subtitle)}</div>
-            <div class="group-brief">${escHtml(outlook)}</div>
-          </div>
-          <div class="group-header-right">
-            <div class="group-meta"></div>
-            <span class="group-chevron">▼</span>
-          </div>
+    <div class="finding-card synthesis-retail-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(priorityStripe)}">
+      <div class="finding-header">
+        <div class="priority-stripe ${escHtml(priorityStripe)}"></div>
+        <div class="finding-center">
+          <div class="finding-title">${escHtml(title)}</div>
+          <div class="finding-oneliner">Cross-segment view</div>
         </div>
-        <div class="group-cards">
-          ${expandedBody}
+        <div class="finding-right">
+          <div class="trigger-metric-value">${escHtml(trigger)}</div>
+          <div class="trigger-metric-label">MPI / ARI / RGI</div>
+          <div class="badges-row">
+            <span class="priority-badge ${escHtml(priorityStripe)}">${escHtml(capitalize(priorityStripe))}</span>
+          </div>
         </div>
       </div>
-    `;
+      <div class="finding-body">
+        ${situation ? `
+        <div class="finding-section">
+          <div class="section-label">SITUATION</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
+        </div>` : ''}
+        ${diagnosis ? `
+        <div class="finding-section">
+          <div class="section-label">DIAGNOSIS</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(diagnosis)}</div>
+        </div>` : ''}
+        ${strVal ? `
+        <div class="finding-section">
+          <div class="section-label">STR VALIDATION</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(strVal)}</div>
+        </div>` : ''}
+        ${decision ? `
+        <div class="finding-section">
+          <div class="section-label">DECISION</div>
+          <div class="decision-line">${escHtml(decision)}</div>
+        </div>` : ''}
+        ${finImpact ? `
+        <div class="finding-section">
+          <div class="section-label">FINANCIAL IMPACT</div>
+          <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(finImpact)}</div>
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function setFindingsUrgencyFilter(mode, el) {
+  findingsUrgencyFilter = mode;
+  const row = document.getElementById('findings-urgency-tabs');
+  if (row) {
+    row.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    if (el && el.classList) el.classList.add('active');
+    else {
+      const tabs = row.querySelectorAll('.tab');
+      const idx = mode === 'high' ? 1 : mode === 'medium' ? 2 : 0;
+      if (tabs[idx]) tabs[idx].classList.add('active');
+    }
+  }
+  applyFindingsUrgencyFilter();
+}
+
+function applyFindingsUrgencyFilter() {
+  const container = document.getElementById('findings-groups-container');
+  if (!container) return;
+  const filter = findingsUrgencyFilter || 'all';
+
+  container.querySelectorAll('.findings-group').forEach(groupEl => {
+    const cards = groupEl.querySelectorAll(':scope > .group-cards > .finding-card');
+    let visible = 0;
+    cards.forEach(cardEl => {
+      const pr = cardEl.getAttribute('data-findings-priority')
+        || cardEl.querySelector('.priority-stripe')?.className?.match(/\b(critical|high|medium|low)\b/)?.[1]
+        || 'medium';
+      const show = findingsUrgencyMatches(filter, pr);
+      cardEl.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    const countEl = groupEl.querySelector('.group-header .group-count');
+    if (countEl) countEl.textContent = String(visible);
+    groupEl.style.display = visible > 0 ? '' : 'none';
+  });
 }
 
 function showLoading(show) {
@@ -4069,9 +4110,12 @@ function computeGroupSummaries(engineJson) {
   const fmtIdx = v => v != null && Number.isFinite(v)
     ? v.toFixed(1) : null;
 
-  // ── HISTORICAL ANALYSIS ────────────────────────────
+  // ── SEGMENTATION (retail + cross-segment synthesis) ──
   const issues = Array.isArray(engineJson?.issues)
     ? engineJson.issues : [];
+  const synthesisCardsRaw = engineJson?.cross_segment_synthesis?.synthesis_cards;
+  const synthesisCardCount = Array.isArray(synthesisCardsRaw)
+    ? synthesisCardsRaw.length : 0;
   const fqs = engineJson?.financial_quantification_summary;
   const histAllRev = Array.isArray(fqs?.issue_level_quantification)
     ? fqs.issue_level_quantification.reduce((s, q) =>
@@ -4079,7 +4123,6 @@ function computeGroupSummaries(engineJson) {
     : 0;
   const histMetric = histAllRev > 0 ? `€${fmt(histAllRev)}` : null;
 
-  // Brief: primary driver + period
   const primaryIssue = issues[0] || null;
   const primaryDriver = primaryIssue?.primary_driver || null;
   const driverLabel = primaryDriver === 'pricing' ? 'Pricing resistance'
@@ -4087,31 +4130,14 @@ function computeGroupSummaries(engineJson) {
     : primaryDriver === 'mix_strategy' ? 'Mix imbalance'
     : primaryDriver === 'visibility' ? 'Visibility gap'
     : 'Commercial signal';
-  const histBrief = primaryIssue
-    ? `${driverLabel} — ${(primaryIssue.enforced_decision_line || '').slice(0, 80)}`
-    : 'No historical signals detected';
-
-  // Pills: primary driver | key segment | RGI | trend
-  const histPills = [];
-  if (primaryDriver) {
-    histPills.push({
-      label: 'Driver',
-      value: driverLabel,
-      cls: 'pill-warning'
-    });
-  }
-  // Primary segment from segment_attribution_summary
   const primarySegRaw = primaryIssue?.segment_attribution_summary
     ?.primary_segment
     || primaryIssue?.primary_segment || null;
-  // Convert USALI bucket key to display name using existing helper
   const primarySegDisplay = primarySegRaw
     ? (typeof usaliBucketToDisplayName === 'function'
         ? usaliBucketToDisplayName(primarySegRaw, primarySegRaw)
         : null)
     : null;
-  // Fallback: if usaliBucketToDisplayName is not available in
-  // frontend scope, use a simple lookup map instead
   const segDisplayMap = {
     transient_retail: 'Retail Transient',
     transient_discount: 'Discount / OTA',
@@ -4129,6 +4155,39 @@ function computeGroupSummaries(engineJson) {
   const primarySeg = primarySegRaw
     ? (primarySegDisplay || segDisplayMap[primarySegRaw] || primarySegRaw)
     : null;
+  const histRgi = primaryIssue?.card_metrics?.avgRGI;
+  const histTrend = primaryIssue?.card_metrics?.trend_status;
+  let strVsSignal = 'STR read unavailable';
+  if (histRgi != null && Number.isFinite(Number(histRgi))) {
+    const rgiN = Number(histRgi);
+    const t = (histTrend || '').toString().toLowerCase();
+    if (rgiN < 100 && (t === 'worsening' || t === 'stable' || !t)) {
+      strVsSignal = 'STR confirms the commercial signal';
+    } else if (rgiN < 100 && t === 'improving') {
+      strVsSignal = 'STR mixed — improving trend with index still below fair share';
+    } else if (rgiN >= 100 && t === 'worsening') {
+      strVsSignal = 'STR contradicts complacency — index above fair share but trend deteriorating';
+    } else if (rgiN >= 100) {
+      strVsSignal = 'STR contradicts headline softness — index above fair share';
+    } else {
+      strVsSignal = 'STR aligns with segment positioning';
+    }
+  }
+  const activeSegLabel = primarySeg || 'Active segment not attributed';
+  const domSignalLabel = primaryIssue ? driverLabel : 'No dominant segment signal';
+  const segBrief = primaryIssue
+    ? `${activeSegLabel} — ${domSignalLabel} — ${strVsSignal}`
+    : 'No segment-level signals detected';
+
+  // Pills: primary driver | key segment | RGI | trend
+  const histPills = [];
+  if (primaryDriver) {
+    histPills.push({
+      label: 'Driver',
+      value: driverLabel,
+      cls: 'pill-warning'
+    });
+  }
   if (primarySeg) {
     histPills.push({
       label: 'Segment',
@@ -4137,7 +4196,6 @@ function computeGroupSummaries(engineJson) {
     });
   }
   // RGI from card_metrics
-  const histRgi = primaryIssue?.card_metrics?.avgRGI;
   if (histRgi != null) {
     const rgiVal = fmtIdx(histRgi);
     histPills.push({
@@ -4155,8 +4213,7 @@ function computeGroupSummaries(engineJson) {
       cls: Number(histMpi) >= 100 ? 'pill-positive' : 'pill-warning'
     });
   }
-  // Trend
-  const histTrend = primaryIssue?.card_metrics?.trend_status;
+  // Trend (histTrend declared with histRgi above)
   if (histTrend) {
     histPills.push({
       label: 'Trend',
@@ -4308,7 +4365,7 @@ function computeGroupSummaries(engineJson) {
     }
   }
 
-  // ── FORWARD PACE ───────────────────────────────────
+  // ── PACE ANALYSIS (forward windows) ────────────────
   const forward = Array.isArray(engineJson?.forward_issues)
     ? engineJson.forward_issues : [];
   const fwdRnBehind = forward.reduce((s, f) => {
@@ -4323,9 +4380,36 @@ function computeGroupSummaries(engineJson) {
     const rn = match ? parseInt(match[1], 10) : 0;
     return rn > (worst.rn || 0) ? { f, rn } : worst;
   }, { f: null, rn: 0 });
-  const fwdBrief = forward.length > 0
-    ? `${forward.length} forward window${forward.length > 1 ? 's' : ''} tracking behind last year`
+  const windowsBehind = forward.filter(f =>
+    (f?.commercial_narrative || '').includes('behind')).length;
+  let fwdBrief = forward.length > 0
+    ? `${windowsBehind} window${windowsBehind !== 1 ? 's' : ''} behind LY`
     : 'No forward pace data';
+  const dcPace = engineJson?.demand_calendar;
+  const upcomingHolsPace = (Array.isArray(dcPace?.upcoming_holidays) &&
+      dcPace.upcoming_holidays.length > 0)
+    ? dcPace.upcoming_holidays
+    : (Array.isArray(dcPace?.public_holidays) && dcPace.public_holidays.length > 0
+      ? dcPace.public_holidays
+      : []);
+  if (forward.length > 0 && upcomingHolsPace.length > 0) {
+    const holNames = upcomingHolsPace.map(h =>
+      (h?.name != null ? String(h.name) : '').trim()).filter(Boolean);
+    if (holNames.length) {
+      const join = holNames.slice(0, 3).join(', ');
+      fwdBrief += ` · ${join} in window`;
+    }
+  }
+  const newsSigsPace = Array.isArray(dcPace?.news_signals) ? dcPace.news_signals : [];
+  if (forward.length > 0 && newsSigsPace.length > 0) {
+    const newsTitles = newsSigsPace.slice(0, 2).map(n =>
+      (n?.title != null ? String(n.title) : '').trim()).filter(Boolean);
+    if (newsTitles.length) {
+      fwdBrief += ` · News: ${newsTitles.join('; ')}`;
+    } else {
+      fwdBrief += ` · ${newsSigsPace.length} news signal${newsSigsPace.length > 1 ? 's' : ''}`;
+    }
+  }
   const fwdMetric = fwdRnBehind > 0 ? `${fwdRnBehind} RN behind` : null;
 
   // Pills: worst window | primary drag segment | windows count
@@ -4350,16 +4434,13 @@ function computeGroupSummaries(engineJson) {
       cls: 'pill-warning'
     });
   }
-  // Windows behind count
-  const windowsBehind = forward.filter(f =>
-    (f?.commercial_narrative || '').includes('behind')).length;
   if (windowsBehind > 0) fwdPills.push({
     label: 'Windows behind',
     value: `${windowsBehind} of ${forward.length}`,
     cls: windowsBehind === forward.length ? 'pill-negative' : 'pill-warning'
   });
 
-  // ── FORECAST GAP ───────────────────────────────────
+  // ── REVENUE EXPOSURE (forecast gap) ────────────────
   const fcGap = Array.isArray(engineJson?.forecast_gap_issues)
     ? engineJson.forecast_gap_issues : [];
   const fcRevTotal = fcGap.reduce((s, f) =>
@@ -4395,10 +4476,17 @@ function computeGroupSummaries(engineJson) {
     : fcAvgAdrGap > 0 ? `ADR −${fcAvgAdrGap.toFixed(0)} below plan`
     : `ADR +${Math.abs(fcAvgAdrGap).toFixed(0)} above plan`;
 
-  const fcBrief = fcAvgOtbPct != null
+  const hasAggressiveForecast = fcGap.some(f =>
+    f?.forecast_may_be_aggressive === true);
+  let fcBrief = fcAvgOtbPct != null
     ? `OTB at ${fcAvgOtbPct}% of plan — ${fcRevTotal > 0 ?
         `€${fmt(fcRevTotal)} revenue gap` : 'gap vs forecast'}`
     : 'No forecast data available';
+  if (hasAggressiveForecast && fcAvgOtbPct != null) {
+    fcBrief = `OTB at ${fcAvgOtbPct}% of plan — forecast may be overstated`;
+  } else if (hasAggressiveForecast) {
+    fcBrief = 'Forecast may be overstated — review gap vs plan';
+  }
 
   // Pills: OTB % of plan | primary segment | ADR status | forecast challenge
   const fcPills = [];
@@ -4428,13 +4516,13 @@ function computeGroupSummaries(engineJson) {
   });
 
   return {
-    historical: {
-      brief: histBrief,
+    segmentation: {
+      brief: segBrief,
       pills: histPills,
       metric: histMetric,
       metricClass: 'warning',
       metaLabel: 'revenue at risk',
-      count: issues.length
+      count: issues.length + synthesisCardCount
     },
     monthly: {
       brief: monthBrief,
@@ -5075,7 +5163,7 @@ function renderWeeklyPickupDeltaIssueCard(card, snapshotDate, index) {
     ? `${Math.round(Number(sig.gap_to_forecast)).toLocaleString()} RN`
     : '—';
   return `
-    <div class="finding-card forward-card fi-intel-card fi-weekly-pickup-card fi-collapsible-card" data-id="${escHtml(id)}">
+    <div class="finding-card forward-card fi-intel-card fi-weekly-pickup-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(urg)}">
       <div class="finding-header" onclick="toggleFiCard(this)">
         <div class="priority-stripe ${escHtml(urg)}"></div>
         <div class="finding-center">
@@ -5126,7 +5214,7 @@ function renderCorporatePaceRiskIssueCard(card, snapshotDate, riskIndex) {
   const rows = accounts.slice(0, maxRows).map(fiCorpAccountRow).join('');
   const more = n > maxRows ? `<div class="impact-meta" style="margin-top:8px;">and ${n - maxRows} more accounts</div>` : '';
   return `
-    <div class="finding-card forward-card fi-intel-card fi-corporate-risk-card fi-collapsible-card" data-id="${escHtml(id)}">
+    <div class="finding-card forward-card fi-intel-card fi-corporate-risk-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="critical">
       <div class="finding-header" onclick="toggleFiCard(this)">
         <div class="priority-stripe critical"></div>
         <div class="finding-center">
@@ -5194,7 +5282,7 @@ function renderCorporatePaceOpportunityIssueCard(card, snapshotDate, oppIndex) {
     return `<li><strong>${escHtml(name)}</strong> — variance ${escHtml(vStr)} — ${escHtml(manager)}</li>`;
   }).join('');
   return `
-    <div class="finding-card forward-card fi-intel-card fi-corporate-opp-card fi-collapsible-card" data-id="${escHtml(id)}">
+    <div class="finding-card forward-card fi-intel-card fi-corporate-opp-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="medium">
       <div class="finding-header" onclick="toggleFiCard(this)">
         <div class="priority-stripe medium"></div>
         <div class="finding-center">
@@ -5293,7 +5381,7 @@ function renderGroupPipelineIssueCard(card, snapshotDate, index) {
   }
   const decision = (card.decision || '').toString().trim();
   return `
-    <div class="finding-card forward-card fi-intel-card fi-pipeline-card fi-collapsible-card" data-id="${escHtml(id)}">
+    <div class="finding-card forward-card fi-intel-card fi-pipeline-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(urg)}">
       <div class="finding-header" onclick="toggleFiCard(this)">
         <div class="priority-stripe ${escHtml(urg)}"></div>
         <div class="finding-center">
@@ -5455,6 +5543,7 @@ function renderFindings() {
   if (!container || !emptyCols) return;
 
   container.innerHTML = '';
+  findingsUrgencyFilter = 'all';
 
   const engineJson = currentEngineJson || {};
   const historicalCards = getFilteredCards();
@@ -5471,13 +5560,18 @@ function renderFindings() {
     ? engineJson.corporate_account_pace_issues : [];
   const groupPipelineIssues = Array.isArray(engineJson.group_pipeline_issues)
     ? engineJson.group_pipeline_issues : [];
+  const synthesisCardsList = Array.isArray(engineJson?.cross_segment_synthesis?.synthesis_cards)
+    ? engineJson.cross_segment_synthesis.synthesis_cards : [];
+  const cvRaw = engineJson?.commercial_verdict;
+  const hasCommercialVerdict = cvRaw && typeof cvRaw === 'object' &&
+    String(cvRaw.verdict_text || '').trim() !== '';
 
-  const demandCalendarOk = isDemandCalendarRenderable(engineJson?.demand_calendar);
   const hasAny = historicalCards.length || forwardCards.length ||
     monthlyIssues.length || mixShiftIssues.length ||
     forecastGapIssues.length ||
     weeklyPickupIssues.length || corporatePaceIssues.length ||
-    groupPipelineIssues.length || demandCalendarOk;
+    groupPipelineIssues.length || synthesisCardsList.length ||
+    hasCommercialVerdict;
 
   if (!hasAny) {
     emptyCols.style.display = 'block';
@@ -5485,6 +5579,19 @@ function renderFindings() {
   }
 
   emptyCols.style.display = 'none';
+
+  const verdictCv = hasCommercialVerdict ? engineJson.commercial_verdict : null;
+  const verdictHtml = verdictCv ? buildCommercialVerdictBlockHtml(verdictCv) : '';
+  if (verdictHtml) {
+    container.insertAdjacentHTML('beforeend', verdictHtml);
+  }
+
+  const urgencyTabsHtml = `<div class="tabs-row" id="findings-urgency-tabs" style="margin-bottom:12px;">
+    <div class="tab active" onclick="setFindingsUrgencyFilter('all', this)">All</div>
+    <div class="tab" onclick="setFindingsUrgencyFilter('high', this)">High</div>
+    <div class="tab" onclick="setFindingsUrgencyFilter('medium', this)">Medium</div>
+  </div>`;
+  container.insertAdjacentHTML('beforeend', urgencyTabsHtml);
 
   // Helper: wrap collected card HTML into a complete group fragment.
   // This produces a valid, self-contained HTML string every time.
@@ -5541,17 +5648,59 @@ function renderFindings() {
 
   const summaries = computeGroupSummaries(engineJson);
 
-  // ── GROUP 1: Historical Analysis ──────────────────────
-  if (historicalCards.length > 0) {
-    const s = summaries.historical;
-    const cardsHtml = historicalCards
-      .map(card => renderCard(card))
-      .join('');
+  // ── GROUP 1: Segmentation (retail + synthesis) ───────
+  const segRetailHtml = historicalCards.length
+    ? historicalCards.map(card => renderCard(card)).join('')
+    : '';
+  let segSynthHtml = '';
+  const fiSnapSeg = (currentEngineRow?.snapshot_date || '').toString();
+  synthesisCardsList.forEach((sc, i) => {
+    if (!sc || typeof sc !== 'object') return;
+    const fin = sc.financial_impact ?? sc.financialImpact;
+    const finStr = typeof fin === 'string' ? fin
+      : (fin != null && typeof fin === 'object'
+        ? [
+            fin.headline,
+            fin.summary,
+            fin.range,
+            fin.amount != null ? String(fin.amount) : null
+          ].filter(Boolean).join(' — ')
+        : '');
+    const synthCard = {
+      title: (sc.title != null && String(sc.title).trim()) ? String(sc.title).trim()
+        : ((sc.headline != null && String(sc.headline).trim()) ? String(sc.headline).trim()
+          : 'Cross-segment synthesis'),
+      priority: (sc.priority != null ? String(sc.priority) : 'medium').toLowerCase(),
+      trigger_display: (() => {
+        const cm = sc.card_metrics || sc.cardMetrics;
+        const mpi = cm?.avgMPI ?? sc.mpi;
+        const ari = cm?.avgARI ?? sc.ari;
+        const rgi = cm?.avgRGI ?? sc.rgi;
+        const has = [mpi, ari, rgi].some(v => v != null && Number.isFinite(Number(v)));
+        if (!has) return '—';
+        return [
+          mpi != null ? Number(mpi).toFixed(1) : '—',
+          ari != null ? Number(ari).toFixed(1) : '—',
+          rgi != null ? Number(rgi).toFixed(1) : '—'
+        ].join(' / ');
+      })(),
+      situation: sc.situation,
+      diagnosis: sc.diagnosis,
+      str_validation: sc.str_validation ?? sc.strValidation,
+      decision: sc.decision,
+      financial_impact: finStr
+    };
+    segSynthHtml += renderSynthesisCardAsRetailTemplate(synthCard, fiSnapSeg, i);
+  });
+  const segCardsHtml = segRetailHtml + segSynthHtml;
+  if (segCardsHtml) {
+    const s = summaries.segmentation;
+    const segCount = historicalCards.length + synthesisCardsList.length;
     const histSparklineHtml = buildStrWeeklySparklineBlockHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
-      buildCompleteGroup('historical', 'Historical Analysis',
+      buildCompleteGroup('historical', 'Segmentation',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml, s.pills, histSparklineHtml)
+        segCount, segCardsHtml, s.pills, histSparklineHtml)
     );
   }
 
@@ -5750,12 +5899,7 @@ function renderFindings() {
     );
   }
 
-  const demandIntelHtml = buildDemandIntelligenceGroupHtml(engineJson);
-  if (demandIntelHtml) {
-    container.insertAdjacentHTML('beforeend', demandIntelHtml);
-  }
-
-  // ── GROUP 4: Forward Pace ─────────────────────────────
+  // ── GROUP 4: Pace Analysis ────────────────────────────
   if (forwardCards.length > 0) {
     const s = summaries.forward;
     const cardsHtml = forwardCards
@@ -5763,7 +5907,7 @@ function renderFindings() {
       .join('');
     const fwdPaceChartHtml = buildForwardPaceChartHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
-      buildCompleteGroup('forward', 'Forward Pace',
+      buildCompleteGroup('forward', 'Pace Analysis',
         s.brief, s.metric, s.metricClass, s.metaLabel,
         s.count, cardsHtml, s.pills, fwdPaceChartHtml)
     );
@@ -5788,7 +5932,7 @@ function renderFindings() {
     );
   }
 
-  // ── GROUP 5: Forecast Gap ─────────────────────────────
+  // ── GROUP 5: Revenue Exposure ─────────────────────────
   if (forecastGapIssues.length > 0) {
     const s = summaries.forecast;
     let cardsHtml = '';
@@ -5826,11 +5970,13 @@ function renderFindings() {
     }
     const fcGapChartHtml = buildForecastGapChartHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
-      buildCompleteGroup('forecast', 'Forecast Gap',
+      buildCompleteGroup('forecast', 'Revenue Exposure',
         s.brief, s.metric, s.metricClass, s.metaLabel,
         s.count, cardsHtml, s.pills, fcGapChartHtml)
     );
   }
+
+  applyFindingsUrgencyFilter();
 
   // Update period labels if the elements still exist
   const colHist = document.getElementById('column-period-historical');
@@ -5860,8 +6006,9 @@ function renderCard(card) {
   const evidenceSubline = `Observed window: ${escHtml(getCardTimeframe(card))}`;
   const executionList = executionActions.map(item => `<li>${escHtml(item)}</li>`).join('');
 
+  const findingsPr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
   return `
-    <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
+    <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(findingsPr)}">
       <div class="finding-header">
         <div class="priority-stripe ${escHtml(card.priority)}"></div>
 
@@ -6027,8 +6174,9 @@ function renderForwardCard(card) {
         </div>`;
   }
 
+  const fwdFindingsPr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
   return `
-    <div class="finding-card forward-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}">
+    <div class="finding-card forward-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(fwdFindingsPr)}">
       <div class="finding-header">
         <div class="priority-stripe ${escHtml(card.priority)}"></div>
 
