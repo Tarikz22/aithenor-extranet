@@ -1844,6 +1844,38 @@ function buildNLContext(targetDate = null) {
       rgi: w.avg_rgi,
       occ: w.avg_occ
     })),
+    str_daily_sample: (() => {
+      const strRows =
+        ej.workbook_ingestion?.rows?.str ||
+        ej.workbook_ingestion?.str_rows || [];
+
+      if (!strRows.length) return [];
+
+      const daily = strRows.map(r => {
+        let dateStr = r['Date'] || r.date || r.stay_date_ymd;
+        if (typeof dateStr === 'number') {
+          dateStr = new Date(
+            Math.round((dateStr - 25569) * 86400 * 1000)
+          ).toISOString().split('T')[0];
+        } else if (dateStr) {
+          dateStr = String(dateStr).split('T')[0];
+        }
+
+        return {
+          date: dateStr,
+          day: r['Day of Week'] || r.day_of_week,
+          hotel_occ: r['Hotel Occupancy %'] || r.hotel_occ,
+          mpi: r['MPI (Index)'] || r['MPI'] || r.mpi,
+          ari: r['ARI (Index)'] || r['ARI'] || r.ari,
+          rgi: r['RGI (Index)'] || r['RGI'] || r.rgi,
+          hotel_adr: r['Hotel ADR'] || r.hotel_adr,
+          comp_adr: r['Comp Set ADR'] || r.comp_adr,
+          hotel_revpar: r['Hotel RevPAR'] || r.hotel_revpar
+        };
+      }).filter(r => r.date);
+
+      return daily.slice(0, 400);
+    })(),
     forward_pace: forwardSummary,
     weekly_pickup: pickupSummary,
     forecast_gaps: forecastSummary,
@@ -2014,11 +2046,16 @@ ANSWER RULES:
 - If the question is about a trend over time and only one snapshot exists, say so honestly
 
 DATA COVERAGE:
-- str_weekly_series: full weekly STR metrics for the period
 - pms_daily_sample: PMS segment data sampled every 7 days PLUS any specifically requested dates are always included in full
 - corporate_accounts_full: all corporate accounts with full production detail
 - group_pipeline_full: all groups with status, dates, room nights and revenue
 - For questions about a specific date not in the sample, use the closest available date and note it
+
+STR DAILY DATA:
+- str_daily_sample contains daily MPI, ARI, RGI, occupancy and ADR for each date in the period
+- Use this for ALL specific date STR questions
+- For January 20 2026 or any specific date, look up that exact date in str_daily_sample
+- Do not say STR is only weekly — daily data IS available
 
 DECISION FRAMEWORK:
 Priority order: Profit (GOP) -> Rate quality -> Market share -> Volume.
@@ -2147,7 +2184,11 @@ async function sendNLQuery(userMessage, conversationHistory) {
   }
 
   const context = buildNLContext(targetDate);
-  const system = buildNLSystemPrompt(context);
+  let system = buildNLSystemPrompt(context);
+  if (targetDate) {
+    system += `\nSPECIFIC DATE REQUESTED: ${targetDate}
+Look up this exact date in str_daily_sample and pms_daily_sample for precise answers.`;
+  }
   const clippedHistory = Array.isArray(conversationHistory)
     ? conversationHistory.slice(-10)
     : [];
