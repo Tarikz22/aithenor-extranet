@@ -1835,6 +1835,15 @@ function buildNLContext() {
     snapshot_date: snap,
     period: period,
     str: strSummary,
+    str_weekly_series: (ej.str_weekly_series || []).map(w => ({
+      week: w.week_key,
+      week_start: w.week_start_ymd,
+      week_end: w.week_end_ymd,
+      mpi: w.avg_mpi,
+      ari: w.avg_ari,
+      rgi: w.avg_rgi,
+      occ: w.avg_occ
+    })),
     forward_pace: forwardSummary,
     weekly_pickup: pickupSummary,
     forecast_gaps: forecastSummary,
@@ -1847,9 +1856,133 @@ function buildNLContext() {
     },
     active_segment_signals: activeSignals,
     corporate_accounts: corporateSummary,
+    corporate_accounts_full: (() => {
+      const riskCard = (ej.corporate_account_pace_issues || [])
+        .find(c => c.card_type === 'corporate_pace_risk');
+      const oppCard = (ej.corporate_account_pace_issues || [])
+        .find(c => c.card_type === 'corporate_pace_opportunity');
+
+      const allAccounts = [
+        ...(riskCard?.accounts_at_risk || []),
+        ...(oppCard?.accounts_ahead || [])
+      ];
+
+      if (allAccounts.length > 0) {
+        return allAccounts.map(a => ({
+          name: a.company_name,
+          account_type: a.account_type,
+          manager: a.account_manager,
+          sector: a.sector,
+          fy_ly_rn: a.fy_ly_rn,
+          actual_ytd_rn: a.actual_ytd_rn,
+          actual_ytd_adr: a.actual_ytd_adr,
+          full_year_projected_rn: a.full_year_projected_rn,
+          variance_pct: a.variance_pct,
+          variance_rn: a.variance_rn,
+          comments: a.comments
+        }));
+      }
+
+      const corpRows = ej.workbook_ingestion?.rows?.corporate || [];
+      return corpRows.slice(0, 30).map(r => ({
+        name: r['Company Name'] || r.company_name,
+        account_type: r['Account Type'] || r.account_type,
+        manager: r['Account Manager'] || r.account_manager,
+        sector: r['Sector'] || r.sector,
+        fy_ly_rn: r['2025 FY Room Nights'] || r.fy_ly_rn,
+        actual_ytd_rn: r['2026 Actual RN YTD'] || r.actual_ytd_rn,
+        actual_ytd_adr: r['2026 Actual ADR YTD'] || r.actual_ytd_adr,
+        full_year_projected_rn:
+          r['2026 Full Year RN (Actual + OTB)'] ||
+          r.full_year_projected_rn,
+        variance_pct: r['Projected RN vs 2025'] || r.variance_pct,
+        comments: r['Comments / Account Intelligence'] || r.comments
+      }));
+    })(),
     group_pipeline: groupSummary,
+    group_pipeline_full: (() => {
+      const allGroups = [];
+      for (const g of (ej.group_pipeline_issues || [])) {
+        for (const grp of (g.groups || [])) {
+          allGroups.push({
+            name: grp.group_name,
+            status: grp.status,
+            arrival_date: grp.arrival_date,
+            room_nights: grp.room_nights,
+            room_revenue: grp.room_revenue,
+            total_revenue: grp.total_revenue,
+            market_segment: grp.market_segment,
+            owner: grp.owner_name,
+            window: g.window_class,
+            is_event_only: grp.is_event_only
+          });
+        }
+      }
+
+      if (allGroups.length > 0) return allGroups;
+
+      const delphiRows = ej.workbook_ingestion?.rows?.delphi || [];
+      return delphiRows.slice(0, 40).map(r => ({
+        name: r['Account: Account Name'] || r.group_name,
+        status: r['Status'] || r.status,
+        arrival_date: r['Arrival Date'] || r.arrival_date,
+        room_nights: r['Blended Roomnights'] || r.room_nights,
+        room_revenue:
+          r['Blended Guestroom Revenue Total'] || r.room_revenue,
+        total_revenue: r['Blended Revenue Total'] || r.total_revenue,
+        market_segment: r['Market Segment'] || r.market_segment,
+        owner: r['Booking: Owner Name'] || r.owner_name
+      }));
+    })(),
     primary_commercial_story: primaryStory,
     demand_intelligence: demandSummary,
+    pms_daily_sample: (() => {
+      const pmsRows = ej.workbook_ingestion?.rows?.pms || [];
+
+      if (!pmsRows.length) return [];
+
+      const byDate = {};
+      for (const row of pmsRows) {
+        const date = row['Date'] || row.stay_date_ymd ||
+          row._ingestion?.stay_date_ymd;
+        if (!date) continue;
+        const dateStr = typeof date === 'number'
+          ? new Date(Math.round((date - 25569) * 86400 * 1000))
+              .toISOString().split('T')[0]
+          : String(date).split('T')[0];
+        if (!byDate[dateStr]) byDate[dateStr] = [];
+        byDate[dateStr].push(row);
+      }
+
+      const sortedDates = Object.keys(byDate).sort();
+      const sampledDates = sortedDates.filter((_, i) => i % 7 === 0);
+
+      const result = [];
+      for (const date of sampledDates.slice(0, 52)) {
+        for (const row of byDate[date]) {
+          result.push({
+            date,
+            segment: row['Market Segment Name'] ||
+                     row['Market Segment'] ||
+                     row.market_segment_label,
+            rn_ty: Number(
+              row['Room Nights TY (Actual / OTB)'] ||
+              row['Occupancy On Books This Year'] || 0
+            ),
+            rn_ly: Number(
+              row['Room Nights LY Actual'] ||
+              row['Occupancy On Books Last Year Actual'] || 0
+            ),
+            rev_ty: Number(
+              row['Revenue TY (Actual / OTB)'] ||
+              row['Booked Room Revenue This Year'] || 0
+            ),
+            adr_ty: Number(row['ADR TY'] || 0)
+          });
+        }
+      }
+      return result.slice(0, 500);
+    })(),
     snapshot_history: {
       has_prior_snapshots: !!snapHistory.has_prior_data,
       weeks_of_history: snapHistory.weeks_available
@@ -1876,6 +2009,13 @@ ANSWER RULES:
 - Speak as a senior commercial director, not a chatbot
 - No filler phrases like "Great question" or "Certainly"
 - If the question is about a trend over time and only one snapshot exists, say so honestly
+
+DATA COVERAGE:
+- str_weekly_series: full weekly STR metrics for the period
+- pms_daily_sample: PMS segment data sampled every 7 days (not every day — for specific daily questions use the closest available date or note the limitation)
+- corporate_accounts_full: all corporate accounts with full production detail
+- group_pipeline_full: all groups with status, dates, room nights and revenue
+- For questions about a specific date not in the sample, use the closest available date and note it
 
 DECISION FRAMEWORK:
 Priority order: Profit (GOP) -> Rate quality -> Market share -> Volume.
