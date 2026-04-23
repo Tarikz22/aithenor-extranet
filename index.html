@@ -2289,6 +2289,25 @@ function findingsUrgencyMatches(filter, priorityRaw) {
   return true;
 }
 
+function sanitizeVerdictPrimaryDecisionRoleNames(text) {
+  if (!text) return '';
+  let s = String(text);
+  const salesCtx = /\b(sales\s+director|vp\s+sales|chief\s+commercial|commercial\s+leadership|sales\s+leadership)\b/i.test(s);
+  const role = salesCtx ? 'the Sales Director' : 'the account manager';
+  s = s.replace(/\baccount\s+manager\s+([A-Z][a-z]{1,22})\s+([A-Z][a-z]{1,22})\b/gi, role);
+  s = s.replace(/\b([A-Z][a-z]{1,22})\s+([A-Z][a-z]{1,22})\s*,\s*account\s+manager\b/gi, role);
+  s = s.replace(/\b(contact|with|from|through)\s+([A-Z][a-z]{1,22})\s+([A-Z][a-z]{1,22})\b/gi,
+    (m, prep, a, b) => {
+      const two = `${a} ${b}`;
+      if (/^(United|Retail|Corporate|Hong|New|Los|San|Las|Lake|North|South|East|West)\b/i.test(two)) {
+        return m;
+      }
+      if (/segment|Transient|Wholesale|Contract|Convention|Government|Discount/i.test(two)) return m;
+      return `${prep} ${role}`;
+    });
+  return s;
+}
+
 function buildCommercialVerdictBlockHtml(cv) {
   if (!cv || typeof cv !== 'object') return '';
   const verdictText = (cv.verdict_text != null ? String(cv.verdict_text) : '').trim();
@@ -2305,7 +2324,9 @@ function buildCommercialVerdictBlockHtml(cv) {
         <div style="font-size:11px;color:var(--gray-400);margin-top:4px;">—</div>
       </div>`;
     }
-    const val = h.value != null ? String(h.value) : '—';
+    const val = h.value != null && String(h.value).trim() !== ''
+      ? parseFloat(String(h.value).replace(/,/g, '')).toFixed(1)
+      : '—';
     const lab = h.label != null ? String(h.label) : '—';
     const dir = String(h.direction || '').toLowerCase();
     const valColor = dir === 'negative' ? 'var(--red)'
@@ -2316,7 +2337,8 @@ function buildCommercialVerdictBlockHtml(cv) {
     </div>`;
   }).join('');
 
-  const primaryDecision = (cv.primary_decision != null ? String(cv.primary_decision) : '').trim();
+  const primaryDecisionRaw = (cv.primary_decision != null ? String(cv.primary_decision) : '').trim();
+  const primaryDecision = sanitizeVerdictPrimaryDecisionRoleNames(primaryDecisionRaw);
   const decisionBlock = primaryDecision
     ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200);font-size:13px;font-style:italic;color:var(--gray-600);line-height:1.6;">${escHtml(primaryDecision)}</div>`
     : '';
@@ -2329,26 +2351,54 @@ function buildCommercialVerdictBlockHtml(cv) {
   </div>`;
 }
 
+function formatSynthesisStrValidationForDisplay(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object') {
+    const o = raw;
+    const t = o.interpretation ?? o.verdict ?? o.summary;
+    if (t != null && String(t).trim()) return String(t).trim();
+    try {
+      return JSON.stringify(o);
+    } catch (e) {
+      return '';
+    }
+  }
+  return String(raw).trim();
+}
+
+function deriveSynthesisCardTitle(card) {
+  const rawT = card.title != null ? String(card.title).trim() : '';
+  if (rawT && rawT.toLowerCase() !== 'cross-segment synthesis') return rawT;
+  const sit = (card.situation != null ? String(card.situation) : '').trim();
+  if (!sit) return 'Cross-segment synthesis';
+  const first = sit.split(/(?<=[.!?])\s+/)[0].trim() || sit;
+  return first.length > 60 ? `${first.slice(0, 60).trim()}...` : first;
+}
+
 function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
   const id = `SYN_${index}_${snapshotDate || ''}`;
-  const title = (card.title != null && String(card.title).trim())
-    ? String(card.title).trim()
-    : 'Cross-segment synthesis';
+  const title = deriveSynthesisCardTitle(card);
   const pr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
   const priorityStripe = ['critical', 'high', 'medium', 'low'].includes(pr) ? pr : 'medium';
   const trigger = (card.trigger_display != null ? String(card.trigger_display) : '—').trim() || '—';
   const situation = (card.situation != null ? String(card.situation) : '').trim();
   const diagnosis = (card.diagnosis != null ? String(card.diagnosis) : '').trim();
-  const strVal = (card.str_validation != null ? String(card.str_validation) : '').trim();
+  const strVal = formatSynthesisStrValidationForDisplay(card.str_validation);
   const decision = (card.decision != null ? String(card.decision) : '').trim();
   const finImpact = (card.financial_impact != null ? String(card.financial_impact) : '').trim();
+  const scenarioType = (card.scenario_type != null ? String(card.scenario_type).trim() : '')
+    || (card.scenarioType != null ? String(card.scenarioType).trim() : '');
+  const subtitleHtml = scenarioType
+    ? `<div class="finding-oneliner">${escHtml(scenarioType)}</div>`
+    : '';
   return `
     <div class="finding-card synthesis-retail-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(priorityStripe)}">
       <div class="finding-header">
         <div class="priority-stripe ${escHtml(priorityStripe)}"></div>
         <div class="finding-center">
           <div class="finding-title">${escHtml(title)}</div>
-          <div class="finding-oneliner">Cross-segment view</div>
+          ${subtitleHtml}
         </div>
         <div class="finding-right">
           <div class="trigger-metric-value">${escHtml(trigger)}</div>
@@ -3585,7 +3635,7 @@ function buildForwardImpactLine(card) {
     const revFmt = v => new Intl.NumberFormat('en-GB',
       { maximumFractionDigits: 0 }).format(Math.round(v));
     if (revGap != null && revGap > 0 && rnGap != null) {
-      return `£${revFmt(revGap)} revenue gap vs forecast — ` +
+      return `€${revFmt(revGap)} revenue gap vs forecast — ` +
         `${Math.round(rnGap)} room nights (${rnGapPct != null
           ? rnGapPct.toFixed(1)
           : '?'}%) short of plan.`;
@@ -3617,6 +3667,7 @@ function buildForwardCards(engineRow, engineJson) {
     priority: issue.priority || 'medium',
     issue_family: issue.issue_family,
     forward_window: issue.forward_window,
+    pace_data: issue.pace_data || null,
     trigger_display: '',
     has_null_metrics: true,
     value_at_stake: null,
@@ -3626,6 +3677,101 @@ function buildForwardCards(engineRow, engineJson) {
     department: 'Revenue',
     demand_context: issue.demand_context || null
   }));
+}
+
+function parseYmdToUtcMidnight(ymd) {
+  const p = String(ymd || '').trim().split(/[-T]/);
+  if (p.length < 3) return null;
+  const y = Number(p[0]);
+  const mo = Number(p[1]) - 1;
+  const d = Number(p[2]);
+  if (![y, mo, d].every(Number.isFinite)) return null;
+  const t = Date.UTC(y, mo, d);
+  return Number.isNaN(t) ? null : t;
+}
+
+/** Days left in forward window from snapshot date; null if dates missing. */
+function computeForwardDaysRemainingInWindow(card) {
+  const pd = card.pace_data;
+  const startY = pd?.window_start_ymd;
+  const endY = pd?.window_end_ymd;
+  const snap = card.snapshot_date;
+  const endMs = parseYmdToUtcMidnight(endY);
+  const todayMs = parseYmdToUtcMidnight(snap);
+  if (endMs == null || todayMs == null) return null;
+  const msDay = 86400000;
+  const startMs = parseYmdToUtcMidnight(startY);
+  const windowLenDays = startMs != null
+    ? Math.max(1, Math.round((endMs - startMs) / msDay) + 1)
+    : 30;
+  if (startMs != null && todayMs < startMs) return windowLenDays;
+  if (startMs == null && todayMs < endMs) {
+    return Math.max(0, Math.round((endMs - todayMs) / msDay));
+  }
+  if (todayMs >= endMs) return 0;
+  return Math.max(0, Math.round((endMs - todayMs) / msDay));
+}
+
+function replaceForwardNarrativeHardcodedWindowDays(text, daysRemaining) {
+  if (text == null || daysRemaining == null || !Number.isFinite(daysRemaining)) return text;
+  const d = Math.round(daysRemaining);
+  return String(text)
+    .replace(/\b30\s+days\s+remaining\s+in\s+the\s+window\b/gi, `${d} days remaining in the window`)
+    .replace(/\b30\s+days\s+left\s+in\s+the\s+window\b/gi, `${d} days left in the window`)
+    .replace(/(\d+)\s+days\s+remaining\s+in\s+the\s+window/gi, (full, num) =>
+      (Number(num) === 30 ? `${d} days remaining in the window` : full));
+}
+
+function inferForwardHorizonBucket(card) {
+  const wl = `${card.window_label || ''} ${card.forward_window || ''}`;
+  if (/days\s*1\s*[–\-]\s*30|days\s*1\s*-\s*30|1\s*[–\-]\s*30\s*day|next\s+30\s+days/i.test(wl)) {
+    return 1;
+  }
+  if (/days\s*31\s*[–\-]\s*60|31\s*[–\-]\s*60/i.test(wl)) return 2;
+  if (/days\s*61\s*[–\-]\s*90|61\s*[–\-]\s*90/i.test(wl)) return 3;
+  const m = wl.match(/next\s+(\d+)\s+days/i);
+  if (m) {
+    const n = Number(m[1]);
+    if (n <= 30) return 1;
+    if (n <= 60) return 2;
+    return 3;
+  }
+  if (/days\s*\d+\s*[–\-]\s*30\b/i.test(wl)) return 1;
+  if (/days\s*\d+\s*[–\-]\s*60\b/i.test(wl) && !/1\s*[–\-]\s*30/.test(wl)) return 2;
+  return 1;
+}
+
+function buildForwardPaceDecisionLineByHorizon(card, bucket, segmentLabel, rnBehindDisplay) {
+  const seg = (segmentLabel || '').trim() || 'the priority segment';
+  const rn = (rnBehindDisplay || '').trim() || '';
+  const rnPhrase = rn ? `at least ${rn} room nights` : 'the quantified room-night shortfall';
+  if (bucket === 1) {
+    return `This week: direct intervention on ${seg} — recover ${rnPhrase} vs reference pace on the highest-leak arrival dates before pickup stalls further.`;
+  }
+  if (bucket === 2) {
+    return `Through days 31–60: run sales activation with weekly checkpoints on ${seg} conversion and channel mix until OTB pace matches plan.`;
+  }
+  return `Through days 61–90: shift emphasis to pipeline strategy and defend rate floors while ${seg} tentative and group material convert into definite room nights.`;
+}
+
+function normSentenceKey(s) {
+  return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/\.+$/, '');
+}
+
+function stripTrailingSentenceIfMatchesDecision(analysisText, decisionLine, alsoCompare) {
+  if (!analysisText || !analysisText.trim()) return analysisText;
+  const dec = normSentenceKey(decisionLine);
+  const alt = normSentenceKey(alsoCompare);
+  const sentences = analysisText.trim().split(/(?<=[.!?])\s+/).map(x => x.trim()).filter(Boolean);
+  if (!sentences.length) return analysisText;
+  const last = sentences[sentences.length - 1];
+  const lastK = normSentenceKey(last);
+  const dup = (dec && (lastK === dec || lastK.includes(dec) || dec.includes(lastK)))
+    || (alt && (lastK === alt || lastK.includes(alt) || alt.includes(lastK)));
+  if (!dup) return analysisText;
+  const rest = sentences.slice(0, -1);
+  if (!rest.length) return '';
+  return rest.join('. ') + (/\.$/.test(rest[rest.length - 1]) ? '' : '.');
 }
 
 function buildCardsFromData(engineRow, recommendations, actions) {
@@ -3940,6 +4086,13 @@ function renderDashboard() {
     const est = estimateFallbackImpactValue(card);
     return est > 0 ? sum + est : sum;
   }, 0);
+  const corpRisk = Number(
+    currentEngineJson?.corporate_account_pace_issues
+      ?.find(c => (c.card_type || '').toString().trim() === 'corporate_pace_risk')
+      ?.total_revenue_at_risk || 0
+  ) || 0;
+  const rangeMaxWithCorp = summaryRangeTotals.max + corpRisk;
+  const rangeMinWithCorp = summaryRangeTotals.min + corpRisk;
   const hotelName = dashboardMeta?.hotel_name || 'Hotel';
   const periodLabel = currentPeriod || dashboardMeta?.period_label || '—';
   const totalValue = summaryLegacyValue || dashboardMeta?.total_value || 0;
@@ -3949,22 +4102,24 @@ function renderDashboard() {
     visibleForwardCards.filter(c => actionedIds.has(c.id)).length;
   const pct = combinedFindingsCount ? Math.round((actionedCount / combinedFindingsCount) * 100) : 0;
   let summaryRevenueRiskLabel = visibleCards.length ? 'High revenue exposure' : 'Impact under review';
-  if (summaryRangeTotals.max > 0) {
-    if (summaryRangeTotals.min > 0 && Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) / summaryRangeTotals.min < 0.2) {
-      summaryRevenueRiskLabel = `€${formatNumber(Math.round((summaryRangeTotals.min + summaryRangeTotals.max) / 2))} at risk`;
-    } else if (Math.abs(summaryRangeTotals.max - summaryRangeTotals.min) < 1) {
-      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.max)} at risk`;
+  if (rangeMaxWithCorp > 0) {
+    if (rangeMinWithCorp > 0 && Math.abs(rangeMaxWithCorp - rangeMinWithCorp) / rangeMinWithCorp < 0.2) {
+      summaryRevenueRiskLabel = `€${formatNumber(Math.round((rangeMinWithCorp + rangeMaxWithCorp) / 2))} at risk`;
+    } else if (Math.abs(rangeMaxWithCorp - rangeMinWithCorp) < 1) {
+      summaryRevenueRiskLabel = `€${formatNumber(rangeMaxWithCorp)} at risk`;
     } else {
-      summaryRevenueRiskLabel = `€${formatNumber(summaryRangeTotals.min)}-€${formatNumber(summaryRangeTotals.max)} at risk`;
+      summaryRevenueRiskLabel = `€${formatNumber(rangeMinWithCorp)}-€${formatNumber(rangeMaxWithCorp)} at risk`;
     }
   } else if (strongestVisibleValue > 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(strongestVisibleValue)} at risk`;
+    summaryRevenueRiskLabel = `€${formatNumber(strongestVisibleValue + corpRisk)} at risk`;
   } else if (estimatedExposureTotal > 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(estimatedExposureTotal)}+ estimated at risk`;
+    summaryRevenueRiskLabel = `€${formatNumber(estimatedExposureTotal + corpRisk)}+ estimated at risk`;
   } else if (summaryRoomNights > 0) {
     summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
   } else if (summaryLegacyValue > 0 && visibleCards.length === 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(summaryLegacyValue)} at risk`;
+    summaryRevenueRiskLabel = `€${formatNumber(summaryLegacyValue + corpRisk)} at risk`;
+  } else if (corpRisk > 0) {
+    summaryRevenueRiskLabel = `€${formatNumber(corpRisk)} at risk`;
   }
 
   document.getElementById('sidebar-hotel').textContent = hotelName;
@@ -4175,8 +4330,9 @@ function computeGroupSummaries(engineJson) {
   }
   const activeSegLabel = primarySeg || 'Active segment not attributed';
   const domSignalLabel = primaryIssue ? driverLabel : 'No dominant segment signal';
+  const strBriefPart = (!strVsSignal || /unavailable/i.test(strVsSignal)) ? '' : strVsSignal;
   const segBrief = primaryIssue
-    ? `${activeSegLabel} — ${domSignalLabel} — ${strVsSignal}`
+    ? [activeSegLabel, domSignalLabel, strBriefPart].filter(Boolean).join(' — ')
     : 'No segment-level signals detected';
 
   // Pills: primary driver | key segment | RGI | trend
@@ -5687,6 +5843,7 @@ function renderFindings() {
       situation: sc.situation,
       diagnosis: sc.diagnosis,
       str_validation: sc.str_validation ?? sc.strValidation,
+      scenario_type: sc.scenario_type ?? sc.scenarioType,
       decision: sc.decision,
       financial_impact: finStr
     };
@@ -6064,7 +6221,11 @@ function renderCard(card) {
 
 function renderForwardCard(card) {
   const isActioned = actionedIds.has(card.id);
-  const narrative = (card.commercial_narrative || '').toString().trim();
+  let narrative = (card.commercial_narrative || '').toString().trim();
+  if (card.granularity !== 'forecast_gap') {
+    const daysRem = computeForwardDaysRemainingInWindow(card);
+    narrative = replaceForwardNarrativeHardcodedWindowDays(narrative, daysRem);
+  }
 
   const splitForwardSentences = para =>
     para
@@ -6130,9 +6291,20 @@ function renderForwardCard(card) {
       .trim();
   }
 
+  const rawDecisionLine = (card.enforced_decision_line || '').toString().trim();
+  let decisionLine = rawDecisionLine;
+  if (card.granularity !== 'forecast_gap') {
+    const bucket = inferForwardHorizonBucket(card);
+    const segLab = extractForwardDragSegment(narrative);
+    const rnLab = extractRoomNightsBehindReference(narrative);
+    decisionLine = buildForwardPaceDecisionLineByHorizon(card, bucket, segLab, rnLab);
+  }
+
+  forwardAnalysisNarrative = stripTrailingSentenceIfMatchesDecision(
+    forwardAnalysisNarrative, decisionLine, rawDecisionLine);
+
   const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
   const forwardImpactLine = buildForwardImpactLine(card);
-  const decisionLine = (card.enforced_decision_line || '').toString().trim();
   const executionActionsRaw = card.enforced_execution_actions || [];
   const executionActions = Array.isArray(executionActionsRaw)
     ? executionActionsRaw
