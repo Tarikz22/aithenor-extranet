@@ -1234,6 +1234,168 @@ table.fi-account-table th {
   .gop-banner { grid-template-columns: 1fr; }
   .gop-stat { border-right: none !important; padding-left: 0; }
 }
+
+/* ── NATURAL LANGUAGE CHAT ─────────────────────────────── */
+.nl-chat-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent, #1e40af);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(15, 31, 61, 0.28);
+  z-index: 1000;
+}
+.nl-chat-fab:hover { filter: brightness(1.05); }
+.nl-chat-fab:focus-visible,
+.nl-send-btn:focus-visible,
+.nl-close-btn:focus-visible,
+.nl-suggestion-btn:focus-visible,
+.nl-input:focus-visible {
+  outline: 2px solid #1e40af;
+  outline-offset: 2px;
+}
+.nl-chat-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 92px;
+  width: 420px;
+  height: 560px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 20px 50px rgba(15, 31, 61, 0.24);
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nl-chat-panel.open { display: flex; }
+.nl-chat-header {
+  padding: 14px 16px 8px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.nl-chat-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--navy);
+}
+.nl-chat-subtitle {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-top: 2px;
+}
+.nl-close-btn {
+  border: none;
+  background: transparent;
+  color: var(--gray-600);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.nl-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fafbfd;
+}
+.nl-message-row {
+  display: flex;
+  width: 100%;
+}
+.nl-message-row.user { justify-content: flex-end; }
+.nl-message-row.assistant { justify-content: flex-start; }
+.nl-message-bubble {
+  max-width: 84%;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.nl-message-row.user .nl-message-bubble {
+  background: #1e40af;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.nl-message-row.assistant .nl-message-bubble {
+  background: #edf0f5;
+  color: #1f2937;
+  border-bottom-left-radius: 4px;
+}
+.nl-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.nl-suggestion-btn {
+  border: none;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.nl-input-wrap {
+  border-top: 1px solid var(--gray-200);
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  background: #fff;
+}
+.nl-input {
+  flex: 1;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+}
+.nl-send-btn {
+  border: none;
+  border-radius: 8px;
+  background: var(--color-accent, #1e40af);
+  color: #fff;
+  font-weight: 600;
+  padding: 0 14px;
+  cursor: pointer;
+}
+.nl-send-btn:disabled,
+.nl-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.nl-loading-dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 4px;
+  background: #475569;
+  border-radius: 50%;
+  animation: nl-bounce 1s infinite ease-in-out;
+}
+.nl-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.nl-loading-dots span:nth-child(3) { animation-delay: 0.3s; margin-right: 0; }
+@keyframes nl-bounce {
+  0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
 </style>
 </head>
 <body>
@@ -1462,6 +1624,27 @@ table.fi-account-table th {
   </div>
 </div>
 
+<button id="nl-chat-fab" class="nl-chat-fab" type="button" aria-label="Open Ask Aithenor chat" aria-expanded="false">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5h-8.02L6 19.98V16H5.5C4.67 16 4 15.33 4 14.5v-9Z" fill="white"/>
+  </svg>
+</button>
+
+<div id="nl-chat-panel" class="nl-chat-panel" role="dialog" aria-modal="false" aria-labelledby="nl-chat-title">
+  <div class="nl-chat-header">
+    <div>
+      <div id="nl-chat-title" class="nl-chat-title">Ask Aithenor</div>
+      <div class="nl-chat-subtitle">Ask anything about your hotel data</div>
+    </div>
+    <button id="nl-chat-close" class="nl-close-btn" type="button" aria-label="Close chat">×</button>
+  </div>
+  <div id="nl-thread" class="nl-thread" aria-live="polite"></div>
+  <div class="nl-input-wrap">
+    <input id="nl-input" class="nl-input" type="text" placeholder="Ask a question..." aria-label="Ask about hotel data" />
+    <button id="nl-send-btn" class="nl-send-btn" type="button">Send</button>
+  </div>
+</div>
+
 <script>
 let currentSnapshot = '';
 let currentPeriod = '';
@@ -1472,6 +1655,10 @@ let dashboardCards = [];
 let dashboardMeta = null;
 let currentEngineRow = null;
 let currentEngineJson = null;
+let nlConversationHistory = [];
+let nlPanelOpen = false;
+let nlWelcomeShown = false;
+let nlRequestPending = false;
 
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
@@ -1530,6 +1717,371 @@ function formatDate(dateStr) {
   } catch {
     return dateStr;
   }
+}
+
+function resetNLConversation() {
+  nlConversationHistory = [];
+  nlWelcomeShown = false;
+  const thread = document.getElementById('nl-thread');
+  if (thread) thread.innerHTML = '';
+}
+
+function buildNLContext() {
+  const ej = currentEngineJson || {};
+  const snap = currentEngineRow?.snapshot_date || 'unknown';
+  const hotelCode = currentEngineRow?.hotel_code || 'unknown';
+  const period = currentEngineRow?.period_label || 'unknown';
+
+  const diagnosis = ej.diagnosis || {};
+  const strSummary = {
+    mpi: diagnosis.metrics?.avgMPI,
+    ari: diagnosis.metrics?.avgARI,
+    rgi: diagnosis.metrics?.avgRGI,
+    occ: diagnosis.metrics?.avgOcc,
+    trend: diagnosis.trend_status,
+    diagnosis_type: diagnosis.diagnosis_type
+  };
+
+  const forwardSummary = (ej.forward_issues || []).map(f => ({
+    window: f.window_label || f.finding_key,
+    rn_ty: f.pace_data?.otb_rn_ty,
+    rn_stly: f.pace_data?.otb_rn_stly,
+    gap_pct: f.pace_data?.pace_gap_pct,
+    adr_ty: f.pace_data?.adr_ty,
+    signal: f.signal
+  }));
+
+  const pickupSummary = (ej.weekly_pickup_delta_issues || []).map(p => ({
+    window: p.window_class,
+    pickup_this_week: p.signal?.pickup_this_week,
+    required_weekly: p.signal?.required_weekly_pickup,
+    gap_to_forecast: p.signal?.gap_to_forecast,
+    direction: p.signal?.gap_direction
+  }));
+
+  const forecastSummary = (ej.forecast_gap_issues || []).map(f => ({
+    window: f.window_label || f.finding_key,
+    gap_rn: f.quantification?.gap_rn,
+    gap_revenue: f.quantification?.gap_revenue,
+    otb_vs_forecast_pct: f.quantification?.otb_vs_forecast_pct
+  }));
+
+  const segmentOverview = ej.segment_overview || {};
+  const activeSignals = (ej.active_segment_signals || []).map(s => ({
+    segment: s.display_name,
+    tier: s.tier,
+    rn_growth: s.rnGrowth,
+    adr_variance: s.adrVariance,
+    share_shift: s.shareShift,
+    signals: s.signal_types
+  }));
+
+  const corpRisk = (ej.corporate_account_pace_issues || [])
+    .find(c => c.card_type === 'corporate_pace_risk');
+  const corporateSummary = corpRisk ? {
+    accounts_at_risk: corpRisk.accounts_at_risk?.length || 0,
+    total_rn_shortfall: corpRisk.total_rn_at_risk,
+    revenue_at_risk: corpRisk.total_revenue_at_risk,
+    top_accounts: (corpRisk.accounts_at_risk || []).slice(0, 5).map(a => ({
+      name: a.company_name,
+      variance_pct: a.variance_pct,
+      variance_rn: a.variance_rn,
+      manager: a.account_manager
+    }))
+  } : null;
+
+  const groupSummary = (ej.group_pipeline_issues || []).map(g => ({
+    window: g.window_class,
+    tentative_rn: g.tentative_rn,
+    prospect_rn: g.prospect_rn,
+    gap_coverage_pct: g.gap_closure_pct,
+    top_group: g.groups?.[0]?.group_name,
+    top_group_rn: g.groups?.[0]?.room_nights,
+    top_group_revenue: g.groups?.[0]?.room_revenue
+  }));
+
+  const synthesis = ej.cross_segment_synthesis || {};
+  const primaryStory = synthesis.primary_story ? {
+    scenario: synthesis.primary_story.scenario_name,
+    situation: synthesis.primary_story.situation,
+    decision: synthesis.primary_story.decision,
+    financial_impact: synthesis.primary_story.financial_impact
+  } : null;
+
+  const demandCal = ej.demand_calendar || {};
+  const demandSummary = {
+    city: demandCal.city,
+    upcoming_holidays: (demandCal.public_holidays || []).slice(0, 5).map(h => ({
+      name: h.name,
+      date: h.date,
+      days_away: h.days_from_snapshot
+    })),
+    news_signals: (demandCal.news_signals || [])
+      .filter(n => n.impact !== 'neutral')
+      .slice(0, 5)
+      .map(n => ({
+        title: n.title,
+        impact: n.impact,
+        displacement: n.displacement_opportunity,
+        type: n.query_type
+      })),
+    outlook: demandCal.demand_outlook
+  };
+
+  const snapHistory = ej.snapshot_history_summary || {};
+
+  return {
+    hotel_code: hotelCode,
+    snapshot_date: snap,
+    period: period,
+    str: strSummary,
+    forward_pace: forwardSummary,
+    weekly_pickup: pickupSummary,
+    forecast_gaps: forecastSummary,
+    segment_overview: {
+      total_rn_ty: segmentOverview.total_rn_ty,
+      total_rn_ly: segmentOverview.total_rn_ly,
+      overall_adr_ty: segmentOverview.overall_adr_ty,
+      overall_adr_ly: segmentOverview.overall_adr_ly,
+      overall_adr_variance: segmentOverview.overall_adr_variance
+    },
+    active_segment_signals: activeSignals,
+    corporate_accounts: corporateSummary,
+    group_pipeline: groupSummary,
+    primary_commercial_story: primaryStory,
+    demand_intelligence: demandSummary,
+    snapshot_history: {
+      has_prior_snapshots: !!snapHistory.has_prior_data,
+      weeks_of_history: snapHistory.weeks_available
+    }
+  };
+}
+
+function buildNLSystemPrompt(context) {
+  return `You are Aithenor, the commercial intelligence engine for ${context.hotel_code}. You are answering questions from the hotel's General Manager or Revenue Director about their own data.
+
+CURRENT DATA SNAPSHOT: ${context.snapshot_date}
+PERIOD: ${context.period}
+
+YOUR FULL DATA CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+ANSWER RULES:
+- Answer in 2-4 sentences maximum unless a list is clearly better
+- Always cite specific numbers from the data
+- If the answer requires a calculation, show it briefly
+- If data for the question is not available in context, say exactly what is missing
+- Never invent numbers not in the context
+- Use € for currency
+- Speak as a senior commercial director, not a chatbot
+- No filler phrases like "Great question" or "Certainly"
+- If the question is about a trend over time and only one snapshot exists, say so honestly
+
+DECISION FRAMEWORK:
+Priority order: Profit (GOP) -> Rate quality -> Market share -> Volume.
+Discounting is never the first recommendation.
+High occupancy + low ADR = pricing problem.
+Weak MPI + strong ARI = overpricing risk.`;
+}
+
+function buildNLSuggestedQuestions(context) {
+  const out = [];
+  if (Array.isArray(context.weekly_pickup) && context.weekly_pickup.length) {
+    out.push('What changed in pickup this week?');
+  }
+  if (context.corporate_accounts) {
+    out.push('Which corporate accounts are most at risk?');
+  }
+  if (Array.isArray(context.group_pipeline) && context.group_pipeline.length) {
+    out.push('Which groups should I prioritize converting?');
+  }
+  out.push('What is my biggest commercial risk right now?');
+  out.push('What should I focus on this week?');
+  return out.slice(0, 4);
+}
+
+function appendNLMessage(role, text, isLoading = false) {
+  const thread = document.getElementById('nl-thread');
+  if (!thread) return null;
+  const row = document.createElement('div');
+  row.className = `nl-message-row ${role}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'nl-message-bubble';
+  if (isLoading) {
+    bubble.innerHTML = '<div class="nl-loading-dots"><span></span><span></span><span></span></div>';
+  } else {
+    bubble.textContent = text;
+  }
+  row.appendChild(bubble);
+  thread.appendChild(row);
+  thread.scrollTop = thread.scrollHeight;
+  return row;
+}
+
+function renderNLSuggestions() {
+  const thread = document.getElementById('nl-thread');
+  if (!thread || !currentEngineJson) return;
+  const context = buildNLContext();
+  const suggestions = buildNLSuggestedQuestions(context);
+  if (!suggestions.length) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'nl-suggestions';
+  wrap.id = 'nl-suggestions';
+  suggestions.forEach(q => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nl-suggestion-btn';
+    btn.textContent = q;
+    btn.addEventListener('click', () => {
+      const node = document.getElementById('nl-suggestions');
+      if (node) node.remove();
+      handleNLSend(q);
+    });
+    wrap.appendChild(btn);
+  });
+  thread.appendChild(wrap);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function ensureNLWelcome() {
+  if (nlWelcomeShown) return;
+  appendNLMessage(
+    'assistant',
+    'I have your full commercial data loaded. Ask me anything — pickup trends, segment performance, corporate accounts, group pipeline, forecast gaps, or what changed this week. What would you like to know?'
+  );
+  nlWelcomeShown = true;
+  renderNLSuggestions();
+}
+
+function openNLPanel() {
+  const panel = document.getElementById('nl-chat-panel');
+  const fab = document.getElementById('nl-chat-fab');
+  if (!panel || !fab) return;
+  panel.classList.add('open');
+  nlPanelOpen = true;
+  fab.setAttribute('aria-expanded', 'true');
+  ensureNLWelcome();
+  document.getElementById('nl-input')?.focus();
+}
+
+function closeNLPanel() {
+  const panel = document.getElementById('nl-chat-panel');
+  const fab = document.getElementById('nl-chat-fab');
+  if (!panel || !fab) return;
+  panel.classList.remove('open');
+  nlPanelOpen = false;
+  fab.setAttribute('aria-expanded', 'false');
+  resetNLConversation();
+}
+
+function toggleNLPanel() {
+  if (nlPanelOpen) closeNLPanel();
+  else openNLPanel();
+}
+
+async function sendNLQuery(userMessage, conversationHistory) {
+  const context = buildNLContext();
+  const system = buildNLSystemPrompt(context);
+  const clippedHistory = Array.isArray(conversationHistory)
+    ? conversationHistory.slice(-10)
+    : [];
+  const messages = [
+    ...clippedHistory,
+    { role: 'user', content: userMessage }
+  ];
+
+  const response = await fetch('/api/nl-query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, system })
+  });
+
+  if (!response.ok) {
+    throw new Error('nl query failed');
+  }
+
+  const data = await response.json();
+  return data?.content || '';
+}
+
+async function handleNLSend(forcedMessage) {
+  if (nlRequestPending) return;
+  const input = document.getElementById('nl-input');
+  const sendBtn = document.getElementById('nl-send-btn');
+  if (!input || !sendBtn) return;
+
+  const userMessage = (forcedMessage || input.value || '').trim();
+  if (!userMessage) return;
+
+  if (!currentEngineJson) {
+    appendNLMessage('assistant', 'Please load hotel data first');
+    if (!forcedMessage) input.value = '';
+    return;
+  }
+
+  const suggestions = document.getElementById('nl-suggestions');
+  if (suggestions) suggestions.remove();
+
+  appendNLMessage('user', userMessage);
+  if (!forcedMessage) input.value = '';
+
+  nlRequestPending = true;
+  input.disabled = true;
+  sendBtn.disabled = true;
+  const loadingNode = appendNLMessage('assistant', '', true);
+
+  try {
+    const responseText = await sendNLQuery(userMessage, nlConversationHistory);
+    if (loadingNode) loadingNode.remove();
+    const safeResponse = responseText || 'Unable to answer right now, please try again';
+    appendNLMessage('assistant', safeResponse);
+
+    nlConversationHistory = [
+      ...nlConversationHistory,
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: safeResponse }
+    ].slice(-10);
+
+    supabaseClient.from('nl_query_log').insert({
+      hotel_code: currentEngineRow?.hotel_code || 'unknown',
+      query_text: userMessage,
+      response_summary: safeResponse.substring(0, 500),
+      data_sources_used: ['engine_json', 'currentEngineJson'],
+      engine_json_snapshot: currentEngineRow?.snapshot_date
+    }).then(() => {}).catch(() => {});
+  } catch (err) {
+    if (loadingNode) loadingNode.remove();
+    appendNLMessage('assistant', 'Unable to answer right now, please try again');
+  } finally {
+    nlRequestPending = false;
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+function initNLChat() {
+  const fab = document.getElementById('nl-chat-fab');
+  const closeBtn = document.getElementById('nl-chat-close');
+  const sendBtn = document.getElementById('nl-send-btn');
+  const input = document.getElementById('nl-input');
+
+  fab?.addEventListener('click', toggleNLPanel);
+  closeBtn?.addEventListener('click', closeNLPanel);
+  sendBtn?.addEventListener('click', () => handleNLSend());
+  input?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleNLSend();
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && nlPanelOpen) {
+      closeNLPanel();
+    }
+  });
 }
 
 function isDemandCalendarRenderable(dc) {
@@ -5383,6 +5935,7 @@ async function loadDashboard() {
       dashboardMeta = null;
       currentEngineRow = null;
       currentEngineJson = null;
+      resetNLConversation();
       populatePeriodFilter([]);
       renderDashboard();
       showLoading(false);
@@ -5457,6 +6010,7 @@ async function loadDashboard() {
 
     currentEngineRow = engineRow;
     currentEngineJson = engineJson;
+    resetNLConversation();
 
     renderDashboard();
     showLoading(false);
@@ -5464,6 +6018,7 @@ async function loadDashboard() {
   } catch (err) {
     currentEngineRow = null;
     currentEngineJson = null;
+    resetNLConversation();
     showLoading(false);
     showError('Could not load data: ' + err.message);
     console.error(err);
@@ -5601,6 +6156,7 @@ async function logout() {
 }
 
 (async () => {
+  initNLChat();
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
     const hotelCode = session.user.user_metadata?.hotel || '';
