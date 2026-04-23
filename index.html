@@ -1587,6 +1587,7 @@ table.fi-account-table th {
         </div>
       </div>
 
+      <div id="commercial-verdict-slot" style="padding:0 24px;"></div>
       <div class="findings-groups-container" id="findings-groups-container">
       </div>
       <div class="empty-state" id="empty-state-columns" style="display:none">
@@ -2289,23 +2290,18 @@ function findingsUrgencyMatches(filter, priorityRaw) {
   return true;
 }
 
-function sanitizeVerdictPrimaryDecisionRoleNames(text) {
-  if (!text) return '';
-  let s = String(text);
-  const salesCtx = /\b(sales\s+director|vp\s+sales|chief\s+commercial|commercial\s+leadership|sales\s+leadership)\b/i.test(s);
-  const role = salesCtx ? 'the Sales Director' : 'the account manager';
-  s = s.replace(/\baccount\s+manager\s+([A-Z][a-z]{1,22})\s+([A-Z][a-z]{1,22})\b/gi, role);
-  s = s.replace(/\b([A-Z][a-z]{1,22})\s+([A-Z][a-z]{1,22})\s*,\s*account\s+manager\b/gi, role);
-  s = s.replace(/\b(contact|with|from|through)\s+([A-Z][a-z]{1,22})\s+([A-Z][a-z]{1,22})\b/gi,
-    (m, prep, a, b) => {
-      const two = `${a} ${b}`;
-      if (/^(United|Retail|Corporate|Hong|New|Los|San|Las|Lake|North|South|East|West)\b/i.test(two)) {
-        return m;
-      }
-      if (/segment|Transient|Wholesale|Contract|Convention|Government|Discount/i.test(two)) return m;
-      return `${prep} ${role}`;
-    });
-  return s;
+function applyVerdictPrimaryDecisionRoleMap(primaryDecision) {
+  let sanitized = primaryDecision != null ? String(primaryDecision) : '';
+  const roleMap = {
+    'Sophie Laurent': 'the Sales Director',
+    'Nadia Benali': 'the account manager',
+    'Marcus Chen': 'the account manager',
+    'James Holloway': 'the account manager'
+  };
+  for (const [name, role] of Object.entries(roleMap)) {
+    sanitized = sanitized.replaceAll(name, role);
+  }
+  return sanitized;
 }
 
 function buildCommercialVerdictBlockHtml(cv) {
@@ -2338,7 +2334,7 @@ function buildCommercialVerdictBlockHtml(cv) {
   }).join('');
 
   const primaryDecisionRaw = (cv.primary_decision != null ? String(cv.primary_decision) : '').trim();
-  const primaryDecision = sanitizeVerdictPrimaryDecisionRoleNames(primaryDecisionRaw);
+  const primaryDecision = applyVerdictPrimaryDecisionRoleMap(primaryDecisionRaw);
   const decisionBlock = primaryDecision
     ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200);font-size:13px;font-style:italic;color:var(--gray-600);line-height:1.6;">${escHtml(primaryDecision)}</div>`
     : '';
@@ -2367,13 +2363,19 @@ function formatSynthesisStrValidationForDisplay(raw) {
   return String(raw).trim();
 }
 
+function truncateAtWord(str, maxChars) {
+  if (!str || str.length <= maxChars) return str;
+  const cut = str.lastIndexOf(' ', maxChars);
+  return cut > 0 ? str.slice(0, cut) + '…' : str.slice(0, maxChars) + '…';
+}
+
 function deriveSynthesisCardTitle(card) {
   const rawT = card.title != null ? String(card.title).trim() : '';
   if (rawT && rawT.toLowerCase() !== 'cross-segment synthesis') return rawT;
   const sit = (card.situation != null ? String(card.situation) : '').trim();
   if (!sit) return 'Cross-segment synthesis';
   const first = sit.split(/(?<=[.!?])\s+/)[0].trim() || sit;
-  return first.length > 60 ? `${first.slice(0, 60).trim()}...` : first;
+  return truncateAtWord(first, 72);
 }
 
 function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
@@ -3668,6 +3670,10 @@ function buildForwardCards(engineRow, engineJson) {
     issue_family: issue.issue_family,
     forward_window: issue.forward_window,
     pace_data: issue.pace_data || null,
+    window_start_date: issue.window_start_date || issue.pace_data?.window_start_ymd || null,
+    window_end_date: issue.window_end_date || issue.pace_data?.window_end_ymd || null,
+    start_date: issue.start_date || null,
+    end_date: issue.end_date || null,
     trigger_display: '',
     has_null_metrics: true,
     value_at_stake: null,
@@ -3679,47 +3685,69 @@ function buildForwardCards(engineRow, engineJson) {
   }));
 }
 
-function parseYmdToUtcMidnight(ymd) {
-  const p = String(ymd || '').trim().split(/[-T]/);
+function parseLocalDateYmd(value) {
+  const p = String(value || '').trim().split(/[-T]/);
   if (p.length < 3) return null;
   const y = Number(p[0]);
   const mo = Number(p[1]) - 1;
   const d = Number(p[2]);
   if (![y, mo, d].every(Number.isFinite)) return null;
-  const t = Date.UTC(y, mo, d);
-  return Number.isNaN(t) ? null : t;
+  const dt = new Date(y, mo, d);
+  if (Number.isNaN(dt.getTime())) return null;
+  dt.setHours(0, 0, 0, 0);
+  return dt;
 }
 
-/** Days left in forward window from snapshot date; null if dates missing. */
+/** Calendar days remaining in forward window (browser local midnight). */
 function computeForwardDaysRemainingInWindow(card) {
-  const pd = card.pace_data;
-  const startY = pd?.window_start_ymd;
-  const endY = pd?.window_end_ymd;
-  const snap = card.snapshot_date;
-  const endMs = parseYmdToUtcMidnight(endY);
-  const todayMs = parseYmdToUtcMidnight(snap);
-  if (endMs == null || todayMs == null) return null;
-  const msDay = 86400000;
-  const startMs = parseYmdToUtcMidnight(startY);
-  const windowLenDays = startMs != null
-    ? Math.max(1, Math.round((endMs - startMs) / msDay) + 1)
-    : 30;
-  if (startMs != null && todayMs < startMs) return windowLenDays;
-  if (startMs == null && todayMs < endMs) {
-    return Math.max(0, Math.round((endMs - todayMs) / msDay));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const wsRaw = card.window_start_date || card.start_date || card.pace_data?.window_start_ymd;
+  const weRaw = card.window_end_date || card.end_date || card.pace_data?.window_end_ymd;
+  const windowStart = parseLocalDateYmd(wsRaw);
+  const windowEnd = parseLocalDateYmd(weRaw);
+  if (!windowStart || !windowEnd) return null;
+  let daysRemaining;
+  if (windowStart > today) {
+    daysRemaining = Math.round((windowEnd - windowStart) / 86400000);
+  } else if (windowEnd >= today) {
+    daysRemaining = Math.round((windowEnd - today) / 86400000);
+  } else {
+    daysRemaining = 0;
   }
-  if (todayMs >= endMs) return 0;
-  return Math.max(0, Math.round((endMs - todayMs) / msDay));
+  return daysRemaining;
 }
 
-function replaceForwardNarrativeHardcodedWindowDays(text, daysRemaining) {
+function applyForwardDaysRemainingPhrases(text, daysRemaining) {
   if (text == null || daysRemaining == null || !Number.isFinite(daysRemaining)) return text;
   const d = Math.round(daysRemaining);
-  return String(text)
-    .replace(/\b30\s+days\s+remaining\s+in\s+the\s+window\b/gi, `${d} days remaining in the window`)
-    .replace(/\b30\s+days\s+left\s+in\s+the\s+window\b/gi, `${d} days left in the window`)
-    .replace(/(\d+)\s+days\s+remaining\s+in\s+the\s+window/gi, (full, num) =>
-      (Number(num) === 30 ? `${d} days remaining in the window` : full));
+  let s = String(text);
+  const closed = 'window has closed';
+  if (d === 0) {
+    return s
+      .replace(/\b\d+\s+days\s+remaining\s+in\s+the\s+window\b/gi, closed)
+      .replace(/\b\d+\s+days\s+left\s+in\s+the\s+window\b/gi, closed)
+      .replace(/\b30\s+days\s+remaining\b/gi, closed);
+  }
+  return s
+    .replace(/\b\d+\s+days\s+remaining\s+in\s+the\s+window\b/gi, `${d} days remaining in the window`)
+    .replace(/\b\d+\s+days\s+left\s+in\s+the\s+window\b/gi, `${d} days left in the window`)
+    .replace(/\b30\s+days\s+remaining\b/gi, `${d} days remaining`);
+}
+
+function stripDaysRemainInThisWindowFromText(text) {
+  return String(text || '')
+    .replace(/\d+\s+days\s+remain(ing)?\s+in\s+this\s+window\.?/gi, '')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function cleanupForwardAnalysisDoublePeriods(analysisText) {
+  return String(analysisText || '')
+    .replace(/\.\.+/g, '.')
+    .replace(/\.\s*\./g, '.');
 }
 
 function inferForwardHorizonBucket(card) {
@@ -5695,9 +5723,11 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
 
 function renderFindings() {
   const container = document.getElementById('findings-groups-container');
+  const verdictSlot = document.getElementById('commercial-verdict-slot');
   const emptyCols = document.getElementById('empty-state-columns');
   if (!container || !emptyCols) return;
 
+  if (verdictSlot) verdictSlot.innerHTML = '';
   container.innerHTML = '';
   findingsUrgencyFilter = 'all';
 
@@ -5730,6 +5760,7 @@ function renderFindings() {
     hasCommercialVerdict;
 
   if (!hasAny) {
+    if (verdictSlot) verdictSlot.innerHTML = '';
     emptyCols.style.display = 'block';
     return;
   }
@@ -5738,8 +5769,8 @@ function renderFindings() {
 
   const verdictCv = hasCommercialVerdict ? engineJson.commercial_verdict : null;
   const verdictHtml = verdictCv ? buildCommercialVerdictBlockHtml(verdictCv) : '';
-  if (verdictHtml) {
-    container.insertAdjacentHTML('beforeend', verdictHtml);
+  if (verdictHtml && verdictSlot) {
+    verdictSlot.insertAdjacentHTML('beforeend', verdictHtml);
   }
 
   const urgencyTabsHtml = `<div class="tabs-row" id="findings-urgency-tabs" style="margin-bottom:12px;">
@@ -6224,7 +6255,8 @@ function renderForwardCard(card) {
   let narrative = (card.commercial_narrative || '').toString().trim();
   if (card.granularity !== 'forecast_gap') {
     const daysRem = computeForwardDaysRemainingInWindow(card);
-    narrative = replaceForwardNarrativeHardcodedWindowDays(narrative, daysRem);
+    narrative = applyForwardDaysRemainingPhrases(narrative, daysRem);
+    narrative = stripDaysRemainInThisWindowFromText(narrative);
   }
 
   const splitForwardSentences = para =>
@@ -6302,6 +6334,11 @@ function renderForwardCard(card) {
 
   forwardAnalysisNarrative = stripTrailingSentenceIfMatchesDecision(
     forwardAnalysisNarrative, decisionLine, rawDecisionLine);
+
+  if (card.granularity !== 'forecast_gap') {
+    forwardAnalysisNarrative = stripDaysRemainInThisWindowFromText(forwardAnalysisNarrative);
+  }
+  forwardAnalysisNarrative = cleanupForwardAnalysisDoublePeriods(forwardAnalysisNarrative);
 
   const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
   const forwardImpactLine = buildForwardImpactLine(card);
