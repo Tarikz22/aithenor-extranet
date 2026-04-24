@@ -1591,7 +1591,7 @@ table.fi-account-table th {
         </div>
       </div>
 
-      <div id="commercial-verdict-slot" style="padding:0 24px;"></div>
+      <div id="aithenor-verdict-slot" style="padding:0 24px;"></div>
       <div class="findings-groups-container" id="findings-groups-container">
       </div>
       <div class="empty-state" id="empty-state-columns" style="display:none">
@@ -2374,9 +2374,18 @@ function truncateAtWord(str, maxChars) {
 }
 
 function deriveSynthesisCardTitle(card) {
-  const rawT = card.title != null ? String(card.title).trim() : '';
-  if (rawT && rawT.toLowerCase() !== 'cross-segment synthesis') return rawT;
+  let synthTitle = String(card.title || card.situation || '').trim();
+  synthTitle = synthTitle
+    .replace(/\b0\s+window\(s\)/gi, 'no windows')
+    .replace(/\b1\s+window\(s\)/gi, '1 window')
+    .replace(/\b(\d+)\s+window\(s\)/gi, '$1 windows');
   const sit = (card.situation != null ? String(card.situation) : '').trim();
+  const scenarioType = String(card.scenario_type || card.scenario || card.issue_family || '').trim();
+  if (/^(s6|pace_timing_misread|pace_timing|volume_without_rate_forward)$/i.test(scenarioType) &&
+      /^forward\s+otb\s+shows/i.test(sit)) {
+    synthTitle = 'All forward windows trailing STLY — pace timing risk';
+  }
+  if (synthTitle && synthTitle.toLowerCase() !== 'cross-segment synthesis') return synthTitle;
   if (!sit) return 'Cross-segment synthesis';
   const first = sit.split(/(?<=[.!?])\s+/)[0].trim() || sit;
   return truncateAtWord(first, 72);
@@ -3202,6 +3211,8 @@ function buildWhyLine(card, insightText) {
     const euro = formatImpactEuroPlus(v);
     return euro ? `${euro} estimated revenue exposure.` : '';
   }
+  const explicitOutcome = (card.expected_outcome != null ? String(card.expected_outcome) : '').trim();
+  if (explicitOutcome) return explicitOutcome;
   return '';
 }
 
@@ -5727,7 +5738,7 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
 
 function renderFindings() {
   const container = document.getElementById('findings-groups-container');
-  const verdictSlot = document.getElementById('commercial-verdict-slot');
+  const verdictSlot = document.getElementById('aithenor-verdict-slot');
   const emptyCols = document.getElementById('empty-state-columns');
   if (!container || !emptyCols) return;
 
@@ -5929,7 +5940,7 @@ function renderFindings() {
       })(),
       finding: sic.situation,
       root_cause: sic.diagnosis,
-      expected_outcome: sic.decision,
+      expected_outcome: sic.financial_impact?.description || sic.decision || '',
       enforced_decision_line: sic.decision,
       enforced_execution_actions: Array.isArray(sic.execution_actions)
         ? sic.execution_actions : [],
@@ -6434,12 +6445,13 @@ function renderForwardCard(card) {
     forwardAnalysisNarrative = forwardAnalysisNarrative
       .split('\n\n')
       .map(para => {
-        const sents = para
-          .split(/\.\s+/)
+        const analysisWithBreaks = para
+          .split(/(?<=\.)\s+(?=[A-Z])/)
           .map(s => s.trim())
           .filter(Boolean)
-          .filter(s => !s.toLowerCase().includes('snapshot history'));
-        return sents.join('.  ');
+          .filter(s => !s.toLowerCase().includes('snapshot history'))
+          .join('\n\n');
+        return analysisWithBreaks;
       })
       .map(p => p.trim())
       .filter(Boolean)
