@@ -483,6 +483,10 @@ body {
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
+.finding-card.opportunity-card {
+  border-left: 3px solid #3B6D11;
+}
+
 /* ── Phase 2: Forecast Gap cards — right column, after pace cards ── */
 /* Purple-violet left border distinguishes from orange (historical)  */
 /* and the existing blue forward pace cards                          */
@@ -5748,6 +5752,23 @@ function renderFindings() {
     ? engineJson.group_pipeline_issues : [];
   const synthesisCardsList = Array.isArray(engineJson?.cross_segment_synthesis?.synthesis_cards)
     ? engineJson.cross_segment_synthesis.synthesis_cards : [];
+  const segmentIssueCards = Array.isArray(engineJson?.segment_issue_cards)
+    ? engineJson.segment_issue_cards : [];
+  const PACE_SCENARIOS = new Set([
+    'S6', 'pace_timing_misread', 'pace_timing', 'volume_without_rate_forward'
+  ]);
+  const synthForSegmentation = synthesisCardsList.filter(sc => {
+    const scType = sc.scenario_type || sc.scenario || sc.issue_family || '';
+    // Route to Pace if scenario is pace-related OR situation text mentions OTB/window
+    if (PACE_SCENARIOS.has(scType)) return false;
+    const sit = String(sc.situation || '').toLowerCase();
+    if (/\botb\b|\bwindow\b|\bpace\b/.test(sit) &&
+        !/negotiated|retail|wholesale|corporate|segment/.test(sit)) return false;
+    return true;
+  });
+  const synthForPace = synthesisCardsList.filter(sc => {
+    return !synthForSegmentation.includes(sc);
+  });
   const cvRaw = engineJson?.commercial_verdict;
   const hasCommercialVerdict = cvRaw && typeof cvRaw === 'object' &&
     String(cvRaw.verdict_text || '').trim() !== '';
@@ -5757,6 +5778,7 @@ function renderFindings() {
     forecastGapIssues.length ||
     weeklyPickupIssues.length || corporatePaceIssues.length ||
     groupPipelineIssues.length || synthesisCardsList.length ||
+    segmentIssueCards.length ||
     hasCommercialVerdict;
 
   if (!hasAny) {
@@ -5841,7 +5863,7 @@ function renderFindings() {
     : '';
   let segSynthHtml = '';
   const fiSnapSeg = (currentEngineRow?.snapshot_date || '').toString();
-  synthesisCardsList.forEach((sc, i) => {
+  synthForSegmentation.forEach((sc, i) => {
     if (!sc || typeof sc !== 'object') return;
     const fin = sc.financial_impact ?? sc.financialImpact;
     const finStr = typeof fin === 'string' ? fin
@@ -5880,10 +5902,72 @@ function renderFindings() {
     };
     segSynthHtml += renderSynthesisCardAsRetailTemplate(synthCard, fiSnapSeg, i);
   });
-  const segCardsHtml = segRetailHtml + segSynthHtml;
+  let segIssueCardsHtml = '';
+  for (const sic of segmentIssueCards) {
+    if (!sic || typeof sic !== 'object') continue;
+    // Opportunity cards render with green left border, issue cards with orange
+    const isOpportunity = sic.signal_type === 'opportunity';
+    const sicCard = {
+      id: 'SEG_' + (sic.finding_key || sic.segment || '') + '_'
+          + (currentEngineRow?.snapshot_date || ''),
+      finding_key: sic.finding_key,
+      title: sic.title || sic.display_name || 'Segment signal',
+      priority: sic.priority || 'medium',
+      segment: sic.segment,
+      trigger_display: (() => {
+        const sv = sic.str_validation || {};
+        const mpi = sv.mpi ?? null;
+        const ari = sv.ari ?? null;
+        const rgi = sv.rgi ?? null;
+        const has = [mpi, ari, rgi].some(v => v != null && Number.isFinite(Number(v)));
+        if (!has) return '—';
+        return [
+          mpi != null ? Number(mpi).toFixed(1) : '—',
+          ari != null ? Number(ari).toFixed(1) : '—',
+          rgi != null ? Number(rgi).toFixed(1) : '—'
+        ].join(' / ');
+      })(),
+      finding: sic.situation,
+      root_cause: sic.diagnosis,
+      expected_outcome: sic.decision,
+      enforced_decision_line: sic.decision,
+      enforced_execution_actions: Array.isArray(sic.execution_actions)
+        ? sic.execution_actions : [],
+      card_metrics: null,
+      issue_family: sic.issue_family || '',
+      key_insight: sic.situation || '',
+      department: 'Revenue',
+      actions: []
+    };
+    let sicHtml = renderCard(sicCard);
+    sicHtml = sicHtml.replace(
+      /Observed window:[^<]*/,
+      `Segment: ${escHtml(sic.display_name || sic.segment || '')}`
+    );
+    if (sic.str_validation?.interpretation) {
+      const strInsert = `
+        <div class="finding-section">
+          <div class="section-label">STR VALIDATION</div>
+          <div class="section-text">${escHtml(sic.str_validation.interpretation)}</div>
+        </div>`;
+      sicHtml = sicHtml.replace(
+        /(<div class="section-label">IMPACT<\/div>)/,
+        strInsert + '$1'
+      );
+    }
+    if (isOpportunity) {
+      sicHtml = sicHtml.replace(
+        'class="finding-card',
+        'class="finding-card opportunity-card'
+      );
+    }
+    segIssueCardsHtml += sicHtml;
+  }
+  const segCardsHtml = segRetailHtml + segSynthHtml + segIssueCardsHtml;
   if (segCardsHtml) {
     const s = summaries.segmentation;
-    const segCount = historicalCards.length + synthesisCardsList.length;
+    const segCount = historicalCards.length + synthForSegmentation.length
+      + segmentIssueCards.length;
     const histSparklineHtml = buildStrWeeklySparklineBlockHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('historical', 'Segmentation',
@@ -6088,16 +6172,56 @@ function renderFindings() {
   }
 
   // ── GROUP 4: Pace Analysis ────────────────────────────
-  if (forwardCards.length > 0) {
+  if (forwardCards.length > 0 || synthForPace.length > 0) {
     const s = summaries.forward;
-    const cardsHtml = forwardCards
+    let cardsHtml = forwardCards
       .map(card => renderForwardCard(card))
       .join('');
-    const fwdPaceChartHtml = buildForwardPaceChartHtml(engineJson);
+    synthForPace.forEach((sc, i) => {
+      if (!sc || typeof sc !== 'object') return;
+      const fin = sc.financial_impact ?? sc.financialImpact;
+      const finStr = typeof fin === 'string' ? fin
+        : (fin != null && typeof fin === 'object'
+          ? [
+              fin.headline,
+              fin.summary,
+              fin.range,
+              fin.amount != null ? String(fin.amount) : null
+            ].filter(Boolean).join(' — ')
+          : '');
+      const synthCard = {
+        title: (sc.title != null && String(sc.title).trim()) ? String(sc.title).trim()
+          : ((sc.headline != null && String(sc.headline).trim()) ? String(sc.headline).trim()
+            : 'Cross-segment synthesis'),
+        priority: (sc.priority != null ? String(sc.priority) : 'medium').toLowerCase(),
+        trigger_display: (() => {
+          const cm = sc.card_metrics || sc.cardMetrics;
+          const mpi = cm?.avgMPI ?? sc.mpi;
+          const ari = cm?.avgARI ?? sc.ari;
+          const rgi = cm?.avgRGI ?? sc.rgi;
+          const has = [mpi, ari, rgi].some(v => v != null && Number.isFinite(Number(v)));
+          if (!has) return '—';
+          return [
+            mpi != null ? Number(mpi).toFixed(1) : '—',
+            ari != null ? Number(ari).toFixed(1) : '—',
+            rgi != null ? Number(rgi).toFixed(1) : '—'
+          ].join(' / ');
+        })(),
+        situation: sc.situation,
+        diagnosis: sc.diagnosis,
+        str_validation: sc.str_validation ?? sc.strValidation,
+        scenario_type: sc.scenario_type ?? sc.scenarioType,
+        decision: sc.decision,
+        financial_impact: finStr
+      };
+      cardsHtml += renderSynthesisCardAsRetailTemplate(synthCard, fiSnapSeg, i);
+    });
+    const fwdPaceChartHtml = forwardCards.length > 0 ? buildForwardPaceChartHtml(engineJson) : '';
+    const paceCount = forwardCards.length + synthForPace.length;
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('forward', 'Pace Analysis',
         s.brief, s.metric, s.metricClass, s.metaLabel,
-        s.count, cardsHtml, s.pills, fwdPaceChartHtml)
+        paceCount, cardsHtml, s.pills, fwdPaceChartHtml)
     );
   }
 
