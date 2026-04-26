@@ -6079,13 +6079,16 @@ function renderFindings() {
   let segIssueCardsHtml = '';
   for (const sic of segmentIssueCards) {
     if (!sic || typeof sic !== 'object') continue;
+    let cardTitle = String(sic.title || sic.display_name || 'Segment signal');
+    // Strip scenario codes from title e.g. "(S4)", "(S5)", "(S7)"
+    cardTitle = cardTitle.replace(/\s*\(S\d+\)\s*/gi, '').trim();
     // Opportunity cards render with green left border, issue cards with orange
     const isOpportunity = sic.signal_type === 'opportunity';
     const sicCard = {
       id: 'SEG_' + (sic.finding_key || sic.segment || '') + '_'
           + (currentEngineRow?.snapshot_date || ''),
       finding_key: sic.finding_key,
-      title: sic.title || sic.display_name || 'Segment signal',
+      title: cardTitle,
       priority: sic.priority || 'medium',
       segment: sic.segment,
       trigger_display: (() => {
