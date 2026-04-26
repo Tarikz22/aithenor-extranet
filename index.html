@@ -2397,11 +2397,12 @@ function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
   const pr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
   const priorityStripe = ['critical', 'high', 'medium', 'low'].includes(pr) ? pr : 'medium';
   const trigger = (card.trigger_display != null ? String(card.trigger_display) : '—').trim() || '—';
-  let situation = (card.situation != null ? String(card.situation) : '').trim();
-  situation = situation
+  const rawSituation = String(card.situation || '');
+  const cleanSituation = rawSituation
     .replace(/\b0\s+window\(s\)/gi, 'no windows')
     .replace(/\b1\s+window\(s\)/gi, '1 window')
-    .replace(/\b(\d+)\s+window\(s\)/gi, '$1 windows');
+    .replace(/\b(\d+)\s+window\(s\)/gi, '$1 windows')
+    .trim();
   const diagnosis = (card.diagnosis != null ? String(card.diagnosis) : '').trim();
   const strVal = formatSynthesisStrValidationForDisplay(card.str_validation);
   const decision = (card.decision != null ? String(card.decision) : '').trim();
@@ -2428,10 +2429,10 @@ function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
         </div>
       </div>
       <div class="finding-body">
-        ${situation ? `
+        ${cleanSituation ? `
         <div class="finding-section">
           <div class="section-label">SITUATION</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
+          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(cleanSituation)}</div>
         </div>` : ''}
         ${diagnosis ? `
         <div class="finding-section">
@@ -3866,6 +3867,60 @@ function buildForwardAnalysisParagraphBlocks(text) {
   };
 
   return [toParagraph(block1), toParagraph(block2), toParagraph(block3)].filter(Boolean);
+}
+
+function buildForecastGapAnalysisParagraphBlocks(text) {
+  const sentences = tokenizeForwardAnalysisSentences(text);
+  if (!sentences.length) return [];
+  const block1 = [];
+  const block2 = [];
+  const block3 = [];
+  const block4 = [];
+  const block5 = [];
+  const block6 = [];
+  const segmentLead = /^(transient|corporate|group|leisure|business|ota|crew|contract|mice|consortia|bar|direct|discount|negotiated|retail|wholesale)\b/i;
+
+  sentences.forEach(sentence => {
+    const s = sentence.trim();
+    if (!s) return;
+    if (s.includes('→')) {
+      block1.push(s);
+      return;
+    }
+    if (/^otb\s+is\b/i.test(s)) {
+      block2.push(s);
+      return;
+    }
+    if (/^(forecast:|otb:|revenue\s+gap:)/i.test(s)) {
+      block3.push(s);
+      return;
+    }
+    if (segmentLead.test(s)) {
+      block4.push(s);
+      return;
+    }
+    if (/^forecast\s+challenge\b/i.test(s)
+      || /^current\s+otb\b/i.test(s)
+      || /^validate\b/i.test(s)) {
+      block5.push(s);
+      return;
+    }
+    if (/^based\s+on\b/i.test(s)) {
+      block6.push(s);
+      return;
+    }
+    if (!block1.length) block1.push(s);
+    else if (!block2.length) block2.push(s);
+    else if (!block3.length) block3.push(s);
+    else if (!block4.length) block4.push(s);
+    else if (!block5.length) block5.push(s);
+    else block6.push(s);
+  });
+
+  const toBlock = arr => arr.join(' ').replace(/\s+/g, ' ').trim();
+  return [block1, block2, block3, block4, block5, block6]
+    .map(toBlock)
+    .filter(Boolean);
 }
 
 function inferForwardHorizonBucket(card) {
@@ -6555,7 +6610,10 @@ function renderForwardCard(card) {
       .join('\n\n')
       .trim();
   }
-  const forwardAnalysisParagraphs = buildForwardAnalysisParagraphBlocks(forwardAnalysisNarrative);
+  const isForecastGapCard = card.granularity === 'forecast_gap';
+  const forwardAnalysisParagraphs = isForecastGapCard
+    ? buildForecastGapAnalysisParagraphBlocks(forwardAnalysisNarrative)
+    : buildForwardAnalysisParagraphBlocks(forwardAnalysisNarrative);
 
   const rawDecisionLine = (card.enforced_decision_line || '').toString().trim();
   let decisionLine = rawDecisionLine;
@@ -6647,7 +6705,7 @@ function renderForwardCard(card) {
         ${forwardAnalysisParagraphs.length ? `
         <div class="finding-section">
           <div class="section-label">FORWARD ANALYSIS</div>
-          <div class="section-text" style="line-height: 1.7; font-size: 13px;">${forwardAnalysisParagraphs.join('<br>')}</div>
+          <div class="section-text" style="line-height: 1.7; font-size: 13px;">${isForecastGapCard ? escHtml(forwardAnalysisParagraphs.join('\n\n')).replace(/\n\n/g, '<br><br>') : forwardAnalysisParagraphs.join('<br>')}</div>
         </div>` : ''}
         <div class="finding-section">
           <div class="section-label">IMPACT</div>
