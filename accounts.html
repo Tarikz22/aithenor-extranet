@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Corporate Accounts</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --navy-light: #243F72;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --gold-pale: #FBF6EA;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --red: #C0392B;
+  --red-light: #FDECEA;
+  --orange: #D35400;
+  --orange-light: #FEF0E7;
+  --amber: #B8860B;
+  --amber-light: #FEF9E7;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--gray-900); min-height: 100vh; }
+.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; z-index: 100; border-right: 1px solid rgba(201,168,76,0.15); }
+.sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.logo-text { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--white); letter-spacing: 4px; text-transform: uppercase; }
+.logo-sub { font-size: 9px; color: var(--gold); letter-spacing: 2.5px; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
+.hotel-card { margin: 16px 14px; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); border-radius: 8px; padding: 12px 14px; }
+.hotel-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 600; color: var(--white); }
+.hotel-meta { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.3px; }
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+.nav-section { padding: 12px 20px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
+.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; min-width: 18px; text-align: center; }
+.sidebar-bottom { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+.sync-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.35); }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.main { margin-left: var(--sidebar-w); min-height: 100vh; }
+.topbar { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--navy); }
+.topbar-sub { color: var(--gray-600); font-size: 12px; letter-spacing: .04em; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.chip { border: 1px solid var(--gray-200); padding: 7px 10px; border-radius: 999px; font-size: 12px; color: var(--gray-600); }
+.btn { border: 1px solid var(--gray-300); border-radius: 999px; font-size: 12px; padding: 8px 12px; background: #fff; cursor: pointer; font-family: inherit; }
+.btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.content { padding: 24px 32px 40px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.summary-tile { background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; }
+.summary-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-600); margin-bottom: 8px; }
+.summary-value { font-size: 24px; color: var(--navy); font-weight: 600; }
+.summary-sub { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+.controls { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab { border: 1px solid var(--gray-300); background: #fff; border-radius: 999px; padding: 8px 12px; font-size: 12px; cursor: pointer; }
+.tab.active { border-color: var(--gold); color: var(--navy); background: var(--gold-pale); }
+.control-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.search { border: 1px solid var(--gray-300); border-radius: 10px; padding: 9px 12px; min-width: 260px; font-family: inherit; }
+.sort { border: 1px solid var(--gray-300); border-radius: 10px; padding: 9px 10px; font-family: inherit; }
+.panel { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden; }
+.group-head { padding: 10px 14px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+.group-risk { background: var(--red-light); color: var(--red); }
+.group-ahead { background: var(--green-light); color: var(--green); }
+.group-track { background: var(--gray-100); color: var(--gray-600); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 1280px; }
+thead th { background: var(--gray-100); color: var(--gray-600); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 10px; text-align: left; border-bottom: 1px solid var(--gray-200); }
+tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 13px; vertical-align: top; }
+.account-main { font-weight: 600; color: var(--navy); }
+.account-sub { margin-top: 2px; color: var(--gray-600); font-size: 12px; }
+.num { white-space: nowrap; }
+.bar-cell { min-width: 190px; }
+.bar-wrap { display: flex; align-items: center; gap: 8px; }
+.bar-track { flex: 1; background: var(--gray-200); border-radius: 999px; height: 8px; overflow: hidden; }
+.bar-fill { height: 100%; }
+.bar-neg { background: var(--red); }
+.bar-pos { background: var(--green); }
+.status { border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 600; display: inline-block; }
+.status-risk { background: var(--red-light); color: var(--red); }
+.status-ahead { background: var(--green-light); color: var(--green); }
+.status-track { background: var(--gray-100); color: var(--gray-600); }
+.comment-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state { display: none; align-items: center; justify-content: center; min-height: 280px; color: var(--gray-600); }
+.state.visible { display: flex; }
+.login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
+.login-card { width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 1px solid rgba(15,31,61,0.1); border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(15,31,61,0.12); }
+.brand-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.brand-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; margin-bottom: 8px; color: var(--navy); }
+.brand-copy { color: var(--gray-600); line-height: 1.6; margin-bottom: 18px; }
+.field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); margin: 12px 0 6px; }
+.input { width: 100%; border: 1px solid var(--gray-300); border-radius: 10px; padding: 12px; font-family: inherit; }
+.login-btn { width: 100%; margin-top: 16px; border: none; border-radius: 10px; padding: 12px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
+.login-error { display: none; margin-top: 10px; color: var(--red); font-size: 12px; }
+.app-screen { display: none; }
+@media (max-width: 980px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 18px; }
+  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .search { min-width: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="brand-kicker">Aithenor</div>
+    <h1 class="brand-title">Accounts Workspace</h1>
+    <div class="brand-copy">Sales Director working page for negotiated corporate accounts.</div>
+    <form onsubmit="handleLogin(event)">
+      <label class="field-label">Email</label>
+      <input class="input" type="email" id="login-email" required>
+      <label class="field-label">Password</label>
+      <input class="input" type="password" id="login-password" required>
+      <button class="login-btn" id="login-btn" type="submit">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<div class="app-screen" id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Aithenor</div>
+      <div class="logo-sub">Strategic Intelligence</div>
+    </div>
+    <div class="hotel-card">
+      <div class="hotel-name" id="sidebar-hotel">Hotel</div>
+      <div class="hotel-meta" id="sidebar-period">Loading...</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Executive</div>
+      <a class="nav-item" href="gm.html"><span class="nav-icon">✦</span>GM Briefing</a>
+      <div class="nav-section">Intelligence</div>
+      <a class="nav-item" href="index.html"><span class="nav-icon">◈</span>Insights<span class="nav-badge">•</span></a>
+      <div class="nav-item"><span class="nav-icon">◇</span>Revenue Modules</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Cost Modules</div>
+      <div class="nav-section">Execution</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Value Tracker</div>
+      <a class="nav-item active" href="accounts.html"><span class="nav-icon">◉</span>Accounts</a>
+      <div class="nav-item"><span class="nav-icon">◇</span>Action Tracker</div>
+      <div class="nav-section">Performance</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Historical Analysis</div>
+      <div class="nav-section">Settings</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Hotel Profile</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Upload Data</div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sync-status"><div class="sync-dot"></div><span>Connected to Supabase</span></div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
+        <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
+        <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Negotiated Corporate Accounts</div>
+        <div class="topbar-sub">Sales Director execution view — pace, ownership, and revenue impact.</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" onclick="loadAccounts()">Refresh</button>
+        <a class="btn btn-primary" href="index.html" style="text-decoration:none;">Back to Insights</a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="state visible" id="loading-state">Loading account pace data...</div>
+      <div class="state" id="error-state">Could not load corporate pace issues.</div>
+      <div class="state" id="empty-state">No corporate account pace data found for this hotel.</div>
+
+      <div id="dashboard" style="display:none;">
+        <div class="summary-grid">
+          <div class="summary-tile"><div class="summary-label">Total Accounts</div><div class="summary-value" id="s-total">0</div><div class="summary-sub">Tracked in current extract</div></div>
+          <div class="summary-tile"><div class="summary-label">At Risk</div><div class="summary-value" id="s-risk">0</div><div class="summary-sub" id="s-risk-sub">RN shortfall: 0</div></div>
+          <div class="summary-tile"><div class="summary-label">Ahead</div><div class="summary-value" id="s-ahead">0</div><div class="summary-sub">Accounts pacing above LY</div></div>
+          <div class="summary-tile"><div class="summary-label">Estimated Revenue At Risk</div><div class="summary-value" id="s-rev-risk">€0</div><div class="summary-sub">Directional estimate</div></div>
+        </div>
+
+        <div class="controls">
+          <div class="tabs" id="tabs"></div>
+          <div class="control-right">
+            <input class="search" id="search" placeholder="Search company, manager, sector, comments">
+            <select class="sort" id="sort">
+              <option value="worst">Worst pace first</option>
+              <option value="best">Best pace first</option>
+              <option value="name">Name A-Z</option>
+              <option value="ly">Largest LY RN first</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel" id="table-panel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STATE = { accounts: [], activeTab: 'all' };
+const TABS = ['all', 'risk', 'ahead', 'track'];
+
+function escHtml(str) {
+  if (str == null) return '';
+  return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function n(v) { const num = Number(v); return Number.isFinite(num) ? num : 0; }
+function money(v) { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n(v)); }
+function int(v) { return new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 }).format(Math.round(n(v))); }
+function pct(v) { return (n(v) * 100).toFixed(1) + '%'; }
+function shortText(v) { return (v || '').toString().trim(); }
+function statusOf(acc) {
+  if (n(acc.variance_vs_ly) < -0.10) return 'risk';
+  if (n(acc.variance_vs_ly) > 0.10) return 'ahead';
+  return 'track';
+}
+function statusLabel(s) { return s === 'risk' ? 'At Risk' : s === 'ahead' ? 'Ahead' : 'On Track'; }
+
+function extractAccounts(engineJson) {
+  const payload = engineJson || {};
+  const issues = Array.isArray(payload.corporate_account_pace_issues) ? payload.corporate_account_pace_issues : [];
+  const riskCard = issues.find(c => c && c.card_type === 'corporate_pace_risk') || {};
+  const oppCard = issues.find(c => c && c.card_type === 'corporate_pace_opportunity') || {};
+  let rows = Array.isArray(riskCard.all_accounts) ? riskCard.all_accounts : null;
+  if (!rows) {
+    const riskRows = Array.isArray(riskCard.accounts_at_risk) ? riskCard.accounts_at_risk : [];
+    const aheadRows = Array.isArray(oppCard.accounts_ahead) ? oppCard.accounts_ahead : [];
+    rows = [...riskRows, ...aheadRows];
+  }
+  const normalized = rows.map((raw, idx) => {
+    const account = { ...raw };
+    account.company_name = shortText(account.company_name) || `Account ${idx + 1}`;
+    account.account_type = shortText(account.account_type);
+    account.account_manager = shortText(account.account_manager) || 'Unassigned';
+    account.sector = shortText(account.sector) || '—';
+    account.comments = shortText(account.comments);
+    account.fy_ly_rn = n(account.fy_ly_rn);
+    account.full_year_projected_rn = n(account.full_year_projected_rn);
+    account.actual_ytd_rn = n(account.actual_ytd_rn);
+    account.actual_ytd_adr = n(account.actual_ytd_adr);
+    account.variance_vs_ly = Number.isFinite(Number(account.variance_vs_ly))
+      ? Number(account.variance_vs_ly)
+      : (account.fy_ly_rn ? (account.full_year_projected_rn - account.fy_ly_rn) / account.fy_ly_rn : 0);
+    account.variance_pct = Number.isFinite(Number(account.variance_pct)) ? Number(account.variance_pct) : account.variance_vs_ly;
+    account.variance_rn = Number.isFinite(Number(account.variance_rn)) ? Number(account.variance_rn) : account.full_year_projected_rn - account.fy_ly_rn;
+    account.est_revenue_impact = account.variance_rn * account.actual_ytd_adr;
+    account.status = statusOf(account);
+    return account;
+  });
+  return { accounts: normalized, riskCard };
+}
+
+function applyFilterSort() {
+  const q = shortText(document.getElementById('search').value).toLowerCase();
+  const sort = document.getElementById('sort').value;
+  const filtered = STATE.accounts.filter(acc => {
+    const tabMatch = STATE.activeTab === 'all' ? true : acc.status === STATE.activeTab;
+    const text = `${acc.company_name} ${acc.account_manager} ${acc.sector} ${acc.comments}`.toLowerCase();
+    const qMatch = !q || text.includes(q);
+    return tabMatch && qMatch;
+  });
+  filtered.sort((a, b) => {
+    if (sort === 'best') return b.variance_vs_ly - a.variance_vs_ly;
+    if (sort === 'name') return a.company_name.localeCompare(b.company_name);
+    if (sort === 'ly') return b.fy_ly_rn - a.fy_ly_rn;
+    return a.variance_vs_ly - b.variance_vs_ly;
+  });
+  return filtered;
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  const labels = { all: 'All', risk: 'At Risk', ahead: 'Ahead', track: 'On Track' };
+  tabs.innerHTML = TABS.map(tab => `<button class="tab ${STATE.activeTab === tab ? 'active' : ''}" data-tab="${tab}">${labels[tab]}</button>`).join('');
+  tabs.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => { STATE.activeTab = btn.dataset.tab; renderTable(); renderTabs(); });
+  });
+}
+
+function renderSummary(riskCard) {
+  const all = STATE.accounts;
+  const risk = all.filter(a => a.status === 'risk');
+  const ahead = all.filter(a => a.status === 'ahead');
+  const riskRnShortfall = risk.reduce((sum, a) => sum + Math.abs(Math.min(0, a.variance_rn)), 0);
+  const fallbackRevRisk = risk.reduce((sum, a) => sum + (Math.min(0, a.variance_rn) * -1 * n(a.actual_ytd_adr)), 0);
+  const totalRevRisk = Number.isFinite(Number(riskCard.total_revenue_at_risk)) ? Number(riskCard.total_revenue_at_risk) : fallbackRevRisk;
+  document.getElementById('s-total').textContent = int(all.length);
+  document.getElementById('s-risk').textContent = int(risk.length);
+  document.getElementById('s-risk-sub').textContent = `RN shortfall: ${int(riskRnShortfall)}`;
+  document.getElementById('s-ahead').textContent = int(ahead.length);
+  document.getElementById('s-rev-risk').textContent = money(totalRevRisk);
+}
+
+function rowHtml(acc, maxAbsVarianceRn) {
+  const barPct = maxAbsVarianceRn > 0 ? Math.min(100, Math.abs(acc.variance_rn) / maxAbsVarianceRn * 100) : 0;
+  const signNum = (acc.variance_rn > 0 ? '+' : '') + int(acc.variance_rn);
+  const pctNum = (acc.variance_vs_ly > 0 ? '+' : '') + pct(acc.variance_vs_ly);
+  return `<tr>
+    <td><div class="account-main">${escHtml(acc.company_name)}</div><div class="account-sub">${escHtml(acc.account_type || '—')}</div></td>
+    <td>${escHtml(acc.account_manager)}</td>
+    <td>${escHtml(acc.sector)}</td>
+    <td class="num">${int(acc.fy_ly_rn)}</td>
+    <td class="num">${int(acc.full_year_projected_rn)}</td>
+    <td class="bar-cell">
+      <div class="bar-wrap">
+        <div class="bar-track"><div class="bar-fill ${acc.variance_rn >= 0 ? 'bar-pos' : 'bar-neg'}" style="width:${barPct}%"></div></div>
+        <span class="num">${signNum}</span>
+      </div>
+    </td>
+    <td class="num">${pctNum}</td>
+    <td class="num">${money(acc.actual_ytd_adr)}</td>
+    <td class="num">${acc.est_revenue_impact >= 0 ? '+' : ''}${money(acc.est_revenue_impact)}</td>
+    <td><span class="status status-${acc.status}">${statusLabel(acc.status)}</span></td>
+    <td class="comment-cell" title="${escHtml(acc.comments)}">${escHtml(acc.comments || '—')}</td>
+  </tr>`;
+}
+
+function renderSection(title, cls, rows) {
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.variance_rn)), 0);
+  return `<div>
+    <div class="group-head ${cls}"><span>${title}</span><span>${rows.length} account${rows.length === 1 ? '' : 's'}</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Account</th><th>Account Manager</th><th>Sector</th><th>LY RN</th><th>Projected RN</th><th>RN Variance</th><th>% vs LY</th><th>YTD ADR</th><th>Est. Revenue Impact</th><th>Status</th><th>Comments</th>
+        </tr></thead>
+        <tbody>${rows.map(r => rowHtml(r, maxAbs)).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderTable() {
+  const list = applyFilterSort();
+  const panel = document.getElementById('table-panel');
+  if (!list.length) {
+    panel.innerHTML = `<div style="padding:24px; color:var(--gray-600);">No accounts match the current filters.</div>`;
+    return;
+  }
+  if (STATE.activeTab === 'all') {
+    const risk = list.filter(a => a.status === 'risk');
+    const ahead = list.filter(a => a.status === 'ahead');
+    const track = list.filter(a => a.status === 'track');
+    panel.innerHTML = [
+      risk.length ? renderSection('At Risk', 'group-risk', risk) : '',
+      ahead.length ? renderSection('Ahead', 'group-ahead', ahead) : '',
+      track.length ? renderSection('On Track', 'group-track', track) : ''
+    ].join('');
+    return;
+  }
+  const titleMap = { risk: 'At Risk', ahead: 'Ahead', track: 'On Track' };
+  const classMap = { risk: 'group-risk', ahead: 'group-ahead', track: 'group-track' };
+  panel.innerHTML = renderSection(titleMap[STATE.activeTab], classMap[STATE.activeTab], list);
+}
+
+function setStateView(view) {
+  ['loading', 'error', 'empty'].forEach(k => document.getElementById(`${k}-state`).classList.remove('visible'));
+  document.getElementById('dashboard').style.display = view === 'dashboard' ? 'block' : 'none';
+  if (view !== 'dashboard') document.getElementById(`${view}-state`).classList.add('visible');
+}
+
+async function loadAccounts() {
+  setStateView('loading');
+  try {
+    const { data, error } = await supabaseClient
+      .from('engine_outputs')
+      .select('hotel_code, period_label, generated_at, engine_json')
+      .eq('hotel_code', 'AUREM-PAR')
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error) throw error;
+    if (!data) return setStateView('empty');
+
+    const engineJson = typeof data.engine_json === 'string' ? JSON.parse(data.engine_json) : (data.engine_json || {});
+    const { accounts, riskCard } = extractAccounts(engineJson);
+    if (!accounts.length) return setStateView('empty');
+
+    STATE.accounts = accounts;
+    document.getElementById('sidebar-hotel').textContent = data.hotel_code || 'Hotel';
+    document.getElementById('sidebar-period').textContent = data.period_label || 'Latest run';
+    renderSummary(riskCard || {});
+    renderTabs();
+    renderTable();
+    setStateView('dashboard');
+  } catch (err) {
+    console.error(err);
+    setStateView('error');
+    document.getElementById('error-state').textContent = `Could not load corporate pace issues: ${err.message || err}`;
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  errorEl.style.display = 'none';
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    errorEl.textContent = 'Incorrect email or password. Please try again.';
+    errorEl.style.display = 'block';
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+    return;
+  }
+  showApp(data.session.user.email);
+  btn.textContent = 'Sign In';
+  btn.disabled = false;
+  loadAccounts();
+}
+function showLogin() { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-screen').style.display = 'none'; }
+function showApp(email) { document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-screen').style.display = 'block'; document.getElementById('user-email').textContent = email; }
+async function logout() { await supabaseClient.auth.signOut(); showLogin(); }
+
+document.getElementById('search').addEventListener('input', renderTable);
+document.getElementById('sort').addEventListener('change', renderTable);
+
+(async () => {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) { showApp(session.user.email); loadAccounts(); } else { showLogin(); }
+})();
+</script>
+</body>
+</html>

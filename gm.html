@@ -22,6 +22,11 @@
   --high: #b06b00;
   --medium: #39537a;
   --low: #4d7a5f;
+  --sidebar-w: 260px;
+  --white: #ffffff;
+  --red: #c0392b;
+  --gold: #c9a84c;
+  --green: #1a6b3c;
 }
 * { box-sizing: border-box; }
 body {
@@ -104,6 +109,101 @@ body {
   font-size: 13px;
 }
 .app-screen { display: none; }
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--navy);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  border-right: 1px solid rgba(201,168,76,0.15);
+}
+.sidebar-logo {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.logo-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+.logo-sub {
+  font-size: 9px;
+  color: var(--gold);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.hotel-card {
+  margin: 16px 14px;
+  background: rgba(201,168,76,0.08);
+  border: 1px solid rgba(201,168,76,0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.hotel-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+}
+.hotel-meta {
+  font-size: 10px;
+  color: var(--gold);
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+.nav-section {
+  padding: 12px 20px 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.25);
+  font-weight: 600;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+}
+.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.sidebar-bottom {
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+}
+.sync-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.main-shell { margin-left: var(--sidebar-w); }
 .topbar {
   position: sticky;
   top: 0;
@@ -473,6 +573,8 @@ body {
   .executive-grid, .executive-grid-v4, .finding-columns { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
+  .sidebar { display: none; }
+  .main-shell { margin-left: 0; }
   .page, .topbar-inner { padding: 18px; }
   .hero, .section { padding: 20px; }
   .hero-title { font-size: 36px; }
@@ -501,6 +603,62 @@ body {
 </div>
 
 <div class="app-screen" id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Aithenor</div>
+      <div class="logo-sub">Strategic Intelligence</div>
+    </div>
+
+    <div class="hotel-card">
+      <div class="hotel-name" id="sidebar-hotel">Hotel</div>
+      <div class="hotel-meta" id="sidebar-period">Latest run</div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">Executive</div>
+      <a class="nav-item active" href="gm.html">
+        <span class="nav-icon">✦</span>
+        GM Briefing
+      </a>
+
+      <div class="nav-section">Intelligence</div>
+      <a class="nav-item" href="index.html">
+        <span class="nav-icon">◈</span>
+        Insights
+      </a>
+      <div class="nav-item">
+        <span class="nav-icon">◇</span>
+        Revenue Modules
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">◇</span>
+        Cost Modules
+      </div>
+
+      <div class="nav-section">Execution</div>
+      <div class="nav-item">
+        <span class="nav-icon">◇</span>
+        Value Tracker
+      </div>
+      <a class="nav-item" href="accounts.html">
+        <span class="nav-icon">◉</span>
+        Accounts
+      </a>
+      <div class="nav-item">
+        <span class="nav-icon">◇</span>
+        Action Tracker
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sync-status">
+        <div class="sync-dot"></div>
+        <span>Connected to Supabase</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-shell">
   <div class="topbar">
     <div class="topbar-inner">
       <div>
@@ -621,6 +779,7 @@ body {
         <div class="footer-note" id="footer-note">This briefing uses the latest uploaded cycle only and groups findings into GM-friendly departments. Revenue upside and GOP impact are directional estimates based on linked action plans.</div>
       </section>
     </div>
+  </div>
   </div>
 </div>
 
@@ -942,6 +1101,10 @@ function renderHero(ej, hotelCode, periodLabel, snapshotDate) {
   document.getElementById('meta-hotel').textContent = hotelCode || '—';
   document.getElementById('meta-period').textContent = periodLabel || '—';
   document.getElementById('meta-generated').textContent = snapshotDate || '—';
+  const sidebarHotel = document.getElementById('sidebar-hotel');
+  const sidebarPeriod = document.getElementById('sidebar-period');
+  if (sidebarHotel) sidebarHotel.textContent = hotelCode || 'Hotel';
+  if (sidebarPeriod) sidebarPeriod.textContent = periodLabel || 'Latest run';
   document.getElementById('stat-findings').textContent = totalSignals;
   document.getElementById('stat-revenue').textContent = fmt(totalExposure);
   document.getElementById('stat-gop').textContent = postureLabel;
