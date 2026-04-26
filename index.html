@@ -3932,8 +3932,17 @@ function buildForecastGapAnalysisGroupedText(analysisText) {
     }
   }
 
+  let para1Text = para1.join(' ').trim();
+  para1Text = para1Text.replace(
+    /Forecast:\s*([\d,]+)\s*RN\s*\/\s*([\d,]+)\s*revenue\.\s*OTB:\s*([\d,]+)\s*RN\s*\/\s*([\d,]+)\s*revenue\.\s*Revenue gap:\s*([\d,]+)\./i,
+    (_, fRN, fRev, oRN, oRev, gap) => {
+      const eur = n => Number(String(n).replace(/,/g, '') || 0).toLocaleString('en-GB');
+      return `The forecast stands at ${fRN} RN / €${eur(fRev)} against current OTB of ${oRN} RN / €${eur(oRev)} — a revenue gap of €${eur(gap)}.`;
+    }
+  );
+
   return [
-    para1.join(' ').trim(),
+    para1Text,
     para2.join(' ').trim(),
     para3.join(' ').trim()
   ].filter(Boolean).join('\n\n');
