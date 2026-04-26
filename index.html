@@ -2397,7 +2397,8 @@ function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
   const pr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
   const priorityStripe = ['critical', 'high', 'medium', 'low'].includes(pr) ? pr : 'medium';
   const trigger = (card.trigger_display != null ? String(card.trigger_display) : '—').trim() || '—';
-  const rawSituation = String(card.situation || '');
+  const sc = card || {};
+  const rawSituation = String(sc.situation || '');
   const cleanSituation = rawSituation
     .replace(/\b0\s+window\(s\)/gi, 'no windows')
     .replace(/\b1\s+window\(s\)/gi, '1 window')
@@ -2407,10 +2408,13 @@ function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
   const strVal = formatSynthesisStrValidationForDisplay(card.str_validation);
   const decision = (card.decision != null ? String(card.decision) : '').trim();
   const finImpact = (card.financial_impact != null ? String(card.financial_impact) : '').trim();
-  const scenarioType = (card.scenario_type != null ? String(card.scenario_type).trim() : '')
-    || (card.scenarioType != null ? String(card.scenarioType).trim() : '');
-  const subtitleHtml = scenarioType
-    ? `<div class="finding-oneliner">${escHtml(scenarioType)}</div>`
+  const subtitle = (sc.scenario_type != null ? String(sc.scenario_type) : '')
+    || (sc.scenario != null ? String(sc.scenario) : '')
+    || '';
+  const scenarioCodePattern = /^S\d+$/;
+  const showSubtitle = !!subtitle && !scenarioCodePattern.test(subtitle.trim());
+  const subtitleHtml = showSubtitle
+    ? `<div class="finding-oneliner">${escHtml(subtitle.trim())}</div>`
     : '';
   return `
     <div class="finding-card synthesis-retail-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(priorityStripe)}">
@@ -3918,9 +3922,10 @@ function buildForecastGapAnalysisParagraphBlocks(text) {
   });
 
   const toBlock = arr => arr.join(' ').replace(/\s+/g, ' ').trim();
-  return [block1, block2, block3, block4, block5, block6]
-    .map(toBlock)
-    .filter(Boolean);
+  const p1 = [toBlock(block1), toBlock(block2), toBlock(block3)].filter(Boolean).join(' ').trim();
+  const p2 = [toBlock(block4), toBlock(block5)].filter(Boolean).join(' ').trim();
+  const p3 = toBlock(block6);
+  return [p1, p2, p3].filter(Boolean);
 }
 
 function inferForwardHorizonBucket(card) {
@@ -6705,7 +6710,7 @@ function renderForwardCard(card) {
         ${forwardAnalysisParagraphs.length ? `
         <div class="finding-section">
           <div class="section-label">FORWARD ANALYSIS</div>
-          <div class="section-text" style="line-height: 1.7; font-size: 13px;">${isForecastGapCard ? escHtml(forwardAnalysisParagraphs.join('\n\n')).replace(/\n\n/g, '<br><br>') : forwardAnalysisParagraphs.join('<br>')}</div>
+          <div class="section-text" style="line-height: 1.7; font-size: 13px;">${isForecastGapCard ? forwardAnalysisParagraphs.map(p => `<p>${escHtml(p)}</p>`).join('') : forwardAnalysisParagraphs.join('<br>')}</div>
         </div>` : ''}
         <div class="finding-section">
           <div class="section-label">IMPACT</div>
