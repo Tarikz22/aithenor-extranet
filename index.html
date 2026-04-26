@@ -985,6 +985,18 @@ table.fi-account-table th {
   transform: rotate(180deg);
 }
 
+.vn-lbl {
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 4px;
+}
+
+.vn-period {
+  font-size: 10px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
 .group-cards {
   display: none;
   flex-direction: column;
@@ -1724,6 +1736,19 @@ function formatDate(dateStr) {
   }
 }
 
+function formatShortDateRange(start, end) {
+  if (!start || !end) return '';
+  const s = new Date(start);
+  const e = new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return '';
+  const sMon = s.toLocaleDateString('en-GB', { month: 'short' });
+  const eMon = e.toLocaleDateString('en-GB', { month: 'short' });
+  const sYr = s.getFullYear();
+  const eYr = e.getFullYear();
+  if (sYr === eYr) return `${sMon}–${eMon} ${eYr}`;
+  return `${sMon} ${sYr}–${eMon} ${eYr}`;
+}
+
 function resetNLConversation() {
   nlConversationHistory = [];
   nlWelcomeShown = false;
@@ -2312,6 +2337,14 @@ function buildCommercialVerdictBlockHtml(cv) {
   if (!cv || typeof cv !== 'object') return '';
   const verdictText = (cv.verdict_text != null ? String(cv.verdict_text) : '').trim();
   if (!verdictText) return '';
+  const engineJson = currentEngineJson || {};
+  const start = engineJson?.period_meta?.period_start
+    || engineJson?.workbook_ingestion?.period_start;
+  const end = engineJson?.period_meta?.period_end
+    || engineJson?.workbook_ingestion?.period_end;
+  const periodLabel = start && end
+    ? formatShortDateRange(start, end) + ' avg'
+    : 'YTD avg';
 
   const rawHeadlines = Array.isArray(cv.headline_numbers) ? cv.headline_numbers : [];
   const headlines = rawHeadlines.slice(0, 4);
@@ -2321,7 +2354,8 @@ function buildCommercialVerdictBlockHtml(cv) {
     if (!h || typeof h !== 'object') {
       return `<div style="flex:1;min-width:0;text-align:center;padding:0 6px;">
         <div style="font-size:18px;font-weight:500;color:var(--gray-600);">—</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:4px;">—</div>
+        <div class="vn-lbl">—</div>
+        <div class="vn-period">${escHtml(periodLabel)}</div>
       </div>`;
     }
     const val = h.value != null && String(h.value).trim() !== ''
@@ -2333,7 +2367,8 @@ function buildCommercialVerdictBlockHtml(cv) {
       : dir === 'positive' ? 'var(--green)' : 'var(--navy)';
     return `<div style="flex:1;min-width:0;text-align:center;padding:0 6px;">
       <div style="font-size:18px;font-weight:500;color:${valColor};">${escHtml(val)}</div>
-      <div style="font-size:11px;color:var(--gray-400);margin-top:4px;">${escHtml(lab)}</div>
+      <div class="vn-lbl">${escHtml(lab)}</div>
+      <div class="vn-period">${escHtml(periodLabel)}</div>
     </div>`;
   }).join('');
 
