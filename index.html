@@ -3873,59 +3873,35 @@ function buildForwardAnalysisParagraphBlocks(text) {
   return [toParagraph(block1), toParagraph(block2), toParagraph(block3)].filter(Boolean);
 }
 
-function buildForecastGapAnalysisParagraphBlocks(text) {
-  const sentences = tokenizeForwardAnalysisSentences(text);
-  if (!sentences.length) return [];
-  const block1 = [];
-  const block2 = [];
-  const block3 = [];
-  const block4 = [];
-  const block5 = [];
-  const block6 = [];
-  const segmentLead = /^(transient|corporate|group|leisure|business|ota|crew|contract|mice|consortia|bar|direct|discount|negotiated|retail|wholesale)\b/i;
+function buildForecastGapAnalysisGroupedText(analysisText) {
+  const sentences = String(analysisText || '')
+    .split(/(?<=[.!?])\s+(?=[A-Z])/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .filter(s => !s.toLowerCase().includes('snapshot history'));
+  if (!sentences.length) return '';
 
-  sentences.forEach(sentence => {
-    const s = sentence.trim();
-    if (!s) return;
-    if (s.includes('→')) {
-      block1.push(s);
-      return;
-    }
-    if (/^otb\s+is\b/i.test(s)) {
-      block2.push(s);
-      return;
-    }
-    if (/^(forecast:|otb:|revenue\s+gap:)/i.test(s)) {
-      block3.push(s);
-      return;
-    }
-    if (segmentLead.test(s)) {
-      block4.push(s);
-      return;
-    }
-    if (/^forecast\s+challenge\b/i.test(s)
-      || /^current\s+otb\b/i.test(s)
-      || /^validate\b/i.test(s)) {
-      block5.push(s);
-      return;
-    }
-    if (/^based\s+on\b/i.test(s)) {
-      block6.push(s);
-      return;
-    }
-    if (!block1.length) block1.push(s);
-    else if (!block2.length) block2.push(s);
-    else if (!block3.length) block3.push(s);
-    else if (!block4.length) block4.push(s);
-    else if (!block5.length) block5.push(s);
-    else block6.push(s);
-  });
+  const para1 = [];
+  const para2 = [];
+  const para3 = [];
 
-  const toBlock = arr => arr.join(' ').replace(/\s+/g, ' ').trim();
-  const p1 = [toBlock(block1), toBlock(block2), toBlock(block3)].filter(Boolean).join(' ').trim();
-  const p2 = [toBlock(block4), toBlock(block5)].filter(Boolean).join(' ').trim();
-  const p3 = toBlock(block6);
-  return [p1, p2, p3].filter(Boolean);
+  for (const s of sentences) {
+    if (/→/.test(s) || /^OTB is/i.test(s)
+      || /^Forecast:/i.test(s) || /^OTB:/i.test(s)
+      || /^Revenue gap:/i.test(s)) {
+      para1.push(s);
+    } else if (/^Based on/i.test(s)) {
+      para3.push(s);
+    } else {
+      para2.push(s);
+    }
+  }
+
+  return [
+    para1.join(' ').trim(),
+    para2.join(' ').trim(),
+    para3.join(' ').trim()
+  ].filter(Boolean).join('\n\n');
 }
 
 function inferForwardHorizonBucket(card) {
@@ -6082,6 +6058,33 @@ function renderFindings() {
     let cardTitle = String(sic.title || sic.display_name || 'Segment signal');
     // Strip scenario codes from title e.g. "(S4)", "(S5)", "(S7)"
     cardTitle = cardTitle.replace(/\s*\(S\d+\)\s*/gi, '').trim();
+    const scenarioType = String(sic.scenario_type || sic.scenario || sic.issue_family || '').trim().toUpperCase();
+    const isS4 = scenarioType === 'S4';
+    const isS7 = scenarioType === 'S7';
+    const rawImpact = sic.financial_impact || {};
+    const impactEur = fiSafeNum(
+      rawImpact.impact_eur
+      ?? rawImpact.amount
+      ?? rawImpact.revenue_impact_eur
+      ?? rawImpact.revenue_impact
+      ?? rawImpact.value
+      ?? rawImpact.low
+      ?? null
+    );
+    const adrMatch = (sic.situation || '').match(/ADR is ([+\-][\d.]+)%/);
+    const adrPct = adrMatch ? adrMatch[1] : 'positive';
+    const rnMatch = (sic.situation || '').match(/([+\-][\d.]+)%\s+room\s+night/i)
+      || (sic.situation || '').match(/room\s+nights?.*?([+\-][\d.]+)%/i);
+    const rnPct = rnMatch ? Number(rnMatch[1]) : null;
+    const rnPctDisp = Number.isFinite(rnPct) ? String(Math.abs(rnPct).toFixed(1)).replace(/\.0$/, '') : 'current';
+    let impactDescription = sic.financial_impact?.description || sic.decision || '';
+    if (Number.isFinite(impactEur) && impactEur < 0) {
+      if (isS4) {
+        impactDescription = `${sic.display_name || 'This segment'} revenue is marginally behind last year — ADR improvement of ${adrPct}% is not yet sufficient to offset the ${rnPctDisp}% room night decline. If volume continues to soften, the revenue gap will widen.`;
+      } else if (isS7) {
+        impactDescription = 'both volume and the revenue base are deteriorating';
+      }
+    }
     // Opportunity cards render with green left border, issue cards with orange
     const isOpportunity = sic.signal_type === 'opportunity';
     const sicCard = {
@@ -6106,7 +6109,7 @@ function renderFindings() {
       })(),
       finding: sic.situation,
       root_cause: sic.diagnosis,
-      expected_outcome: sic.financial_impact?.description || sic.decision || '',
+      expected_outcome: impactDescription,
       enforced_decision_line: sic.decision,
       enforced_execution_actions: Array.isArray(sic.execution_actions)
         ? sic.execution_actions : [],
@@ -6618,11 +6621,6 @@ function renderForwardCard(card) {
       .join('\n\n')
       .trim();
   }
-  const isForecastGapCard = card.granularity === 'forecast_gap';
-  const forwardAnalysisParagraphs = isForecastGapCard
-    ? buildForecastGapAnalysisParagraphBlocks(forwardAnalysisNarrative)
-    : buildForwardAnalysisParagraphBlocks(forwardAnalysisNarrative);
-
   const rawDecisionLine = (card.enforced_decision_line || '').toString().trim();
   let decisionLine = rawDecisionLine;
   if (card.granularity !== 'forecast_gap') {
@@ -6639,6 +6637,18 @@ function renderForwardCard(card) {
     forwardAnalysisNarrative = stripDaysRemainInThisWindowFromText(forwardAnalysisNarrative);
   }
   forwardAnalysisNarrative = cleanupForwardAnalysisDoublePeriods(forwardAnalysisNarrative);
+  const isForecastGapCard = card.granularity === 'forecast_gap';
+  const forwardAnalysisParagraphs = isForecastGapCard
+    ? []
+    : buildForwardAnalysisParagraphBlocks(forwardAnalysisNarrative);
+  const forecastGapGroupedAnalysis = isForecastGapCard
+    ? buildForecastGapAnalysisGroupedText(forwardAnalysisNarrative)
+    : '';
+  const forwardAnalysisDisplayHtml = isForecastGapCard
+    ? escHtml(forecastGapGroupedAnalysis || forwardAnalysisNarrative || '').replace(/\n\n/g, '<br><br>')
+    : (forwardAnalysisParagraphs.length
+      ? forwardAnalysisParagraphs.join('<br>')
+      : (forwardAnalysisNarrative ? `<p>${escHtml(forwardAnalysisNarrative)}</p>` : ''));
 
   const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
   const forwardImpactLine = buildForwardImpactLine(card);
@@ -6710,10 +6720,10 @@ function renderForwardCard(card) {
           <div class="section-label">SIGNAL</div>
           <div class="section-text">${escHtml(signalDisplay)}</div>
         </div>
-        ${forwardAnalysisParagraphs.length ? `
+        ${forwardAnalysisDisplayHtml ? `
         <div class="finding-section">
           <div class="section-label">FORWARD ANALYSIS</div>
-          <div class="section-text" style="line-height: 1.7; font-size: 13px;">${isForecastGapCard ? forwardAnalysisParagraphs.map(p => `<p>${escHtml(p)}</p>`).join('') : forwardAnalysisParagraphs.join('<br>')}</div>
+          <div class="section-text" style="line-height: 1.7; font-size: 13px; white-space: pre-line;">${forwardAnalysisDisplayHtml}</div>
         </div>` : ''}
         <div class="finding-section">
           <div class="section-label">IMPACT</div>
