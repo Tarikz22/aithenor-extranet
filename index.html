@@ -2397,7 +2397,11 @@ function renderSynthesisCardAsRetailTemplate(card, snapshotDate, index) {
   const pr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
   const priorityStripe = ['critical', 'high', 'medium', 'low'].includes(pr) ? pr : 'medium';
   const trigger = (card.trigger_display != null ? String(card.trigger_display) : '—').trim() || '—';
-  const situation = (card.situation != null ? String(card.situation) : '').trim();
+  let situation = (card.situation != null ? String(card.situation) : '').trim();
+  situation = situation
+    .replace(/\b0\s+window\(s\)/gi, 'no windows')
+    .replace(/\b1\s+window\(s\)/gi, '1 window')
+    .replace(/\b(\d+)\s+window\(s\)/gi, '$1 windows');
   const diagnosis = (card.diagnosis != null ? String(card.diagnosis) : '').trim();
   const strVal = formatSynthesisStrValidationForDisplay(card.str_validation);
   const decision = (card.decision != null ? String(card.decision) : '').trim();
@@ -3713,14 +3717,59 @@ function parseLocalDateYmd(value) {
   return dt;
 }
 
+function parseLocalDateFromLabelDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const m = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const monRaw = m[2].toLowerCase();
+  const year = Number(m[3]);
+  const monMap = {
+    jan: 0, january: 0,
+    feb: 1, february: 1,
+    mar: 2, march: 2,
+    apr: 3, april: 3,
+    may: 4,
+    jun: 5, june: 5,
+    jul: 6, july: 6,
+    aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8,
+    oct: 9, october: 9,
+    nov: 10, november: 10,
+    dec: 11, december: 11
+  };
+  const month = monMap[monRaw];
+  if (![day, year].every(Number.isFinite) || !Number.isFinite(month)) return null;
+  const dt = new Date(year, month, day);
+  if (Number.isNaN(dt.getTime())) return null;
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function parseForwardWindowDatesFromLabel(windowLabel) {
+  const label = String(windowLabel || '').trim();
+  if (!label || !label.includes('→')) return { start: null, end: null };
+  const [startStr, endStr] = label.split('→').map(s => s.trim());
+  return {
+    start: parseLocalDateFromLabelDate(startStr),
+    end: parseLocalDateFromLabelDate(endStr)
+  };
+}
+
 /** Calendar days remaining in forward window (browser local midnight). */
 function computeForwardDaysRemainingInWindow(card) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const wsRaw = card.window_start_date || card.start_date || card.pace_data?.window_start_ymd;
   const weRaw = card.window_end_date || card.end_date || card.pace_data?.window_end_ymd;
-  const windowStart = parseLocalDateYmd(wsRaw);
-  const windowEnd = parseLocalDateYmd(weRaw);
+  let windowStart = parseLocalDateYmd(wsRaw);
+  let windowEnd = parseLocalDateYmd(weRaw);
+  if (!windowStart || !windowEnd) {
+    const fromLabel = parseForwardWindowDatesFromLabel(card.window_label || card.forward_window || '');
+    windowStart = windowStart || fromLabel.start;
+    windowEnd = windowEnd || fromLabel.end;
+  }
   if (!windowStart || !windowEnd) return null;
   let daysRemaining;
   if (windowStart > today) {
@@ -3763,6 +3812,60 @@ function cleanupForwardAnalysisDoublePeriods(analysisText) {
   return String(analysisText || '')
     .replace(/\.\.+/g, '.')
     .replace(/\.\s*\./g, '.');
+}
+
+function tokenizeForwardAnalysisSentences(text) {
+  return String(text || '')
+    .split(/\n\n+/)
+    .flatMap(para => para.split(/(?<=[.!?])\s+/))
+    .map(s => s.trim())
+    .filter(Boolean)
+    .filter(s => !s.toLowerCase().includes('snapshot history'));
+}
+
+function buildForwardAnalysisParagraphBlocks(text) {
+  const sentences = tokenizeForwardAnalysisSentences(text);
+  if (!sentences.length) return [];
+  const block1 = [];
+  const block2 = [];
+  const block3 = [];
+  const segmentLead = /^(transient|corporate|group|leisure|business|ota|wholesale|crew|contract|mice|consortia|bar|direct)\b/i;
+
+  sentences.forEach(sentence => {
+    const s = sentence.trim();
+    if (!s) return;
+    if (/^based\s+on\b/i.test(s)) {
+      block3.push(s);
+      return;
+    }
+    if (s.includes('→')) {
+      block1.push(s);
+      return;
+    }
+    if (/^otb\s+is\b/i.test(s)) {
+      block1.push(s);
+      return;
+    }
+    if (/^(forecast:|otb:)/i.test(s)
+      || /^forecast\s+challenge\b/i.test(s)
+      || /^current\s+otb\b/i.test(s)
+      || /^validate\b/i.test(s)
+      || segmentLead.test(s)) {
+      block2.push(s);
+      return;
+    }
+
+    if (!block1.length) block1.push(s);
+    else if (!block2.length || !block3.length) block2.push(s);
+    else block3.push(s);
+  });
+
+  const toParagraph = arr => {
+    const txt = arr.join(' ').replace(/\s+/g, ' ').trim();
+    return txt ? `<p>${escHtml(txt)}</p>` : '';
+  };
+
+  return [toParagraph(block1), toParagraph(block2), toParagraph(block3)].filter(Boolean);
 }
 
 function inferForwardHorizonBucket(card) {
@@ -6444,20 +6547,15 @@ function renderForwardCard(card) {
   if (forwardAnalysisNarrative) {
     forwardAnalysisNarrative = forwardAnalysisNarrative
       .split('\n\n')
-      .map(para => {
-        const analysisWithBreaks = para
-          .split(/(?<=\.)\s+(?=[A-Z])/)
-          .map(s => s.trim())
-          .filter(Boolean)
-          .filter(s => !s.toLowerCase().includes('snapshot history'))
-          .join('\n\n');
-        return analysisWithBreaks;
-      })
+      .map(para => para.trim())
+      .filter(Boolean)
+      .filter(s => !s.toLowerCase().includes('snapshot history'))
       .map(p => p.trim())
       .filter(Boolean)
       .join('\n\n')
       .trim();
   }
+  const forwardAnalysisParagraphs = buildForwardAnalysisParagraphBlocks(forwardAnalysisNarrative);
 
   const rawDecisionLine = (card.enforced_decision_line || '').toString().trim();
   let decisionLine = rawDecisionLine;
@@ -6546,10 +6644,10 @@ function renderForwardCard(card) {
           <div class="section-label">SIGNAL</div>
           <div class="section-text">${escHtml(signalDisplay)}</div>
         </div>
-        ${forwardAnalysisNarrative ? `
+        ${forwardAnalysisParagraphs.length ? `
         <div class="finding-section">
           <div class="section-label">FORWARD ANALYSIS</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(forwardAnalysisNarrative)}</div>
+          <div class="section-text" style="line-height: 1.7; font-size: 13px;">${forwardAnalysisParagraphs.join('<br>')}</div>
         </div>` : ''}
         <div class="finding-section">
           <div class="section-label">IMPACT</div>
