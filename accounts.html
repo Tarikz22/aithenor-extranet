@@ -83,6 +83,9 @@ table { width: 100%; border-collapse: collapse; min-width: 1280px; }
 thead th { background: var(--gray-100); color: var(--gray-600); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 10px; text-align: left; border-bottom: 1px solid var(--gray-200); }
 tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 13px; vertical-align: top; }
 .account-main { font-weight: 600; color: var(--navy); }
+.account-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.account-chevron { color: var(--gray-400); transition: transform 0.2s ease; font-size: 12px; line-height: 1; }
+.account-chevron.expanded { transform: rotate(180deg); color: var(--navy); }
 .account-sub { margin-top: 2px; color: var(--gray-600); font-size: 12px; }
 .num { white-space: nowrap; }
 .bar-cell { min-width: 190px; }
@@ -96,6 +99,17 @@ tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 1
 .status-ahead { background: var(--green-light); color: var(--green); }
 .status-track { background: var(--gray-100); color: var(--gray-600); }
 .comment-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-row { cursor: pointer; }
+.account-row:hover { background: #fcfcfa; }
+.expanded-panel-cell { padding: 0; background: #fff; }
+.expanded-panel {
+  padding: 14px 16px;
+  border-top: 1px dashed var(--gray-300);
+  background: #fff;
+  color: var(--gray-900);
+  line-height: 1.6;
+}
+.expanded-panel strong { color: var(--navy); }
 .state { display: none; align-items: center; justify-content: center; min-height: 280px; color: var(--gray-600); }
 .state.visible { display: flex; }
 .login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
@@ -222,7 +236,7 @@ const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const STATE = { accounts: [], activeTab: 'all' };
+const STATE = { accounts: [], activeTab: 'all', expandedAccountKey: null };
 const TABS = ['all', 'risk', 'ahead', 'track'];
 
 function escHtml(str) {
@@ -254,6 +268,7 @@ function extractAccounts(engineJson) {
   }
   const normalized = rows.map((raw, idx) => {
     const account = { ...raw };
+    account._rowKey = `${shortText(account.company_name || `account-${idx + 1}`)}::${idx}`;
     account.company_name = shortText(account.company_name) || `Account ${idx + 1}`;
     account.account_type = shortText(account.account_type);
     account.account_manager = shortText(account.account_manager) || 'Unassigned';
@@ -316,12 +331,32 @@ function renderSummary(riskCard) {
   document.getElementById('s-rev-risk').textContent = money(totalRevRisk);
 }
 
-function rowHtml(acc, maxAbsVarianceRn) {
+function rowHtml(acc, maxAbsVarianceRn, sectionKey) {
   const barPct = maxAbsVarianceRn > 0 ? Math.min(100, Math.abs(acc.variance_rn) / maxAbsVarianceRn * 100) : 0;
   const signNum = (acc.variance_rn > 0 ? '+' : '') + int(acc.variance_rn);
   const pctNum = (acc.variance_vs_ly > 0 ? '+' : '') + pct(acc.variance_vs_ly);
-  return `<tr>
-    <td><div class="account-main">${escHtml(acc.company_name)}</div><div class="account-sub">${escHtml(acc.account_type || '—')}</div></td>
+  const isExpanded = STATE.expandedAccountKey === acc._rowKey;
+  const nextActionRaw = shortText(acc.next_action || acc.nextAction || acc.recommended_next_action);
+  const nextActionLine = nextActionRaw ? `<div><strong>Next action:</strong> ${escHtml(nextActionRaw)}</div>` : '';
+  const detailRow = isExpanded
+    ? `<tr class="expanded-row">
+      <td class="expanded-panel-cell" colspan="11">
+        <div class="expanded-panel">
+          <div><strong>Comments:</strong> ${escHtml(acc.comments || '—')}</div>
+          <div><strong>Account type:</strong> ${escHtml(acc.account_type || '—')}</div>
+          ${nextActionLine}
+        </div>
+      </td>
+    </tr>`
+    : '';
+  return `<tr class="account-row" data-account-key="${escHtml(acc._rowKey)}" data-section-key="${escHtml(sectionKey)}">
+    <td>
+      <div class="account-head">
+        <div class="account-main">${escHtml(acc.company_name)}</div>
+        <span class="account-chevron ${isExpanded ? 'expanded' : ''}">⌄</span>
+      </div>
+      <div class="account-sub">${escHtml(acc.account_type || '—')}</div>
+    </td>
     <td>${escHtml(acc.account_manager)}</td>
     <td>${escHtml(acc.sector)}</td>
     <td class="num">${int(acc.fy_ly_rn)}</td>
@@ -337,10 +372,10 @@ function rowHtml(acc, maxAbsVarianceRn) {
     <td class="num">${acc.est_revenue_impact >= 0 ? '+' : ''}${money(acc.est_revenue_impact)}</td>
     <td><span class="status status-${acc.status}">${statusLabel(acc.status)}</span></td>
     <td class="comment-cell" title="${escHtml(acc.comments)}">${escHtml(acc.comments || '—')}</td>
-  </tr>`;
+  </tr>${detailRow}`;
 }
 
-function renderSection(title, cls, rows) {
+function renderSection(title, cls, rows, sectionKey) {
   const maxAbs = Math.max(...rows.map(r => Math.abs(r.variance_rn)), 0);
   return `<div>
     <div class="group-head ${cls}"><span>${title}</span><span>${rows.length} account${rows.length === 1 ? '' : 's'}</span></div>
@@ -349,10 +384,20 @@ function renderSection(title, cls, rows) {
         <thead><tr>
           <th>Account</th><th>Account Manager</th><th>Sector</th><th>LY RN</th><th>Projected RN</th><th>RN Variance</th><th>% vs LY</th><th>YTD ADR</th><th>Est. Revenue Impact</th><th>Status</th><th>Comments</th>
         </tr></thead>
-        <tbody>${rows.map(r => rowHtml(r, maxAbs)).join('')}</tbody>
+        <tbody>${rows.map(r => rowHtml(r, maxAbs, sectionKey)).join('')}</tbody>
       </table>
     </div>
   </div>`;
+}
+
+function bindRowToggleHandlers() {
+  document.querySelectorAll('.account-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const key = row.getAttribute('data-account-key');
+      STATE.expandedAccountKey = STATE.expandedAccountKey === key ? null : key;
+      renderTable();
+    });
+  });
 }
 
 function renderTable() {
@@ -367,15 +412,17 @@ function renderTable() {
     const ahead = list.filter(a => a.status === 'ahead');
     const track = list.filter(a => a.status === 'track');
     panel.innerHTML = [
-      risk.length ? renderSection('At Risk', 'group-risk', risk) : '',
-      ahead.length ? renderSection('Ahead', 'group-ahead', ahead) : '',
-      track.length ? renderSection('On Track', 'group-track', track) : ''
+      risk.length ? renderSection('At Risk', 'group-risk', risk, 'risk') : '',
+      ahead.length ? renderSection('Ahead', 'group-ahead', ahead, 'ahead') : '',
+      track.length ? renderSection('On Track', 'group-track', track, 'track') : ''
     ].join('');
+    bindRowToggleHandlers();
     return;
   }
   const titleMap = { risk: 'At Risk', ahead: 'Ahead', track: 'On Track' };
   const classMap = { risk: 'group-risk', ahead: 'group-ahead', track: 'group-track' };
-  panel.innerHTML = renderSection(titleMap[STATE.activeTab], classMap[STATE.activeTab], list);
+  panel.innerHTML = renderSection(titleMap[STATE.activeTab], classMap[STATE.activeTab], list, STATE.activeTab);
+  bindRowToggleHandlers();
 }
 
 function setStateView(view) {
