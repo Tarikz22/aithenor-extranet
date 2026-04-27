@@ -3709,6 +3709,14 @@ function buildCardsFromIssues(engineRow, engineJson, recommendations, actions) {
       arbitration_role: issue.arbitration_role || '',
       temporal_badge: temporalCue?.badge || '',
       temporal_line: temporalCue?.line || '',
+      // Added: expose primary segment at card top level for deduplication logic.
+      primary_segment: issue.segment
+        ?? issue.primary_segment
+        ?? issue.segment_attribution_summary?.primary_segment
+        ?? null,
+      // Added: carry str_validation from issue so historical cards can render STR Validation section.
+      // Without this, the field is dropped and the frontend injection never fires.
+      str_validation: issue.str_validation ?? null,
       phase5_decision: phase5Decision,
       phase5_action: phase5Action,
       phase5_controlled_action: issueControlledAction,
@@ -6189,10 +6197,7 @@ function renderFindings() {
   );
   const dedupedHistoricalCards = historicalCards.filter(card => {
     // Get the segment bucket from the card's primary segment attribution
-    const bucket = card.segment
-      ?? card.primary_segment
-      ?? card.segment_attribution_summary?.primary_segment
-      ?? null;
+    const bucket = card.segment ?? card.primary_segment ?? null;
     // If a segment issue card already covers this bucket, suppress the historical card
     if (bucket && coveredSegmentBuckets.has(bucket)) return false;
     return true;
