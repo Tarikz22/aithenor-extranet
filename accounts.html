@@ -334,7 +334,7 @@ function renderSummary(riskCard) {
 function rowHtml(acc, maxAbsVarianceRn, sectionKey) {
   const barPct = maxAbsVarianceRn > 0 ? Math.min(100, Math.abs(acc.variance_rn) / maxAbsVarianceRn * 100) : 0;
   const signNum = (acc.variance_rn > 0 ? '+' : '') + int(acc.variance_rn);
-  const pctNum = (acc.variance_vs_ly > 0 ? '+' : '') + pct(acc.variance_vs_ly);
+  const pctNum = (acc.variance_pct >= 0 ? '+' : '') + Number(acc.variance_pct).toFixed(1) + '%';
   const isExpanded = STATE.expandedAccountKey === acc._rowKey;
   const nextActionRaw = shortText(acc.next_action || acc.nextAction || acc.recommended_next_action);
   const nextActionLine = nextActionRaw ? `<div><strong>Next action:</strong> ${escHtml(nextActionRaw)}</div>` : '';
@@ -437,7 +437,7 @@ async function loadAccounts() {
     const { data, error } = await supabaseClient
       .from('engine_outputs')
       .select('hotel_code, period_label, generated_at, engine_json')
-      .eq('hotel_code', 'AUREM-PAR')
+      .eq('hotel_code', localStorage.getItem('hotelCode') || '')
       .order('generated_at', { ascending: false })
       .limit(1)
       .single();
