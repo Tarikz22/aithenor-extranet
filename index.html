@@ -6180,8 +6180,42 @@ function renderFindings() {
   const summaries = computeGroupSummaries(engineJson);
 
   // ── GROUP 1: Segmentation (retail + synthesis) ───────
-  const segRetailHtml = historicalCards.length
-    ? historicalCards.map(card => renderCard(card)).join('')
+  // Deduplication: suppress historical cards whose primary segment already has
+  // a segment_issue_card. The segment_issue_cards pipeline is the current one.
+  // historicalCards from engineJson.issues are legacy and should not double-render
+  // when a more specific card already covers the same segment bucket.
+  const coveredSegmentBuckets = new Set(
+    segmentIssueCards.map(sic => sic.segment).filter(Boolean)
+  );
+  const dedupedHistoricalCards = historicalCards.filter(card => {
+    // Get the segment bucket from the card's primary segment attribution
+    const bucket = card.segment
+      ?? card.primary_segment
+      ?? card.segment_attribution_summary?.primary_segment
+      ?? null;
+    // If a segment issue card already covers this bucket, suppress the historical card
+    if (bucket && coveredSegmentBuckets.has(bucket)) return false;
+    return true;
+  });
+  // Fixed: inject STR Validation section on historical cards when str_validation is present.
+  // Mirrors the same injection logic used for segment issue cards.
+  const segRetailHtml = dedupedHistoricalCards.length
+    ? dedupedHistoricalCards.map(card => {
+        let html = renderCard(card);
+        const sv = card.str_validation ?? card.strValidation;
+        if (sv?.interpretation) {
+          const strInsert = `
+            <div class="finding-section">
+              <div class="section-label">STR VALIDATION</div>
+              <div class="section-text">${escHtml(sv.interpretation)}</div>
+            </div>`;
+          html = html.replace(
+            /(<div class="section-label">IMPACT<\/div>)/,
+            strInsert + '$1'
+          );
+        }
+        return html;
+      }).join('')
     : '';
   let segSynthHtml = '';
   const fiSnapSeg = (currentEngineRow?.snapshot_date || '').toString();
@@ -6321,7 +6355,7 @@ function renderFindings() {
   const segCardsHtml = segRetailHtml + segSynthHtml + segCausalChainHtml + segIssueCardsHtml;
   if (segCardsHtml) {
     const s = summaries.segmentation;
-    const segCount = historicalCards.length + synthForSegmentation.length
+    const segCount = dedupedHistoricalCards.length + synthForSegmentation.length
       + segmentIssueCards.length + (hasCausalChainCard ? 1 : 0);
     const histSparklineHtml = buildStrWeeklySparklineBlockHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
