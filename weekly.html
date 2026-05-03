@@ -149,7 +149,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
       <div class="logo-sub">Strategic Intelligence</div>
     </div>
     <div class="hotel-card">
-      <div class="hotel-name" id="sidebar-hotel">Hotel</div>
+      <div class="hotel-name" id="hotel-name">Hotel</div>
       <div class="hotel-meta" id="sidebar-period">Weekly Intel</div>
     </div>
     <nav class="nav">
@@ -836,8 +836,15 @@ async function handleLogin(e) {
     btn.disabled = false;
     return;
   }
-  const hotelCode = (data.session.user.user_metadata && (data.session.user.user_metadata.hotel || data.session.user.user_metadata.hotel_code)) || '';
-  localStorage.setItem('hotelCode', hotelCode);
+  const hotelCode =
+    data.session.user.user_metadata?.hotel ||
+    localStorage.getItem('hotelCode') ||
+    '';
+  if (hotelCode) localStorage.setItem('hotelCode', hotelCode);
+
+  const hotelNameEl = document.getElementById('hotel-name');
+  if (hotelNameEl) hotelNameEl.textContent = hotelCode || 'Hotel';
+
   showApp(data.session.user.email);
   btn.textContent = 'Sign In';
   btn.disabled = false;
@@ -858,15 +865,22 @@ async function logout() {
 (async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
-    const hotelCode = getHotelCodeFromSession(session);
+    // Read hotel code from session metadata first, fall back to localStorage.
+    // index.html writes user_metadata.hotel into localStorage as 'hotelCode'.
+    // weekly.html must use the same source of truth.
+    const hotelCode =
+      session.user.user_metadata?.hotel ||
+      localStorage.getItem('hotelCode') ||
+      '';
+    // Always keep localStorage in sync so other pages can read it too.
     if (hotelCode) localStorage.setItem('hotelCode', hotelCode);
+
+    // Update the hotel name display in the sidebar
+    const hotelNameEl = document.getElementById('hotel-name');
+    if (hotelNameEl) hotelNameEl.textContent = hotelCode || 'Hotel';
+
     showApp(session.user.email);
-    try {
-      await loadSnapshots(hotelCode);
-    } catch (err) {
-      console.error(err);
-      document.getElementById('pickup-body').innerHTML = `<p style="color:var(--red)">${escHtml(err.message || err)}</p>`;
-    }
+    loadSnapshots(hotelCode);
   } else {
     showLogin();
   }
