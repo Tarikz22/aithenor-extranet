@@ -108,6 +108,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .badge-improved, .badge-correct { background: var(--green-light); color: var(--green); }
 .badge-none { background: var(--red-light); color: var(--red); }
 .badge-pending { background: var(--gray-100); color: var(--gray-600); }
+.badge-updated { background: var(--amber-light); color: var(--signal-persist); }
+.badge-unchanged { background: var(--gray-100); color: var(--gray-600); }
+.account-decision-cell { font-size: 12px; line-height: 1.45; color: var(--gray-900); max-width: 280px; vertical-align: top; }
 .login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
 .login-card { width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 1px solid rgba(15,31,61,0.1); border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(15,31,61,0.12); }
 .brand-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
@@ -246,6 +249,8 @@ const STATE = {
   paceRows: [],
   pickupWeekBlocks: null,
   decisionRows: [],
+  signalPersistence: null,
+  accountabilityRows: null,
   allDecisionKeys: [],
   showAllWeeks: false,
   lastSnapA: null,
@@ -404,6 +409,50 @@ async function loadPersistenceCounts(hotelCode, findingKeys) {
   return out;
 }
 
+function extractSignals(ej) {
+  const signals = [];
+  const addCards = (arr, type) => {
+    for (const c of (Array.isArray(arr) ? arr : [])) {
+      if (!c) continue;
+      signals.push({
+        finding_key: c.finding_key || c.id || '',
+        card_type: type,
+        decision: c.decision || c.enforced_decision_line ||
+          c.commercial_narrative || '',
+      });
+    }
+  };
+  addCards(ej.segment_issue_cards, 'segment_issue');
+  addCards(ej.forward_issues, 'forward_pace');
+  addCards(ej.forecast_gap_issues, 'forecast_gap');
+  addCards(ej.corporate_account_pace_issues, 'corporate_pace');
+  addCards(
+    ej.cross_segment_synthesis && ej.cross_segment_synthesis.synthesis_cards,
+    'cross_segment_synthesis',
+  );
+  if (ej.cross_segment_synthesis && ej.cross_segment_synthesis.causal_chain_card) {
+    const cc = ej.cross_segment_synthesis.causal_chain_card;
+    signals.push({
+      finding_key: cc.finding_key || 'CAUSAL_CHAIN',
+      card_type: 'causal_chain',
+      decision: cc.decision || '',
+    });
+  }
+  return signals;
+}
+
+function dedupeSignalsByFindingKey(arr) {
+  const seen = new Set();
+  const out = [];
+  for (const s of arr) {
+    const fk = String(s.finding_key || '').trim();
+    if (!fk || seen.has(fk)) continue;
+    seen.add(fk);
+    out.push(s);
+  }
+  return out;
+}
+
 async function loadSnapshots(hotelCode) {
   try {
     // Pull only the snapshot_date column across all rows for this hotel.
@@ -477,7 +526,7 @@ async function runComparison(hotelCode, snapA, snapB) {
   document.getElementById('pickup-subtitle').textContent =
     `Room nights and revenue picked up between ${a} and ${b}`;
   document.getElementById('account-subtitle').textContent =
-    `Did the metrics move in the right direction since ${a}?`;
+    `Decision text for signals present in both snapshots (${a} vs ${b}).`;
   document.getElementById('last-updated-chip').textContent = `Last updated: ${b}`;
 
   const { data: paceData, error: paceError } = await supabaseClient
@@ -494,6 +543,7 @@ async function runComparison(hotelCode, snapA, snapB) {
     .limit(100000);
 
   if (paceError) throw paceError;
+  console.log('pms_pace_snapshots rows returned:', (paceData || []).length, 'for hotel:', hotelCode, 'dates:', [a, b]);
 
   const mapA = new Map();
   const mapB = new Map();
@@ -596,27 +646,92 @@ async function runComparison(hotelCode, snapA, snapB) {
   STATE.pickupWeekBlocks = segmentsByWeek;
   STATE.paceRows = paceData || [];
 
-  const { data: trackingData, error: trackingError } = await supabaseClient
-    .from('decision_tracking')
-    .select('*')
+  const { data: engineRows, error: engineError } = await supabaseClient
+    .from('engine_outputs')
+    .select('snapshot_date, engine_json, generated_at')
     .eq('hotel_code', hotelCode)
     .in('snapshot_date', [a, b])
-    .order('snapshot_date', { ascending: true })
-    .limit(10000);
+    .order('generated_at', { ascending: true })
+    .limit(10);
 
-  if (trackingError) {
-    console.error('decision_tracking query error:', trackingError);
+  if (engineError) {
+    console.error('engine_outputs query error:', engineError);
   }
-  console.log('decision_tracking rows returned:',
-    (trackingData || []).length,
-    'for hotel:', hotelCode,
-    'dates:', [a, b]);
+  console.log('engine_outputs rows returned:',
+    (engineRows || []).length,
+    'for dates:', [a, b]);
 
-  STATE.decisionRows = trackingData || [];
+  const engineBySnap = {};
+  for (const row of (engineRows || [])) {
+    let ej = {};
+    try {
+      ej = typeof row.engine_json === 'string'
+        ? JSON.parse(row.engine_json || '{}')
+        : (row.engine_json || {});
+    } catch (e) {
+      console.warn('engine_json parse error', e);
+    }
+    const sd = normDate(row.snapshot_date);
+    if (sd) engineBySnap[sd] = ej;
+  }
+
+  const ejA = engineBySnap[a] || {};
+  const ejB = engineBySnap[b] || {};
+
+  const signalsA = extractSignals(ejA);
+  const signalsB = extractSignals(ejB);
+
+  const keysA = new Set(signalsA.map(s => String(s.finding_key || '').trim()).filter(Boolean));
+  const keysB = new Set(signalsB.map(s => String(s.finding_key || '').trim()).filter(Boolean));
+
+  const newSignals = signalsB.filter(s =>
+    s.finding_key && !keysA.has(String(s.finding_key).trim()));
+  const persistingSignals = signalsB.filter(s =>
+    s.finding_key && keysA.has(String(s.finding_key).trim()));
+  const resolvedSignals = signalsA.filter(s =>
+    s.finding_key && !keysB.has(String(s.finding_key).trim()));
+
+  const mapSA = new Map();
+  for (const s of signalsA) {
+    const fk = String(s.finding_key || '').trim();
+    if (fk) mapSA.set(fk, s);
+  }
+  const mapSB = new Map();
+  for (const s of signalsB) {
+    const fk = String(s.finding_key || '').trim();
+    if (fk) mapSB.set(fk, s);
+  }
+  const accountabilityRows = [];
+  for (const fk of keysA) {
+    if (!keysB.has(fk)) continue;
+    const sa = mapSA.get(fk);
+    const sb = mapSB.get(fk);
+    if (!sa || !sb) continue;
+    const da = String(sa.decision || '').trim();
+    const db = String(sb.decision || '').trim();
+    if (!da && !db) continue;
+    accountabilityRows.push({
+      finding_key: fk,
+      card_type: sa.card_type || sb.card_type || '—',
+      decisionA: da,
+      decisionB: db,
+      outcome: da === db ? 'UNCHANGED' : 'UPDATED',
+      outcomeCls: da === db ? 'badge-unchanged' : 'badge-updated',
+    });
+  }
+  accountabilityRows.sort((x, y) => x.finding_key.localeCompare(y.finding_key));
+
+  STATE.signalPersistence = {
+    newList: dedupeSignalsByFindingKey(newSignals),
+    persistList: dedupeSignalsByFindingKey(persistingSignals),
+    resolvedList: dedupeSignalsByFindingKey(resolvedSignals),
+  };
+  STATE.accountabilityRows = accountabilityRows;
+  STATE.decisionRows = [];
 
   renderPickup(hotelCode, a, b);
-  await renderSignals(hotelCode, a, b);
-  await renderAccountability(hotelCode, a, b);
+  renderSignals(hotelCode, a, b);
+  renderAccountability(hotelCode, a, b);
 }
 
 function handleCompare() {
@@ -716,38 +831,31 @@ function decisionMapForSnapshot(rows, snap) {
   return m;
 }
 
-async function renderSignals(hotelCode, snapA, snapB) {
-  const rows = STATE.decisionRows;
-  if (!(rows || []).length) {
-    document.getElementById('signals-body').innerHTML = '<p class="muted">No signals tracked for this period.</p>';
+function renderSignals(hotelCode, snapA, snapB) {
+  const sp = STATE.signalPersistence;
+  const emptyMsg = '<p class="muted">No signals tracked for this period.</p>';
+  if (!sp) {
+    document.getElementById('signals-body').innerHTML = emptyMsg;
     return;
   }
-  const mapA = decisionMapForSnapshot(rows, snapA);
-  const mapB = decisionMapForSnapshot(rows, snapB);
-  const keysA = new Set(mapA.keys());
-  const keysB = new Set(mapB.keys());
-  const news = [...keysB].filter(k => !keysA.has(k));
-  const resolved = [...keysA].filter(k => !keysB.has(k));
-  const persisting = [...keysA].filter(k => keysB.has(k));
-
-  let persistCounts = new Map();
-  try {
-    persistCounts = await loadPersistenceCounts(hotelCode, persisting);
-  } catch (e) {
-    console.warn(e);
+  const news = sp.newList || [];
+  const persisting = sp.persistList || [];
+  const resolved = sp.resolvedList || [];
+  if (!news.length && !persisting.length && !resolved.length) {
+    document.getElementById('signals-body').innerHTML = emptyMsg;
+    return;
   }
 
-  const sortPersist = (a, b) => n(persistCounts.get(b) || 0) - n(persistCounts.get(a) || 0);
-
-  function card(cls, label, fk, cardType, summary, extra) {
+  function card(cls, label, s) {
+    const fk = s.finding_key || '';
+    const summary = s.decision || '—';
     return `<div class="signal-card ${cls}">
       <div class="priority-stripe"></div>
       <div class="signal-body">
         <div class="signal-label">${escHtml(label)}</div>
         <div class="signal-key">${escHtml(fk)}</div>
-        <div class="signal-meta"><strong>Type:</strong> ${escHtml(cardType || '—')}</div>
-        <div class="signal-meta">${escHtml(summary || '—')}</div>
-        ${extra || ''}
+        <div class="signal-meta"><strong>Type:</strong> ${escHtml(s.card_type || '—')}</div>
+        <div class="signal-meta">${escHtml(summary)}</div>
       </div>
     </div>`;
   }
@@ -757,9 +865,8 @@ async function renderSignals(hotelCode, snapA, snapB) {
   html += '<div class="signal-block"><h4>New signals</h4>';
   if (!news.length) html += '<p class="muted">None</p>';
   else {
-    for (const fk of news) {
-      const r = mapB.get(fk);
-      html += card('signal-new', 'NEW THIS WEEK', fk, r.card_type, r.decision_summary, '');
+    for (const s of news) {
+      html += card('signal-new', 'NEW THIS WEEK', s);
     }
   }
   html += '</div>';
@@ -767,11 +874,8 @@ async function renderSignals(hotelCode, snapA, snapB) {
   html += '<div class="signal-block"><h4>Persisting signals</h4>';
   if (!persisting.length) html += '<p class="muted">None</p>';
   else {
-    for (const fk of [...persisting].sort(sortPersist)) {
-      const r = mapB.get(fk) || mapA.get(fk);
-      const cnt = persistCounts.get(fk) || 0;
-      const label = `PERSISTING · ${cnt} snapshot${cnt === 1 ? '' : 's'}`;
-      html += card('signal-persist', label, fk, r.card_type, r.decision_summary, '');
+    for (const s of persisting) {
+      html += card('signal-persist', 'PERSISTING', s);
     }
   }
   html += '</div>';
@@ -779,9 +883,8 @@ async function renderSignals(hotelCode, snapA, snapB) {
   html += '<div class="signal-block"><h4>Resolved signals</h4>';
   if (!resolved.length) html += '<p class="muted">None</p>';
   else {
-    for (const fk of resolved) {
-      const r = mapA.get(fk);
-      html += card('signal-resolved', 'RESOLVED', fk, r.card_type, r.decision_summary, '');
+    for (const s of resolved) {
+      html += card('signal-resolved', 'RESOLVED', s);
     }
   }
   html += '</div>';
@@ -789,97 +892,24 @@ async function renderSignals(hotelCode, snapA, snapB) {
   document.getElementById('signals-body').innerHTML = html;
 }
 
-async function renderAccountability(hotelCode, snapA, snapB) {
-  const rows = STATE.decisionRows;
+function renderAccountability(hotelCode, snapA, snapB) {
+  const rows = STATE.accountabilityRows;
   if (!(rows || []).length) {
     document.getElementById('account-body').innerHTML = '<p class="muted">No signals tracked for this period.</p>';
     return;
   }
-  const mapA = decisionMapForSnapshot(rows, snapA);
-  const mapB = decisionMapForSnapshot(rows, snapB);
-  const pace = STATE.paceRows;
-
-  const candidates = [...mapA.values()].filter(r => (r.decision_summary != null ? String(r.decision_summary) : '').trim());
-
-  if (!candidates.length) {
-    document.getElementById('account-body').innerHTML = '<p class="muted">No signals tracked for this period.</p>';
-    return;
-  }
-
-  const forwardTypes = new Set(['forward_pace', 'forecast_gap']);
-
-  function inferOutcome(rowA, rowB) {
-    const tm = (rowA.target_metric != null ? String(rowA.target_metric) : '').trim();
-    const td = (rowA.target_direction != null ? String(rowA.target_direction) : '').trim();
-    if (!tm || !td) return { label: 'PENDING', cls: 'badge-pending' };
-
-    const ct = (rowA.card_type != null ? String(rowA.card_type) : '').trim();
-    if (!forwardTypes.has(ct)) return { label: 'PENDING', cls: 'badge-pending' };
-
-    let weekKeys = paceWindowWeekKeysFromDecision(rowA);
-    if (!weekKeys || !weekKeys.size) {
-      const wk = new Set();
-      for (const r of pace) {
-        if (normDate(r.snapshot_date) !== normDate(snapB)) continue;
-        if (r.row_phase !== 'future_forecast') continue;
-        if (n(r.lead_days_snapshot_to_stay) <= 0) continue;
-        const wkStr = r.stay_week_key != null ? String(r.stay_week_key).trim() : '';
-        if (wkStr) wk.add(wkStr);
-      }
-      weekKeys = wk.size ? wk : null;
-    }
-    const rnA = sumRnPaceForWeeks(pace, snapA, weekKeys);
-    const rnB = sumRnPaceForWeeks(pace, snapB, weekKeys);
-    const dir = (rowA.target_direction != null ? String(rowA.target_direction) : '').toLowerCase().trim();
-    const up = dir === 'up' || dir === 'increase' || dir === 'higher';
-    const down = dir === 'down' || dir === 'decrease' || dir === 'lower';
-    if (!up && !down) return { label: 'PENDING', cls: 'badge-pending' };
-    const delta = rnB - rnA;
-    if (up) {
-      if (delta > 0) return { label: 'IMPROVED', cls: 'badge-improved' };
-      return { label: 'NO MOVEMENT', cls: 'badge-none' };
-    }
-    if (down) {
-      if (delta < 0) return { label: 'IMPROVED', cls: 'badge-improved' };
-      return { label: 'NO MOVEMENT', cls: 'badge-none' };
-    }
-    return { label: 'PENDING', cls: 'badge-pending' };
-  }
 
   let html = '<div class="table-wrap"><table class="data-table"><thead><tr>';
-  html += '<th>Signal</th><th>Card type</th><th>Decision</th><th>Target</th><th>Direction</th><th>Outcome</th>';
+  html += `<th>Signal</th><th>Card type</th><th>Decision (${escHtml(snapA)})</th><th>Decision (${escHtml(snapB)})</th><th>Outcome</th>`;
   html += '</tr></thead><tbody>';
 
-  for (const rowA of candidates) {
-    const fk = String(rowA.finding_key).trim();
-    const rowB = mapB.get(fk);
-    const tmDisp = (rowA.target_metric != null ? String(rowA.target_metric) : '').trim();
-    const tdDisp = (rowA.target_direction != null ? String(rowA.target_direction) : '').trim();
-    if (!rowB) {
-      html += `<tr>
-        <td>${escHtml(fk)}</td>
-        <td>${escHtml(rowA.card_type)}</td>
-        <td>${escHtml(rowA.decision_summary)}</td>
-        <td>${escHtml(tmDisp || '—')}</td>
-        <td>${escHtml(tdDisp || '—')}</td>
-        <td><span class="badge-outcome badge-pending">PENDING</span></td>
-      </tr>`;
-      continue;
-    }
-    const stB = (rowB.outcome_status != null ? String(rowB.outcome_status) : '').toLowerCase().trim();
-    let outcome;
-    if (stB === 'correct') outcome = { label: 'CORRECT', cls: 'badge-correct' };
-    else if (stB === 'incorrect' || stB === 'wrong') outcome = { label: 'NO MOVEMENT', cls: 'badge-none' };
-    else if (stB === 'pending' || !stB) outcome = inferOutcome(rowA, rowB);
-    else outcome = { label: stB.toUpperCase(), cls: 'badge-pending' };
-
+  for (const r of rows) {
     html += `<tr>
-      <td>${escHtml(fk)}</td>
-      <td>${escHtml(rowA.card_type)}</td>
-      <td>${escHtml(rowA.decision_summary)}</td>
-      <td>${escHtml(tmDisp || '—')}</td>
-      <td>${escHtml(tdDisp || '—')}</td>
-      <td><span class="badge-outcome ${outcome.cls}">${escHtml(outcome.label)}</span></td>
+      <td>${escHtml(r.finding_key)}</td>
+      <td>${escHtml(r.card_type)}</td>
+      <td class="account-decision-cell">${escHtml(r.decisionA || '—')}</td>
+      <td class="account-decision-cell">${escHtml(r.decisionB || '—')}</td>
+      <td><span class="badge-outcome ${r.outcomeCls}">${escHtml(r.outcome)}</span></td>
     </tr>`;
   }
   html += '</tbody></table></div>';
