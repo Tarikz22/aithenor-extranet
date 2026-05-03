@@ -410,11 +410,11 @@ async function loadSnapshots(hotelCode) {
     // Supabase does not support DISTINCT — we deduplicate in JS below.
     // Use a high limit to ensure all rows are returned (table has ~41k rows).
     const { data, error } = await supabaseClient
-      .from('pms_pace_snapshots')
-      .select('snapshot_date')
+      .from('engine_outputs')
+      .select('snapshot_date, generated_at')
       .eq('hotel_code', hotelCode)
-      .order('snapshot_date', { ascending: false })
-      .limit(100000);
+      .not('snapshot_date', 'is', null)
+      .order('generated_at', { ascending: false });
 
     if (error) throw error;
 
