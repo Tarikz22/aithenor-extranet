@@ -6124,6 +6124,16 @@ function renderFindings() {
   if (verdictHtml && verdictSlot) {
     verdictSlot.insertAdjacentHTML('beforeend', verdictHtml);
   }
+  // Inject causal chain card as hero block immediately below Commercial Verdict,
+  // before any section. Full-width, standalone, always the first card a person reads.
+  if (hasCausalChainCard && verdictSlot) {
+    const heroSnapDate = (currentEngineRow?.snapshot_date || '').toString();
+    const causalHeroHtml = `
+      <div id="causal-chain-hero" style="padding: 0 24px; margin-top: 16px;">
+        ${renderCausalChainSynthesisCard(causalChainCard, heroSnapDate)}
+      </div>`;
+    verdictSlot.insertAdjacentHTML('beforeend', causalHeroHtml);
+  }
 
   const urgencyTabsHtml = `<div class="tabs-row" id="findings-urgency-tabs" style="margin-bottom:12px;">
     <div class="tab active" onclick="setFindingsUrgencyFilter('all', this)">All</div>
@@ -6272,9 +6282,9 @@ function renderFindings() {
     };
     segSynthHtml += renderSynthesisCardAsRetailTemplate(synthCard, fiSnapSeg, i);
   });
-  const segCausalChainHtml = hasCausalChainCard
-    ? renderCausalChainSynthesisCard(causalChainCard, fiSnapSeg)
-    : '';
+  const segCausalChainHtml = '';
+  // Causal chain card moved to hero position above all sections.
+  // No longer rendered inside the SEGMENTATION group.
   let segIssueCardsHtml = '';
   for (const sic of segmentIssueCards) {
     if (!sic || typeof sic !== 'object') continue;
@@ -6370,7 +6380,8 @@ function renderFindings() {
   if (segCardsHtml) {
     const s = summaries.segmentation;
     const segCount = dedupedHistoricalCards.length + synthForSegmentation.length
-      + segmentIssueCards.length + (hasCausalChainCard ? 1 : 0);
+      + segmentIssueCards.length;
+    // hasCausalChainCard no longer counted in SEGMENTATION — it has its own hero slot.
     const histSparklineHtml = buildStrWeeklySparklineBlockHtml(engineJson);
     container.insertAdjacentHTML('beforeend',
       buildCompleteGroup('historical', 'Segmentation',
