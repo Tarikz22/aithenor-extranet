@@ -244,6 +244,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const STATE = {
   snapshotDates: [],
   paceRows: [],
+  pickupWeekBlocks: null,
   decisionRows: [],
   allDecisionKeys: [],
   showAllWeeks: false,
@@ -479,25 +480,139 @@ async function runComparison(hotelCode, snapA, snapB) {
     `Did the metrics move in the right direction since ${a}?`;
   document.getElementById('last-updated-chip').textContent = `Last updated: ${b}`;
 
-  const [q1, q2] = await Promise.all([
-    supabaseClient
-      .from('pms_pace_snapshots')
-      .select('snapshot_date, stay_week_key, stay_week_start_ymd, stay_week_end_ymd, market_segment_label, row_phase, rn_on_books_ty, rn_stly, booked_revenue_ty, booked_revenue_stly, adr_ty, lead_days_snapshot_to_stay')
-      .eq('hotel_code', hotelCode)
-      .in('snapshot_date', [a, b])
-      .eq('row_phase', 'future_forecast')
-      .order('stay_week_key', { ascending: true }),
-    supabaseClient
-      .from('decision_tracking')
-      .select('*')
-      .eq('hotel_code', hotelCode)
-      .in('snapshot_date', [a, b])
-      .order('snapshot_date', { ascending: true }),
-  ]);
-  if (q1.error) throw q1.error;
-  if (q2.error) throw q2.error;
-  STATE.paceRows = q1.data || [];
-  STATE.decisionRows = q2.data || [];
+  const { data: paceData, error: paceError } = await supabaseClient
+    .from('pms_pace_snapshots')
+    .select(`snapshot_date, stay_date_ymd, stay_week_key,
+             stay_week_start_ymd, stay_week_end_ymd,
+             market_segment_label, row_phase,
+             rn_on_books_ty, booked_revenue_ty,
+             lead_days_snapshot_to_stay`)
+    .eq('hotel_code', hotelCode)
+    .in('snapshot_date', [a, b])
+    .eq('row_phase', 'future_forecast')
+    .order('stay_date_ymd', { ascending: true })
+    .limit(100000);
+
+  if (paceError) throw paceError;
+
+  const mapA = new Map();
+  const mapB = new Map();
+  for (const row of (paceData || [])) {
+    const sd = normDate(row.stay_date_ymd);
+    if (!sd) continue;
+    const seg = (row.market_segment_label != null ? String(row.market_segment_label) : '—').trim() || '—';
+    const key = sd + '|' + seg;
+    if (normDate(row.snapshot_date) === a) {
+      const ex = mapA.get(key);
+      if (ex) {
+        ex.rn_on_books_ty = n(ex.rn_on_books_ty) + n(row.rn_on_books_ty);
+        ex.booked_revenue_ty = n(ex.booked_revenue_ty) + n(row.booked_revenue_ty);
+      } else {
+        mapA.set(key, { ...row });
+      }
+    }
+    if (normDate(row.snapshot_date) === b) {
+      const ex = mapB.get(key);
+      if (ex) {
+        ex.rn_on_books_ty = n(ex.rn_on_books_ty) + n(row.rn_on_books_ty);
+        ex.booked_revenue_ty = n(ex.booked_revenue_ty) + n(row.booked_revenue_ty);
+      } else {
+        mapB.set(key, { ...row });
+      }
+    }
+  }
+
+  const intersectKeys = [...mapB.keys()].filter(k => mapA.has(k));
+
+  const byWeek = new Map();
+  for (const k of intersectKeys) {
+    const rowA = mapA.get(k);
+    const rowB = mapB.get(k);
+    if (n(rowB.lead_days_snapshot_to_stay) <= 0) continue;
+    const wk = rowB.stay_week_key != null ? String(rowB.stay_week_key) : '';
+    const seg = (rowB.market_segment_label != null ? String(rowB.market_segment_label) : '—').trim() || '—';
+    if (!byWeek.has(wk)) {
+      byWeek.set(wk, {
+        start: rowB.stay_week_start_ymd,
+        end: rowB.stay_week_end_ymd,
+        maxLead: 0,
+        segs: new Map(),
+      });
+    }
+    const W = byWeek.get(wk);
+    W.maxLead = Math.max(W.maxLead, n(rowB.lead_days_snapshot_to_stay));
+    if (normDate(rowB.stay_week_start_ymd) && (!W.start || normDate(rowB.stay_week_start_ymd) < normDate(W.start))) {
+      W.start = rowB.stay_week_start_ymd;
+    }
+    if (normDate(rowB.stay_week_end_ymd) && (!W.end || normDate(rowB.stay_week_end_ymd) > normDate(W.end))) {
+      W.end = rowB.stay_week_end_ymd;
+    }
+    if (!W.segs.has(seg)) {
+      W.segs.set(seg, { rnA: 0, rnB: 0, revA: 0, revB: 0 });
+    }
+    const S = W.segs.get(seg);
+    S.rnA += n(rowA.rn_on_books_ty);
+    S.rnB += n(rowB.rn_on_books_ty);
+    S.revA += n(rowA.booked_revenue_ty);
+    S.revB += n(rowB.booked_revenue_ty);
+  }
+
+  const weekList = [...byWeek.entries()].sort(([, W1], [, W2]) => {
+    const d1 = normDate(W1.start);
+    const d2 = normDate(W2.start);
+    if (d1 && d2) return d1.localeCompare(d2);
+    return 0;
+  });
+
+  const segmentsByWeek = [];
+  for (const [wk, W] of weekList) {
+    const rows = [];
+    let weekRn = 0;
+    let weekRev = 0;
+    for (const [seg, S] of W.segs) {
+      const rnDelta = S.rnB - S.rnA;
+      const revDelta = S.revB - S.revA;
+      weekRn += rnDelta;
+      weekRev += revDelta;
+      if (rnDelta === 0 && revDelta === 0) continue;
+      rows.push({
+        seg,
+        ra: { rn: S.rnA, rev: S.revA },
+        rb: { rn: S.rnB, rev: S.revB },
+        rnDelta,
+        revDelta,
+      });
+    }
+    if (!rows.length) continue;
+    segmentsByWeek.push({
+      wk,
+      meta: { start: W.start, end: W.end, weekKey: wk },
+      rows,
+      weekRn,
+      weekRev,
+    });
+  }
+
+  STATE.pickupWeekBlocks = segmentsByWeek;
+  STATE.paceRows = paceData || [];
+
+  const { data: trackingData, error: trackingError } = await supabaseClient
+    .from('decision_tracking')
+    .select('*')
+    .eq('hotel_code', hotelCode)
+    .in('snapshot_date', [a, b])
+    .order('snapshot_date', { ascending: true })
+    .limit(10000);
+
+  if (trackingError) {
+    console.error('decision_tracking query error:', trackingError);
+  }
+  console.log('decision_tracking rows returned:',
+    (trackingData || []).length,
+    'for hotel:', hotelCode,
+    'dates:', [a, b]);
+
+  STATE.decisionRows = trackingData || [];
 
   renderPickup(hotelCode, a, b);
   await renderSignals(hotelCode, a, b);
@@ -529,56 +644,18 @@ function handleCompare() {
 }
 
 function renderPickup(hotelCode, snapA, snapB) {
-  const pace = STATE.paceRows;
-  const mapA = aggregatePaceByWeekSegment(pace, snapA);
-  const mapB = aggregatePaceByWeekSegment(pace, snapB);
-  const weekMeta = buildWeekMeta(mapB);
-
-  const weekKeys = [...weekMeta.keys()].filter(wk => {
-    const meta = weekMeta.get(wk);
-    return meta && n(meta.maxLead) > 0;
-  });
-
-  weekKeys.sort((w1, w2) => {
-    const m1 = weekMeta.get(w1);
-    const m2 = weekMeta.get(w2);
-    const d1 = normDate(m1.start);
-    const d2 = normDate(m2.start);
-    if (d1 && d2) return d1.localeCompare(d2);
-    return String(w1).localeCompare(String(w2));
-  });
-
-  const segmentsByWeek = [];
+  const segmentsByWeek = Array.isArray(STATE.pickupWeekBlocks) ? STATE.pickupWeekBlocks : [];
   let totalRn = 0;
   let totalRev = 0;
-  let gainW = 0, loseW = 0, flatW = 0;
-
-  for (const wk of weekKeys) {
-    const segs = new Set();
-    for (const k of mapA.keys()) if (k.startsWith(wk + '\0')) segs.add(k.split('\0')[1]);
-    for (const k of mapB.keys()) if (k.startsWith(wk + '\0')) segs.add(k.split('\0')[1]);
-    const rows = [];
-    let weekRn = 0;
-    let weekRev = 0;
-    for (const seg of segs) {
-      const key = wk + '\0' + seg;
-      const ra = mapA.get(key) || { rn: 0, rev: 0 };
-      const rb = mapB.get(key) || { rn: 0, rev: 0 };
-      const rnDelta = rb.rn - ra.rn;
-      const revDelta = rb.rev - ra.rev;
-      weekRn += rnDelta;
-      weekRev += revDelta;
-      if (rnDelta === 0 && revDelta === 0) continue;
-      rows.push({ seg, ra, rb, rnDelta, revDelta });
-    }
-    if (!rows.length) continue;
-    const meta = weekMeta.get(wk) || { start: '', end: '', weekKey: wk };
-    if (weekRn > 0) gainW++;
-    else if (weekRn < 0) loseW++;
+  let gainW = 0;
+  let loseW = 0;
+  let flatW = 0;
+  for (const block of segmentsByWeek) {
+    totalRn += block.weekRn;
+    totalRev += block.weekRev;
+    if (block.weekRn > 0) gainW++;
+    else if (block.weekRn < 0) loseW++;
     else flatW++;
-    totalRn += weekRn;
-    totalRev += weekRev;
-    segmentsByWeek.push({ wk, meta, rows, weekRn, weekRev });
   }
 
   const cap = 12;
