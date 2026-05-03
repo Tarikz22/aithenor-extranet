@@ -404,49 +404,64 @@ async function loadPersistenceCounts(hotelCode, findingKeys) {
 }
 
 async function loadSnapshots(hotelCode) {
-  setSectionsLoading();
-  document.getElementById('header-hotel').textContent = hotelCode || '—';
-  document.getElementById('sidebar-hotel').textContent = hotelCode || 'Hotel';
-  if (!hotelCode) {
-    document.getElementById('pickup-body').innerHTML =
-      '<p class="muted">No hotel code found. Your account needs <code>hotel</code> (or <code>hotel_code</code>) in user metadata, or sign in from a page that sets localStorage.</p>';
-    document.getElementById('signals-body').innerHTML = '';
-    document.getElementById('account-body').innerHTML = '';
-    return;
-  }
-  const { data, error } = await supabaseClient
-    .from('pms_pace_snapshots')
-    .select('snapshot_date')
-    .eq('hotel_code', hotelCode)
-    .order('snapshot_date', { ascending: false });
-  if (error) throw error;
-  const raw = (data || []).map(r => normDate(r.snapshot_date)).filter(Boolean);
-  const dates = [...new Set(raw)];
-  STATE.snapshotDates = dates;
-  const fromEl = document.getElementById('sel-from');
-  const toEl = document.getElementById('sel-to');
-  fromEl.innerHTML = dates.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
-  toEl.innerHTML = dates.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
-  if (dates.length >= 2) {
-    toEl.value = dates[0];
-    fromEl.value = dates[1];
-  } else if (dates.length === 1) {
-    toEl.value = dates[0];
-    fromEl.value = dates[0];
-  }
-  document.getElementById('last-updated-chip').textContent = dates.length ? `Last updated: ${dates[0]}` : 'Last updated: —';
+  try {
+    // Pull only the snapshot_date column across all rows for this hotel.
+    // No filters on row_phase or future_window_class — we need ALL dates.
+    // Supabase does not support DISTINCT — we deduplicate in JS below.
+    // Use a high limit to ensure all rows are returned (table has ~41k rows).
+    const { data, error } = await supabaseClient
+      .from('pms_pace_snapshots')
+      .select('snapshot_date')
+      .eq('hotel_code', hotelCode)
+      .order('snapshot_date', { ascending: false })
+      .limit(100000);
 
-  if (dates.length < 2) {
-    document.getElementById('pickup-subtitle').textContent = 'Room nights and revenue picked up between snapshots.';
-    document.getElementById('pickup-body').innerHTML =
-      '<p class="muted">Only one snapshot available for this hotel. Upload next week\'s data to enable pickup comparison.</p>';
-    document.getElementById('signals-body').innerHTML = '<p class="muted">Select two snapshot dates once available.</p>';
-    document.getElementById('account-body').innerHTML = '<p class="muted">Select two snapshot dates once available.</p>';
-    return;
+    if (error) throw error;
+
+    // Deduplicate in JS — extract unique snapshot_date values
+    const seen = new Set();
+    const dates = [];
+    for (const row of (data || [])) {
+      const d = row.snapshot_date;
+      if (d && !seen.has(d)) {
+        seen.add(d);
+        dates.push(d);
+      }
+    }
+    // dates is already sorted descending (newest first) from the query
+
+    // Populate both dropdowns (HTML uses sel-from / sel-to)
+    const snapAEl = document.getElementById('sel-from');
+    const snapBEl = document.getElementById('sel-to');
+    if (!snapAEl || !snapBEl) return;
+
+    snapAEl.innerHTML = '';
+    snapBEl.innerHTML = '';
+    dates.forEach(d => {
+      snapAEl.insertAdjacentHTML('beforeend',
+        `<option value="${d}">${d}</option>`);
+      snapBEl.insertAdjacentHTML('beforeend',
+        `<option value="${d}">${d}</option>`);
+    });
+
+    // Default: snapB (To) = most recent, snapA (From) = second most recent
+    if (dates.length >= 2) {
+      snapBEl.value = dates[0];
+      snapAEl.value = dates[1];
+    } else if (dates.length === 1) {
+      snapBEl.value = dates[0];
+      snapAEl.value = dates[0];
+    }
+
+    // Update last updated chip
+    const lastUpdatedEl = document.getElementById('last-updated-chip');
+    if (lastUpdatedEl && dates.length) {
+      lastUpdatedEl.textContent = 'Last updated: ' + dates[0];
+    }
+
+  } catch (err) {
+    console.error('loadSnapshots error:', err);
   }
-  document.getElementById('pickup-body').innerHTML = '<p class="muted">Select dates and click Compare to load pickup and signals.</p>';
-  document.getElementById('signals-body').innerHTML = '<p class="muted">Select dates and click Compare to load pickup and signals.</p>';
-  document.getElementById('account-body').innerHTML = '<p class="muted">Select dates and click Compare to load pickup and signals.</p>';
 }
 
 async function runComparison(hotelCode, snapA, snapB) {
