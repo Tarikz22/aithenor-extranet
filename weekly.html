@@ -88,6 +88,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .week-sum-pos { color: #1A6B3C; }
 .week-sum-neg { color: #C0392B; }
 .week-sum-zero { color: #6B6B67; }
+.week-summary-muted td { color: var(--gray-600); font-style: italic; }
 .show-all-link { margin-top: 10px; font-size: 13px; color: var(--navy-mid); cursor: pointer; text-decoration: underline; display: inline-block; }
 .signal-block { margin-bottom: 18px; }
 .signal-block h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; color: var(--gray-600); }
@@ -543,7 +544,9 @@ async function runComparison(hotelCode, snapA, snapB) {
     .limit(100000);
 
   if (paceError) throw paceError;
-  console.log('pms_pace_snapshots rows returned:', (paceData || []).length, 'for hotel:', hotelCode, 'dates:', [a, b]);
+  console.log('pms_pace_snapshots rows:', (paceData || []).length,
+    'snapA rows:', (paceData || []).filter(r => r.snapshot_date === snapA).length,
+    'snapB rows:', (paceData || []).filter(r => r.snapshot_date === snapB).length);
 
   const mapA = new Map();
   const mapB = new Map();
@@ -572,74 +575,97 @@ async function runComparison(hotelCode, snapA, snapB) {
     }
   }
 
-  const intersectKeys = [...mapB.keys()].filter(k => mapA.has(k));
-
-  const byWeek = new Map();
-  for (const k of intersectKeys) {
-    const rowA = mapA.get(k);
-    const rowB = mapB.get(k);
+  const weekSegAgg = new Map();
+  const weekMeta = new Map();
+  for (const [key, rowB] of mapB) {
     if (n(rowB.lead_days_snapshot_to_stay) <= 0) continue;
     const wk = rowB.stay_week_key != null ? String(rowB.stay_week_key) : '';
     const seg = (rowB.market_segment_label != null ? String(rowB.market_segment_label) : '—').trim() || '—';
-    if (!byWeek.has(wk)) {
-      byWeek.set(wk, {
+    const gk = wk + '\x1f' + seg;
+
+    if (!weekMeta.has(wk)) {
+      weekMeta.set(wk, {
         start: rowB.stay_week_start_ymd,
         end: rowB.stay_week_end_ymd,
-        maxLead: 0,
-        segs: new Map(),
+        maxLead: n(rowB.lead_days_snapshot_to_stay),
+        hasAnyMatchWithA: false,
+      });
+    } else {
+      const M = weekMeta.get(wk);
+      M.maxLead = Math.max(M.maxLead, n(rowB.lead_days_snapshot_to_stay));
+      if (normDate(rowB.stay_week_start_ymd) && (!M.start || normDate(rowB.stay_week_start_ymd) < normDate(M.start))) {
+        M.start = rowB.stay_week_start_ymd;
+      }
+      if (normDate(rowB.stay_week_end_ymd) && (!M.end || normDate(rowB.stay_week_end_ymd) > normDate(M.end))) {
+        M.end = rowB.stay_week_end_ymd;
+      }
+    }
+    if (mapA.has(key)) weekMeta.get(wk).hasAnyMatchWithA = true;
+
+    if (!weekSegAgg.has(gk)) {
+      weekSegAgg.set(gk, {
+        wk,
+        seg,
+        rnB: 0,
+        revB: 0,
+        rnPick: 0,
+        revPick: 0,
+        rnA: 0,
+        revA: 0,
+        matchedAny: false,
       });
     }
-    const W = byWeek.get(wk);
-    W.maxLead = Math.max(W.maxLead, n(rowB.lead_days_snapshot_to_stay));
-    if (normDate(rowB.stay_week_start_ymd) && (!W.start || normDate(rowB.stay_week_start_ymd) < normDate(W.start))) {
-      W.start = rowB.stay_week_start_ymd;
-    }
-    if (normDate(rowB.stay_week_end_ymd) && (!W.end || normDate(rowB.stay_week_end_ymd) > normDate(W.end))) {
-      W.end = rowB.stay_week_end_ymd;
-    }
-    if (!W.segs.has(seg)) {
-      W.segs.set(seg, { rnA: 0, rnB: 0, revA: 0, revB: 0 });
-    }
-    const S = W.segs.get(seg);
-    S.rnA += n(rowA.rn_on_books_ty);
+    const S = weekSegAgg.get(gk);
     S.rnB += n(rowB.rn_on_books_ty);
-    S.revA += n(rowA.booked_revenue_ty);
     S.revB += n(rowB.booked_revenue_ty);
+    const rowA = mapA.get(key);
+    if (rowA) {
+      S.matchedAny = true;
+      S.rnA += n(rowA.rn_on_books_ty);
+      S.revA += n(rowA.booked_revenue_ty);
+      S.rnPick += n(rowB.rn_on_books_ty) - n(rowA.rn_on_books_ty);
+      S.revPick += n(rowB.booked_revenue_ty) - n(rowA.booked_revenue_ty);
+    }
   }
 
-  const weekList = [...byWeek.entries()].sort(([, W1], [, W2]) => {
-    const d1 = normDate(W1.start);
-    const d2 = normDate(W2.start);
+  const weekKeysSorted = [...weekMeta.keys()].sort((wk1, wk2) => {
+    const M1 = weekMeta.get(wk1);
+    const M2 = weekMeta.get(wk2);
+    const d1 = normDate(M1.start);
+    const d2 = normDate(M2.start);
     if (d1 && d2) return d1.localeCompare(d2);
-    return 0;
+    return String(wk1).localeCompare(String(wk2));
   });
 
   const segmentsByWeek = [];
-  for (const [wk, W] of weekList) {
+  for (const wk of weekKeysSorted) {
+    const Wm = weekMeta.get(wk);
+    const newWindowWeek = !Wm.hasAnyMatchWithA;
     const rows = [];
     let weekRn = 0;
     let weekRev = 0;
-    for (const [seg, S] of W.segs) {
-      const rnDelta = S.rnB - S.rnA;
-      const revDelta = S.revB - S.revA;
-      weekRn += rnDelta;
-      weekRev += revDelta;
-      if (rnDelta === 0 && revDelta === 0) continue;
+    for (const [, S] of weekSegAgg) {
+      if (S.wk !== wk) continue;
+      weekRn += S.rnPick;
+      weekRev += S.revPick;
+      if (S.rnPick === 0 && S.revPick === 0) continue;
       rows.push({
-        seg,
+        seg: S.seg,
         ra: { rn: S.rnA, rev: S.revA },
         rb: { rn: S.rnB, rev: S.revB },
-        rnDelta,
-        revDelta,
+        rnDelta: S.rnPick,
+        revDelta: S.revPick,
+        raAbsent: !S.matchedAny,
       });
     }
-    if (!rows.length) continue;
+    if (!rows.length && !newWindowWeek) continue;
     segmentsByWeek.push({
       wk,
-      meta: { start: W.start, end: W.end, weekKey: wk },
+      meta: { start: Wm.start, end: Wm.end, weekKey: wk },
       rows,
       weekRn,
       weekRev,
+      newWindowWeek,
     });
   }
 
@@ -798,14 +824,18 @@ function renderPickup(hotelCode, snapA, snapB) {
 
   for (const block of displayWeeks) {
     const { wk, meta, rows, weekRn, weekRev } = block;
-    const wkCls = weekRn > 0 ? 'week-sum-pos' : weekRn < 0 ? 'week-sum-neg' : 'week-sum-zero';
+    const newWindowWeek = !!block.newWindowWeek;
+    const wkCls = newWindowWeek
+      ? 'week-sum-zero'
+      : (weekRn > 0 ? 'week-sum-pos' : weekRn < 0 ? 'week-sum-neg' : 'week-sum-zero');
     const wl = weekLabel(wk, meta.start, meta.end);
-    html += `<tr class="week-summary"><td colspan="6" class="${wkCls}">${escHtml(wl)} &nbsp;|&nbsp; Total: ${fmtDeltaRn(weekRn)} RN · ${fmtDeltaMoney(weekRev)}</td></tr>`;
+    const newWinSuffix = newWindowWeek ? ' (new window — not in prior snapshot)' : '';
+    html += `<tr class="week-summary${newWindowWeek ? ' week-summary-muted' : ''}"><td colspan="6" class="${wkCls}">${escHtml(wl)}${newWinSuffix} &nbsp;|&nbsp; Total: ${fmtDeltaRn(weekRn)} RN · ${fmtDeltaMoney(weekRev)}</td></tr>`;
     for (const r of rows) {
       html += '<tr>';
       html += '<td></td>';
       html += `<td>${escHtml(r.seg)}</td>`;
-      html += `<td class="num">${fmtInt(r.ra.rn)}</td>`;
+      html += `<td class="num">${r.raAbsent ? '—' : fmtInt(r.ra.rn)}</td>`;
       html += `<td class="num">${fmtInt(r.rb.rn)}</td>`;
       html += `<td class="${deltaClass(r.rnDelta)}">${escHtml(fmtDeltaRn(r.rnDelta))}</td>`;
       html += `<td class="${deltaClass(r.revDelta)}">${escHtml(fmtDeltaMoney(r.revDelta))}</td>`;
