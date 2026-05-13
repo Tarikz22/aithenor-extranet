@@ -6323,69 +6323,127 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
     (a, b) => fiPipelineWindowSortKey(a) - fiPipelineWindowSortKey(b)
   );
 
+  // WHY: Combine pickup delta + group pipeline per window into one tile.
+  // Reduces 6 cards to 3 window tiles + corporate cards.
+  // Each window tile gives the GM both the pace gap and the pipeline cover in one read.
+
+  const windowKeys = ['window_1', 'window_2', 'window_3'];
+  const windowLabels = { window_1: '1–30', window_2: '31–60', window_3: '61–90' };
+
+  function renderWindowTile(wKey) {
+    const wLabel = windowLabels[wKey];
+    const pickup = sortedWeekly.find(c => c.window_class === wKey);
+    const pipeline = sortedPipeline.find(c => c.window_class === wKey);
+    if (!pickup && !pipeline) return '';
+
+    const sig = pickup?.signal || {};
+    const isClosing = sig.gap_direction === 'closing';
+    const urg = String(pickup?.urgency || pipeline?.urgency || 'medium').toLowerCase();
+
+    const gapRn = sig.gap_to_forecast != null && Number.isFinite(Number(sig.gap_to_forecast))
+      ? Math.round(Number(sig.gap_to_forecast)) : null;
+    const pickupThisWeek = sig.pickup_this_week != null ? Math.round(sig.pickup_this_week) : null;
+    const required = sig.required_weekly_pickup != null && Number.isFinite(Number(sig.required_weekly_pickup))
+      ? Math.round(Number(sig.required_weekly_pickup)) : null;
+    const weeksLeft = sig.weeks_remaining != null ? sig.weeks_remaining : null;
+
+    const covPct = pipeline?.gap_closure_pct != null
+      ? Math.round(Number(pipeline.gap_closure_pct) * 100) : null;
+    const tentRn = pipeline?.tentative_rn != null ? Math.round(pipeline.tentative_rn) : null;
+    const prospRn = pipeline?.prospect_rn != null ? Math.round(pipeline.prospect_rn) : null;
+    const groupsArr = pipeline && (Array.isArray(pipeline.pipeline_groups) ? pipeline.pipeline_groups
+      : (Array.isArray(pipeline.groups) ? pipeline.groups : []));
+    const topGroup = groupsArr.length ? groupsArr[0] : null;
+
+    // Title: pace gap + pipeline cover in one line
+    const titleParts = [];
+    if (gapRn !== null) titleParts.push(`${gapRn} RN to forecast`);
+    if (covPct !== null) titleParts.push(`${covPct}% covered by pipeline`);
+    const title = titleParts.join(' — ') || `Days ${wLabel}`;
+
+    // Facts
+    const facts = [];
+    if (pickupThisWeek !== null && required !== null) {
+      facts.push(`Picked up ${pickupThisWeek} RN this week — need ${required} RN/week${weeksLeft ? ` for ${weeksLeft} weeks` : ''}`);
+    }
+    if (tentRn !== null || prospRn !== null) {
+      facts.push(`Pipeline: ${tentRn ?? 0} RN tentative / ${prospRn ?? 0} RN prospect`);
+    }
+    if (topGroup?.group_name) {
+      const topRn = topGroup.room_nights != null ? Math.round(topGroup.room_nights)
+        : (topGroup.rn != null ? Math.round(topGroup.rn) : null);
+      facts.push(`Largest group: ${topGroup.group_name}${topRn ? ` — ${topRn} RN` : ''}`);
+    }
+
+    // Action: pickup if widening, group conversion if closing or no pickup data
+    let action = '';
+    if (!isClosing && required !== null && weeksLeft !== null) {
+      action = `Need ${required} RN/week for ${weeksLeft} weeks — identify dragging segment and intervene now`;
+    } else if (topGroup?.group_name && pipeline?.forecast_gap_rn) {
+      const closePct = topGroup.room_nights != null || topGroup.rn != null
+        ? Math.round(((topGroup.room_nights != null ? topGroup.room_nights : topGroup.rn) / pipeline.forecast_gap_rn) * 100)
+        : null;
+      action = `Convert ${topGroup.group_name} to definite this week${closePct ? ` — closes ${closePct}% of window gap` : ''}`;
+    } else if (isClosing) {
+      action = `Pace closing — hold rate and distribution strategy through window close`;
+    } else {
+      action = `Review pace and pipeline for Days ${wLabel} — no single lever identified`;
+    }
+
+    const badgeText = pickup ? (isClosing ? '▲ Closing' : '▼ Widening') : `${covPct ?? '?'}% covered`;
+    const badgeCls = isClosing ? 'opportunity' : urg;
+
+    return `
+      <div class="fi-tile" data-findings-priority="${escHtml(urg)}">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="fi-tile-type">Days ${escHtml(wLabel)}</div>
+          <span class="fi-tile-badge ${escHtml(badgeCls)}">${escHtml(sanitiseSegmentNames(badgeText))}</span>
+        </div>
+        <div class="fi-tile-title">${escHtml(sanitiseSegmentNames(title))}</div>
+        <ul class="fi-tile-facts">${facts.map(f => `<li>${escHtml(sanitiseSegmentNames(f))}</li>`).join('')}</ul>
+        <div class="fi-tile-action">${escHtml(sanitiseSegmentNames(action))}</div>
+      </div>`;
+  }
+
   let html = '';
-  sortedWeekly.forEach((c, i) => {
-    html += renderWeeklyPickupDeltaIssueCard(c, snapshotDate, i);
-  });
+
+  // Window tiles (combined pickup + pipeline per window)
+  const windowTiles = windowKeys.map(renderWindowTile).filter(Boolean);
+  html += windowTiles.join('');
+
+  // Corporate risk tile
   corpRiskCards.forEach((c, i) => {
     html += renderCorporatePaceRiskIssueCard(c, snapshotDate, i);
   });
-  sortedPipeline.forEach((c, i) => {
-    html += renderGroupPipelineIssueCard(c, snapshotDate, i);
-  });
+
+  // Corporate opportunity tile
   corpOppCards.forEach((c, i) => {
     html += renderCorporatePaceOpportunityIssueCard(c, snapshotDate, i);
   });
 
-  const count = sortedWeekly.length + corpRiskCards.length +
-    sortedPipeline.length + corpOppCards.length;
+  const count = windowTiles.length + corpRiskCards.length + corpOppCards.length;
 
   const insightParts = [];
   let widenRn = 0;
-  for (const w of weeklyPickupIssues) {
+  for (const w of sortedWeekly) {
     const ws = w.signal && typeof w.signal === 'object' ? w.signal : {};
     if (normalize(ws.gap_direction) === 'widening') {
       const g = fiSafeNum(ws.gap_to_forecast);
       if (g != null) widenRn += g;
     }
   }
-  if (weeklyPickupIssues.length) {
-    if (widenRn > 0) {
-      insightParts.push(`${Math.round(widenRn)} RN gap widening`);
-    } else {
-      let closeRn = 0;
-      for (const w of weeklyPickupIssues) {
-        const ws = w.signal && typeof w.signal === 'object' ? w.signal : {};
-        if (normalize(ws.gap_direction) === 'closing') {
-          const g = fiSafeNum(ws.gap_to_forecast);
-          if (g != null) closeRn += Math.abs(g);
-        }
-      }
-      if (closeRn > 0) insightParts.push(`${Math.round(closeRn)} RN gap closing`);
-      else insightParts.push(`${weeklyPickupIssues.length} pickup watch`);
-    }
-  }
+  if (widenRn > 0) insightParts.push(`${Math.round(widenRn)} RN gap widening`);
   let accBehind = 0;
   for (const c of corpRiskCards) {
     accBehind += Array.isArray(c.accounts_at_risk) ? c.accounts_at_risk.length : 0;
   }
-  if (accBehind > 0) {
-    insightParts.push(`${accBehind} account${accBehind === 1 ? '' : 's'} behind`);
-  }
-  let grpConvert = 0;
-  for (const p of groupPipelineIssues) {
-    grpConvert += Array.isArray(p.pipeline_groups) ? p.pipeline_groups.length : 0;
-  }
-  if (grpConvert > 0) {
-    insightParts.push(`${grpConvert} group${grpConvert === 1 ? '' : 's'} to convert`);
-  }
+  if (accBehind > 0) insightParts.push(`${accBehind} account${accBehind === 1 ? '' : 's'} behind`);
 
   const pills = insightParts.length
     ? [{ label: 'Insight', value: insightParts.join(' · '), cls: 'pill-neutral' }]
     : [];
 
-  const mosaicHtml = html
-    ? `<div class="fi-mosaic-grid">${html}</div>` : '';
+  const mosaicHtml = html ? `<div class="fi-mosaic-grid">${html}</div>` : '';
   return { cardsHtml: mosaicHtml, count, insightPills: pills };
 }
 
