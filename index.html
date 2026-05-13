@@ -1753,6 +1753,76 @@ table.fi-account-table th {
 .pace-3col-grid .nc-exec-list li {
   font-size: 12px;
 }
+
+.fi-mosaic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.fi-tile {
+  background: var(--white);
+  border: 0.5px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fi-tile-type {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--gray-400);
+}
+.fi-tile-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.35;
+}
+.fi-tile-facts {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fi-tile-facts li {
+  font-size: 12px;
+  color: var(--gray-700);
+  line-height: 1.5;
+  padding-left: 12px;
+  position: relative;
+}
+.fi-tile-facts li::before {
+  content: '·';
+  position: absolute;
+  left: 2px;
+  color: var(--gray-400);
+}
+.fi-tile-action {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--navy);
+  padding: 6px 8px;
+  background: var(--gray-50);
+  border-left: 2px solid #D85A30;
+  border-radius: 0 4px 4px 0;
+  line-height: 1.5;
+}
+.fi-tile-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+.fi-tile-badge.critical { background: #FCEBEB; color: #A32D2D; }
+.fi-tile-badge.high { background: #FAEEDA; color: #854F0B; }
+.fi-tile-badge.medium { background: var(--gray-100); color: var(--gray-600); }
+.fi-tile-badge.opportunity { background: #EAF3DE; color: #3B6D11; }
 </style>
 </head>
 <body>
@@ -2928,7 +2998,7 @@ function applyFindingsUrgencyFilter() {
   const filter = findingsUrgencyFilter || 'all';
 
   container.querySelectorAll('.findings-group, .ng-group').forEach(groupEl => {
-    const cards = groupEl.querySelectorAll(':scope > .group-cards > .finding-card, :scope > .ng-group-cards > .finding-card');
+    const cards = groupEl.querySelectorAll(':scope > .group-cards > .finding-card, :scope > .ng-group-cards > .finding-card, :scope > .ng-group-cards .fi-mosaic-grid .fi-tile');
     let visible = 0;
     cards.forEach(cardEl => {
       if (cardEl.getAttribute('data-urgency-exempt') === 'true') {
@@ -6030,312 +6100,148 @@ function fiCorpAccountRow(acc) {
 }
 
 function renderWeeklyPickupDeltaIssueCard(card, snapshotDate, index) {
-  const id = `WPD_${index}_${snapshotDate || ''}`;
-  const urg = (card.urgency || 'medium').toString().toLowerCase();
+  // WHY: Compact tile — 3 hard facts, one action. No paragraphs.
   const sig = card.signal && typeof card.signal === 'object' ? card.signal : {};
-  const windowLabels = {
-    window_1: '1–30',
-    window_2: '31–60',
-    window_3: '61–90'
-  };
-  const windowLabel = windowLabels[card.window_class] ||
-    (card.window_class != null && String(card.window_class).trim() !== ''
-      ? String(card.window_class)
-      : '—');
-  const direction = sig.gap_direction === 'closing' ? '▲ Closing' : '▼ Widening';
-  const title = `Days ${windowLabel} — Pickup ${direction}`;
-  const closing = sig.gap_direction === 'closing';
-  const pillCls = closing ? 'fi-pill-green' : 'fi-pill-red';
-  const collapsedLines = [
-    `Pickup this week: ${sig.pickup_this_week ?? '—'}`,
-    `Required: ${sig.required_weekly_pickup != null && Number.isFinite(Number(sig.required_weekly_pickup))
-      ? `${Math.round(Number(sig.required_weekly_pickup))} RN/week`
-      : '—'}`,
-    `Gap to forecast: ${sig.gap_to_forecast != null && Number.isFinite(Number(sig.gap_to_forecast))
-      ? `${Math.round(Number(sig.gap_to_forecast))} RN`
-      : '—'}`
-  ].join('\n');
-  const pvrRaw = sig.pickup_vs_required;
-  const pvrNum = Number(pvrRaw);
-  const barPct = pvrRaw != null && Number.isFinite(pvrNum)
-    ? Math.min(100, pvrNum * 100)
-    : 0;
-  const barCol = pvrRaw != null && Number.isFinite(pvrNum) && pvrNum >= 1 ? '#10b981'
-    : pvrRaw != null && Number.isFinite(pvrNum) && pvrNum >= 0.5 ? '#f59e0b'
-      : '#ef4444';
-  const capBar = fiProgressBarHtml(
-    barPct,
-    barCol,
-    'Weekly pickup vs required rate',
-    `${sig.pickup_this_week ?? 0} RN of ${Math.round(Number(sig.required_weekly_pickup ?? 0))} RN needed`
-  );
-  const situation = (card.situation || '').toString().trim();
-  const decision = (card.decision || '').toString().trim();
-  const heroGap = sig.gap_to_forecast != null && Number.isFinite(Number(sig.gap_to_forecast))
-    ? `${Math.round(Number(sig.gap_to_forecast)).toLocaleString()} RN`
-    : '—';
+  const windowLabels = { window_1: '1–30', window_2: '31–60', window_3: '61–90' };
+  const wLabel = windowLabels[card.window_class] || '—';
+  const urg = (card.urgency || 'medium').toLowerCase();
+  const isClosing = sig.gap_direction === 'closing';
+  const pickup = sig.pickup_this_week != null ? Math.round(sig.pickup_this_week) : null;
+  const required = sig.required_weekly_pickup != null && Number.isFinite(Number(sig.required_weekly_pickup))
+    ? Math.round(Number(sig.required_weekly_pickup)) : null;
+  const gap = sig.gap_to_forecast != null && Number.isFinite(Number(sig.gap_to_forecast))
+    ? Math.round(Number(sig.gap_to_forecast)) : null;
+  const weeksLeft = sig.weeks_remaining != null ? sig.weeks_remaining : null;
+
+  // 3 facts: this week's pickup vs what was needed, gap remaining, weeks left
+  const facts = [];
+  if (pickup !== null && required !== null)
+    facts.push(`Picked up ${pickup} RN this week — need ${required} RN/week to close`);
+  if (gap !== null)
+    facts.push(`${gap} RN still to go to reach forecast`);
+  if (weeksLeft !== null && required !== null)
+    facts.push(`${weeksLeft} weeks remaining in window`);
+
+  // Action: direct, no AI wording
+  let action = '';
+  if (!isClosing && gap !== null && required !== null) {
+    action = `Need ${required} RN/week for ${weeksLeft || '?'} weeks — identify which segment is dragging and intervene before window closes`;
+  } else {
+    action = `Pace closing — maintain current rate and distribution strategy through window close`;
+  }
+
   return `
-    <div class="finding-card forward-card fi-intel-card fi-weekly-pickup-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(urg)}">
-      <div class="finding-header" onclick="toggleFiCard(this)">
-        <div class="priority-stripe ${escHtml(urg)}"></div>
-        <div class="finding-center">
-          <div><span class="fi-signal-pill ${pillCls}">PICKUP DELTA</span></div>
-          <div class="finding-title">${escHtml(title)}</div>
-          <div class="finding-oneliner" style="white-space:pre-line;">${escHtml(collapsedLines)}</div>
-        </div>
-        <div class="finding-right">
-          <div class="trigger-metric-value">${heroGap}</div>
-          <div class="trigger-metric-label">Gap to forecast</div>
-          <div class="badges-row">
-            <span class="priority-badge ${escHtml(urg)}">${escHtml(capitalize(urg))}</span>
-          </div>
-        </div>
+    <div class="fi-tile" data-findings-priority="${escHtml(urg)}">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="fi-tile-type">Pickup delta · Days ${wLabel}</div>
+        <span class="fi-tile-badge ${urg}">${isClosing ? '▲ Closing' : '▼ Widening'}</span>
       </div>
-      <div class="finding-body">
-        ${situation ? `
-        <div class="finding-section">
-          <div class="section-label">SITUATION</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
-        </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">PICKUP VS REQUIRED</div>
-          ${capBar}
-        </div>
-        <div class="finding-section">
-          <div class="section-label">DECISION</div>
-          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
-        </div>
-      </div>
+      <div class="fi-tile-title">Days ${escHtml(wLabel)} — ${gap !== null ? gap + ' RN to forecast' : 'Gap open'}</div>
+      <ul class="fi-tile-facts">${facts.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>
+      <div class="fi-tile-action">${escHtml(action)}</div>
     </div>`;
 }
 
 function renderCorporatePaceRiskIssueCard(card, snapshotDate, riskIndex) {
-  const id = `CPR_${riskIndex}_${snapshotDate || ''}`;
+  // WHY: Compact tile — top 3 accounts by name with RN shortfall, one action.
   const accounts = Array.isArray(card.accounts_at_risk) ? card.accounts_at_risk : [];
   const n = accounts.length;
   const revAtRisk = fiSafeNum(card.total_revenue_at_risk);
-  const title = `${n} Accounts Behind Pace — ${fiFmtEuroAmt(revAtRisk)} at Risk`;
-  const collapsedLines = [
-    `Total RN shortfall: ${fiFmtRnVal(card.total_rn_at_risk)}`,
-    `Accounts affected: ${n}`
-  ].join('\n');
-  const situation = (card.situation || '').toString().trim();
-  const diagnosis = (card.diagnosis || '').toString().trim();
-  const decision = (card.decision || '').toString().trim();
-  const maxRows = 10;
-  const rows = accounts.slice(0, maxRows).map(fiCorpAccountRow).join('');
-  const more = n > maxRows ? `<div class="impact-meta" style="margin-top:8px;">and ${n - maxRows} more accounts</div>` : '';
+  const top3 = [...accounts]
+    .sort((a, b) => (a.variance_rn || 0) - (b.variance_rn || 0))
+    .slice(0, 3);
+
+  const facts = top3.map(a => {
+    const rn = a.variance_rn != null ? Math.round(Math.abs(a.variance_rn)) : null;
+    const mgr = a.account_manager || '';
+    return `${a.company_name || '—'}${rn !== null ? ` — ${rn} RN short` : ''}${mgr ? ` (${mgr})` : ''}`;
+  });
+  if (n > 3) facts.push(`+${n - 3} further accounts behind pace`);
+
+  const action = `Contact the 3 account managers above this week — confirm whether shortfall is recoverable or requires replacement volume`;
+
   return `
-    <div class="finding-card forward-card fi-intel-card fi-corporate-risk-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="critical">
-      <div class="finding-header" onclick="toggleFiCard(this)">
-        <div class="priority-stripe critical"></div>
-        <div class="finding-center">
-          <div><span class="fi-signal-pill fi-pill-red">CORPORATE RISK</span></div>
-          <div class="finding-title">${escHtml(title)}</div>
-          <div class="finding-oneliner" style="white-space:pre-line;">${escHtml(collapsedLines)}</div>
-        </div>
-        <div class="finding-right">
-          <div class="trigger-metric-value">${escHtml(String(n))}</div>
-          <div class="trigger-metric-label">Accounts at risk</div>
-          <div class="badges-row">
-            <span class="priority-badge critical">${escHtml(capitalize('critical'))}</span>
-          </div>
-        </div>
+    <div class="fi-tile" data-findings-priority="critical">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="fi-tile-type">Corporate risk</div>
+        <span class="fi-tile-badge critical">Critical</span>
       </div>
-      <div class="finding-body">
-        ${situation ? `
-        <div class="finding-section">
-          <div class="section-label">SITUATION</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
-        </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">ACCOUNTS</div>
-          <div class="fi-account-table-wrap">
-            <table class="fi-account-table">
-              <thead><tr>
-                <th>Account</th><th>Sector</th><th>Manager</th>
-                <th>2025 FY RN</th><th>2026 Projected</th><th>Variance</th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-          ${more}
-        </div>
-        ${diagnosis ? `
-        <div class="finding-section">
-          <div class="section-label">DIAGNOSIS</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(diagnosis)}</div>
-        </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">DECISION</div>
-          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
-        </div>
-      </div>
+      <div class="fi-tile-title">${n} accounts behind — ${revAtRisk != null ? fiFmtEuroAmt(revAtRisk) : '—'} at risk</div>
+      <ul class="fi-tile-facts">${facts.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>
+      <div class="fi-tile-action">${escHtml(action)}</div>
     </div>`;
 }
 
 function renderCorporatePaceOpportunityIssueCard(card, snapshotDate, oppIndex) {
-  const id = `CPO_${oppIndex}_${snapshotDate || ''}`;
+  // WHY: Compact tile — names accounts ahead, one protection action.
   const accounts = Array.isArray(card.accounts_ahead) ? card.accounts_ahead : [];
   const n = accounts.length;
-  const title = `${n} Accounts Ahead of Pace — Protect These`;
-  const collapsedLines = `Accounts ahead: ${n}`;
-  const situation = (card.situation || '').toString().trim();
-  const decision = (card.decision || '').toString().trim();
-  const listItems = accounts.map(a => {
-    const name = a.account_name || a.name || a.account || '—';
-    const manager = a.manager || a.account_manager || '—';
+  const top3 = accounts.slice(0, 3);
+
+  const facts = top3.map(a => {
+    const name = a.account_name || a.name || '—';
     const vari = fiSafeNum(a.variance_rn ?? a.variance ?? a.rn_variance);
-    let vStr = '—';
-    if (vari != null) {
-      const vRounded = Math.abs(vari - Math.round(vari)) < 1e-6 ? Math.round(vari).toLocaleString() : vari.toFixed(1);
-      vStr = (vari > 0 ? '+' : '') + vRounded;
-    }
-    return `<li><strong>${escHtml(name)}</strong> — variance ${escHtml(vStr)} — ${escHtml(manager)}</li>`;
-  }).join('');
+    const mgr = a.account_manager || a.manager || '';
+    return `${name}${vari != null ? ` — +${Math.round(Math.abs(vari))} RN ahead` : ''}${mgr ? ` (${mgr})` : ''}`;
+  });
+  if (n > 3) facts.push(`+${n - 3} further accounts ahead of pace`);
+
+  const action = `Protect rate on these accounts — do not offer unsolicited discounts on compression dates`;
+
   return `
-    <div class="finding-card forward-card fi-intel-card fi-corporate-opp-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="medium">
-      <div class="finding-header" onclick="toggleFiCard(this)">
-        <div class="priority-stripe medium"></div>
-        <div class="finding-center">
-          <div><span class="fi-signal-pill fi-pill-green">CORPORATE OPPORTUNITY</span></div>
-          <div class="finding-title">${escHtml(title)}</div>
-          <div class="finding-oneliner">${escHtml(collapsedLines)}</div>
-        </div>
-        <div class="finding-right">
-          <div class="trigger-metric-value">${escHtml(String(n))}</div>
-          <div class="trigger-metric-label">Accounts ahead</div>
-          <div class="badges-row">
-            <span class="dept-badge">Opportunity</span>
-          </div>
-        </div>
+    <div class="fi-tile" data-findings-priority="medium">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="fi-tile-type">Corporate opportunity</div>
+        <span class="fi-tile-badge opportunity">Ahead</span>
       </div>
-      <div class="finding-body">
-        ${situation ? `
-        <div class="finding-section">
-          <div class="section-label">SITUATION</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
-        </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">ACCOUNTS</div>
-          <ul class="fi-opp-list">${listItems}</ul>
-        </div>
-        <div class="finding-section">
-          <div class="section-label">DECISION</div>
-          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
-        </div>
-      </div>
+      <div class="fi-tile-title">${n} accounts ahead of pace</div>
+      <ul class="fi-tile-facts">${facts.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>
+      <div class="fi-tile-action">${escHtml(action)}</div>
     </div>`;
 }
 
 function renderGroupPipelineIssueCard(card, snapshotDate, index) {
-  const id = `GPG_${index}_${snapshotDate || ''}`;
-  const urg = (card.urgency || 'medium').toString().toLowerCase();
-  const windowLabels = {
-    window_1: '1–30',
-    window_2: '31–60',
-    window_3: '61–90',
-    beyond: '91+'
-  };
-  const windowLabel = windowLabels[card.window_class] || card.window_class || '—';
-  const titlePctStr = card.gap_closure_pct != null && Number.isFinite(Number(card.gap_closure_pct))
-    ? (Number(card.gap_closure_pct) * 100).toFixed(0)
-    : '—';
-  const title = `Days ${windowLabel} — Pipeline covers ${titlePctStr}% of Forecast Gap`;
-  const covDisp = fiFmtPct1FromRatio(card.gap_closure_pct);
-  const collapsedLines = [
-    `Tentative RN: ${fiFmtRnVal(card.tentative_rn)}`,
-    `Prospect RN: ${fiFmtRnVal(card.prospect_rn)}`,
-    `Gap coverage: ${covDisp}`
-  ].join('\n');
-  const groups = Array.isArray(card.pipeline_groups) ? card.pipeline_groups : [];
-  const maxRows = 8;
-  const rows = groups.slice(0, maxRows).map(g => {
-    const gname = g.group_name || g.name || g.group || '—';
-    const seg = g.segment || g.segment_label || '—';
-    const stRaw = (g.status || '').toString().toLowerCase();
-    const isTent = stRaw.includes('tent');
-    const pillCls = isTent ? 'tentative' : 'prospect';
-    const pillText = isTent ? 'Tentative' : 'Prospect';
-    const arrival = (g.arrival || g.arrival_date || g.arrival_window || '—').toString();
-    const eventOnly = g.is_event_only === true;
-    const rnCell = eventOnly ? 'Event only' : fiFmtRnVal(g.rn ?? g.room_nights ?? g.tentative_rn ?? g.prospect_rn);
-    const rr = fiSafeNum(g.room_revenue ?? g.revenue ?? g.rev);
-    const rrStr = rr != null ? fiFmtEuroAmt(rr) : '—';
-    return `<tr>
-      <td>${escHtml(gname)}</td>
-      <td>${escHtml(seg)}</td>
-      <td><span class="fi-status-pill ${pillCls}">${escHtml(pillText)}</span></td>
-      <td>${escHtml(arrival)}</td>
-      <td>${escHtml(rnCell)}</td>
-      <td>${escHtml(rrStr)}</td>
-    </tr>`;
-  }).join('');
-  const totalPipe = fiSafeNum(card.total_pipeline_rn);
-  const gapRn = fiSafeNum(card.forecast_gap_rn);
-  const barPct = Math.min(100, fiPct01Or100(card.gap_closure_pct) ?? 0);
-  const bPct = fiPct01Or100(card.gap_closure_pct) ?? 0;
-  const barCol = bPct >= 75 ? '#10b981' : bPct >= 40 ? '#f59e0b' : '#ef4444';
-  const gapBar = fiProgressBarHtml(
-    barPct,
-    barCol,
-    'Pipeline vs forecast gap',
-    `${totalPipe != null ? Math.round(totalPipe).toLocaleString() : '—'} RN pipeline vs ${gapRn != null ? Math.round(gapRn).toLocaleString() : '—'} RN gap`
-  );
-  let situation = (card.situation || '').toString().trim();
-  if (situation) {
-    ['window_1', 'window_2', 'window_3', 'window_beyond'].forEach(k => {
-      if (situation.includes(k) && (windowLabels[k] || windowLabels.beyond)) {
-        const repl = k === 'window_beyond' ? windowLabels.beyond : windowLabels[k];
-        situation = situation.split(k).join(repl);
-      }
-    });
+  // WHY: Compact tile — named top group, coverage %, one conversion action.
+  const urg = (card.urgency || 'medium').toLowerCase();
+  const windowLabels = { window_1: '1–30', window_2: '31–60', window_3: '61–90' };
+  const wLabel = windowLabels[card.window_class] || '—';
+  const covPct = card.gap_closure_pct != null
+    ? Math.round(Number(card.gap_closure_pct) * 100) : null;
+  const tentRn = card.tentative_rn != null ? Math.round(card.tentative_rn) : null;
+  const prospRn = card.prospect_rn != null ? Math.round(card.prospect_rn) : null;
+  const gapRn = card.forecast_gap_rn != null ? Math.round(card.forecast_gap_rn) : null;
+
+  // Top group by revenue (engine uses pipeline_groups)
+  const groups = Array.isArray(card.pipeline_groups) ? card.pipeline_groups
+    : (Array.isArray(card.groups) ? card.groups : []);
+  const top = groups[0];
+
+  const facts = [];
+  if (tentRn !== null) facts.push(`${tentRn} RN tentative in window`);
+  if (prospRn !== null) facts.push(`${prospRn} RN prospect in window`);
+  if (gapRn !== null && covPct !== null)
+    facts.push(`Covers ${covPct}% of the ${gapRn} RN forecast gap`);
+  if (top?.group_name) {
+    const topRn = top.room_nights != null ? Math.round(top.room_nights)
+      : (top.rn != null ? Math.round(top.rn) : null);
+    const topRevRaw = fiSafeNum(top.room_revenue ?? top.revenue ?? top.rev);
+    const topRev = topRevRaw != null ? Math.round(topRevRaw) : null;
+    facts.push(`Largest: ${top.group_name}${topRn ? ` — ${topRn} RN` : ''}${topRev ? ` / €${topRev.toLocaleString('en-GB')}` : ''}`);
   }
-  const decision = (card.decision || '').toString().trim();
+
+  const action = top?.group_name
+    ? `Convert ${top.group_name} from tentative to definite this week — this alone closes ${top.room_nights != null && gapRn ? Math.round((top.room_nights / gapRn) * 100) : (top.rn != null && gapRn ? Math.round((top.rn / gapRn) * 100) : '?')}% of the window gap`
+    : `Prioritise conversion of tentative groups — pipeline covers ${covPct ?? '?'}% of window gap`;
+
   return `
-    <div class="finding-card forward-card fi-intel-card fi-pipeline-card fi-collapsible-card" data-id="${escHtml(id)}" data-findings-priority="${escHtml(urg)}">
-      <div class="finding-header" onclick="toggleFiCard(this)">
-        <div class="priority-stripe ${escHtml(urg)}"></div>
-        <div class="finding-center">
-          <div><span class="fi-signal-pill fi-pill-blue">GROUP PIPELINE</span></div>
-          <div class="finding-title">${escHtml(title)}</div>
-          <div class="finding-oneliner" style="white-space:pre-line;">${escHtml(collapsedLines)}</div>
-        </div>
-        <div class="finding-right">
-          <div class="trigger-metric-value">${escHtml(covDisp)}</div>
-          <div class="trigger-metric-label">Gap coverage</div>
-          <div class="badges-row">
-            <span class="priority-badge ${escHtml(urg)}">${escHtml(capitalize(urg))}</span>
-          </div>
-        </div>
+    <div class="fi-tile" data-findings-priority="${escHtml(urg)}">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="fi-tile-type">Group pipeline · Days ${wLabel}</div>
+        <span class="fi-tile-badge ${urg}">${covPct !== null ? covPct + '% covered' : '—'}</span>
       </div>
-      <div class="finding-body">
-        ${situation ? `
-        <div class="finding-section">
-          <div class="section-label">SITUATION</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(situation)}</div>
-        </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">PIPELINE GROUPS</div>
-          <div class="fi-account-table-wrap">
-            <table class="fi-account-table">
-              <thead><tr>
-                <th>Group Name</th><th>Segment</th><th>Status</th>
-                <th>Arrival</th><th>RN</th><th>Room Revenue</th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-        </div>
-        <div class="finding-section">
-          <div class="section-label">GAP COVERAGE</div>
-          ${gapBar}
-        </div>
-        <div class="finding-section">
-          <div class="section-label">DECISION</div>
-          <div class="fi-decision-block"><div class="decision-line">${escHtml(decision)}</div></div>
-        </div>
-      </div>
+      <div class="fi-tile-title">Days ${wLabel} — ${covPct !== null ? covPct + '%' : '?'} of forecast gap in pipeline</div>
+      <ul class="fi-tile-facts">${facts.map(f => `<li>${escHtml(f)}</li>`).join('')}</ul>
+      <div class="fi-tile-action">${escHtml(action)}</div>
     </div>`;
 }
 
@@ -6446,7 +6352,9 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
     ? [{ label: 'Insight', value: insightParts.join(' · '), cls: 'pill-neutral' }]
     : [];
 
-  return { cardsHtml: html, count, insightPills: pills };
+  const mosaicHtml = html
+    ? `<div class="fi-mosaic-grid">${html}</div>` : '';
+  return { cardsHtml: mosaicHtml, count, insightPills: pills };
 }
 
 function renderFindings() {
