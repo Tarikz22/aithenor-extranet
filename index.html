@@ -771,6 +771,24 @@ ul.demand-holiday-list {
 .group-cards .fi-pipeline-card {
   margin-left: 0;
 }
+.ng-group-cards .finding-card.fi-weekly-pickup-card {
+  border-left: 3px solid #b91c1c;
+}
+.ng-group-cards .finding-card.fi-corporate-risk-card {
+  border-left: 3px solid var(--red);
+}
+.ng-group-cards .finding-card.fi-corporate-opp-card {
+  border-left: 3px solid var(--green);
+}
+.ng-group-cards .finding-card.fi-pipeline-card {
+  border-left: 3px solid #185FA5;
+}
+.ng-group-cards .fi-weekly-pickup-card,
+.ng-group-cards .fi-corporate-risk-card,
+.ng-group-cards .fi-corporate-opp-card,
+.ng-group-cards .fi-pipeline-card {
+  margin-left: 0;
+}
 .fi-progress-wrap {
   margin-top: 4px;
 }
@@ -1447,6 +1465,10 @@ table.fi-account-table th {
   --color-text-primary: var(--gray-900);
   --color-text-secondary: var(--gray-600);
   --color-text-tertiary: var(--gray-400);
+  --gray-50: #FAFAF9;
+  --gray-500: #73736E;
+  --gray-700: #454542;
+  --gray-800: #2E2E2B;
 }
 
 /* KPI strip cells */
@@ -1476,6 +1498,233 @@ table.fi-account-table th {
 }
 .topbar-meta {
   font-size: 12px; color: var(--color-text-secondary); margin-top: 2px;
+}
+
+/* ── NEW CARD DESIGN ── */
+.nc-card {
+  background: var(--white);
+  border: 0.5px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.nc-card.opportunity { border-left: 3px solid #3B6D11; border-radius: 0 8px 8px 0; }
+.nc-card.actioned { opacity: 0.55; }
+
+.nc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 0.5px solid var(--gray-100);
+  gap: 12px;
+}
+.nc-header-left { flex: 1; min-width: 0; }
+.nc-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.35;
+  margin-bottom: 3px;
+}
+.nc-subtitle {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.nc-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.nc-str-trio {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+  text-align: right;
+}
+.nc-str-trio-label {
+  font-size: 10px;
+  color: var(--gray-400);
+  text-align: right;
+}
+.nc-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nc-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 0; }
+
+.nc-section { padding: 10px 0; border-bottom: 0.5px solid var(--gray-100); }
+.nc-section:last-child { border-bottom: none; }
+
+.nc-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--gray-400);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.nc-text {
+  font-size: 13px;
+  color: var(--gray-800);
+  line-height: 1.65;
+}
+.nc-text-bold {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.65;
+}
+
+/* STR inline block inside card */
+.nc-str-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--gray-50);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 4px;
+}
+.nc-str-metric { text-align: center; flex-shrink: 0; }
+.nc-str-metric-val {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--navy);
+}
+.nc-str-metric-val.pos { color: #3B6D11; }
+.nc-str-metric-val.neg { color: #D85A30; }
+.nc-str-metric-val.warn { color: #BA7517; }
+.nc-str-metric-lbl {
+  font-size: 10px;
+  color: var(--gray-400);
+}
+.nc-str-interpretation {
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.55;
+  flex: 1;
+}
+
+/* Decision accent line */
+.nc-decision-line {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: var(--gray-50);
+  border-left: 2px solid #D85A30;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Numbered execution list */
+.nc-exec-list {
+  list-style: none;
+  counter-reset: nc-exec;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0; padding: 0;
+}
+.nc-exec-list li {
+  counter-increment: nc-exec;
+  font-size: 13px;
+  color: var(--gray-800);
+  line-height: 1.55;
+  padding-left: 20px;
+  position: relative;
+}
+.nc-exec-list li::before {
+  content: counter(nc-exec) ".";
+  position: absolute;
+  left: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-400);
+  top: 1px;
+}
+
+/* Demand context block */
+.nc-demand-block {
+  background: #EFF6FF;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #1E40AF;
+  line-height: 1.55;
+}
+
+/* ── NEW GROUP DESIGN ── */
+.ng-group {
+  margin-bottom: 6px;
+}
+.ng-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 4px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 0.5px solid var(--gray-200);
+  margin-bottom: 8px;
+}
+.ng-group-left { display: flex; align-items: center; gap: 8px; }
+.ng-group-name {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gray-500);
+}
+.ng-group-count {
+  font-size: 11px;
+  color: var(--gray-400);
+}
+.ng-group-right { display: flex; align-items: center; gap: 10px; }
+.ng-group-metric {
+  font-size: 13px;
+  font-weight: 500;
+  color: #D85A30;
+}
+.ng-group-chevron {
+  font-size: 10px;
+  color: var(--gray-400);
+  transition: transform 0.15s;
+}
+.ng-group-header.open .ng-group-chevron { transform: rotate(180deg); }
+.ng-group-cards { display: flex; flex-direction: column; }
+.ng-group-cards.collapsed { display: none; }
+
+.ng-group-cards .finding-card {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 0.5px solid var(--gray-100);
+  margin: 0;
+}
+.ng-group-cards .finding-card:last-child { border-bottom: none; }
+.ng-group-cards .monthly-card {
+  margin-left: 0;
+  border-left: 3px solid var(--gold);
+}
+.ng-group-cards .mix-shift-card {
+  border-left: 3px solid #0F6E56;
+}
+.ng-group-cards .forward-card {
+  border-left: 3px solid #185FA5;
+}
+.ng-group-cards .forecast-gap-card {
+  border-left: 3px solid #7C3AED;
+}
+.ng-group-cards .finding-card:has(+ .str-weekly-sparkline-wrap) {
+  border-bottom: none;
 }
 </style>
 </head>
@@ -2651,8 +2900,8 @@ function applyFindingsUrgencyFilter() {
   if (!container) return;
   const filter = findingsUrgencyFilter || 'all';
 
-  container.querySelectorAll('.findings-group').forEach(groupEl => {
-    const cards = groupEl.querySelectorAll(':scope > .group-cards > .finding-card');
+  container.querySelectorAll('.findings-group, .ng-group').forEach(groupEl => {
+    const cards = groupEl.querySelectorAll(':scope > .group-cards > .finding-card, :scope > .ng-group-cards > .finding-card');
     let visible = 0;
     cards.forEach(cardEl => {
       if (cardEl.getAttribute('data-urgency-exempt') === 'true') {
@@ -2667,7 +2916,8 @@ function applyFindingsUrgencyFilter() {
       cardEl.style.display = show ? '' : 'none';
       if (show) visible++;
     });
-    const countEl = groupEl.querySelector('.group-header .group-count');
+    const countEl = groupEl.querySelector('.group-header .group-count')
+      || groupEl.querySelector('.ng-group-count');
     if (countEl) countEl.textContent = String(visible);
     groupEl.style.display = visible > 0 ? '' : 'none';
   });
@@ -4686,6 +4936,14 @@ function toggleGroup(headerEl) {
   }
 }
 
+function toggleNgGroup(headerEl) {
+  // WHY: Toggle for new flat group headers. Separate from legacy toggleGroup().
+  const isOpen = headerEl.classList.contains('open');
+  headerEl.classList.toggle('open', !isOpen);
+  const cards = headerEl.nextElementSibling;
+  if (cards) cards.classList.toggle('collapsed', isOpen);
+}
+
 // Phase 3: Build a collapsible group header HTML string.
 // groupType: 'historical' | 'monthly' | 'mix-shift' | 'forward' | 'forecast'
 // groupName: display label e.g. "Historical Analysis"
@@ -6261,51 +6519,31 @@ function renderFindings() {
                                metric, metricClass, metaLabel,
                                count, cardsHtml, pills,
                                extraAfterCardsHtml = '') {
+    // WHY: New flat group header — section label style, no heavy box.
+    // Cards render open by default (no click required to see content).
     if (!cardsHtml) return '';
-    const countHtml = count > 0
-      ? `<span class="group-count">${count}</span>` : '';
     const metricHtml = metric
-      ? `<div class="group-metric ${escHtml(metricClass || '')}">
-           ${escHtml(metric)}
-         </div>
-         <div class="group-meta">${escHtml(metaLabel || '')}</div>`
-      : `<div class="group-meta">${escHtml(metaLabel || '')}</div>`;
-
-    // Build pills HTML — each pill shows label + value
-    const pillsArr = Array.isArray(pills) ? pills : [];
-    const pillsHtml = pillsArr.length > 0
-      ? `<div class="group-pills">
-          ${pillsArr.map(p => `
-            <span class="group-pill ${escHtml(p.cls || '')}">
-              <span class="pill-label">${escHtml(p.label)}</span>
-              ${escHtml(p.value)}
-            </span>`).join('')}
-        </div>`
+      ? `<div class="ng-group-metric">${escHtml(metric)}</div>
+       <div style="font-size:10px;color:var(--gray-400);">${escHtml(metaLabel || '')}</div>`
       : '';
-
     return `
-      <div class="findings-group">
-        <div class="group-header" onclick="toggleGroup(this)">
-          <div class="group-accent ${escHtml(groupType)}"></div>
-          <div class="group-header-body">
-            <div class="group-header-top">
-              <span class="group-name">${escHtml(groupName)}</span>
-              ${countHtml}
-            </div>
-            <div class="group-brief">${escHtml(brief)}</div>
-            ${pillsHtml}
-          </div>
-          <div class="group-header-right">
-            ${metricHtml}
-            <span class="group-chevron">▼</span>
-          </div>
+    <div class="ng-group">
+      <div class="ng-group-header open" onclick="toggleNgGroup(this)">
+        <div class="ng-group-left">
+          <span class="ng-group-name">${escHtml(groupName)}</span>
+          ${count > 0 ? `<span class="ng-group-count">${count}</span>` : ''}
+          ${brief ? `<span style="font-size:11px;color:var(--gray-400);">· ${escHtml(brief)}</span>` : ''}
         </div>
-        <div class="group-cards">
-          ${cardsHtml}
-          ${extraAfterCardsHtml}
+        <div class="ng-group-right">
+          ${metricHtml}
+          <span class="ng-group-chevron">▼</span>
         </div>
       </div>
-    `;
+      <div class="ng-group-cards">
+        ${cardsHtml}
+        ${extraAfterCardsHtml}
+      </div>
+    </div>`;
   }
 
   const summaries = computeGroupSummaries(engineJson);
@@ -6342,12 +6580,12 @@ function renderFindings() {
         const sv = card.str_validation ?? card.strValidation;
         if (sv?.interpretation) {
           const strInsert = `
-            <div class="finding-section">
-              <div class="section-label">STR VALIDATION</div>
-              <div class="section-text">${escHtml(sv.interpretation)}</div>
+            <div class="nc-section">
+              <div class="nc-label">STR validation</div>
+              <div class="nc-text">${escHtml(sv.interpretation)}</div>
             </div>`;
           html = html.replace(
-            /(<div class="section-label">IMPACT<\/div>)/,
+            /(<div class="nc-section">\s*<div class="nc-label">Impact<\/div>)/,
             strInsert + '$1'
           );
         }
@@ -6431,15 +6669,14 @@ function renderFindings() {
         impactDescription = 'both volume and the revenue base are deteriorating';
       }
     }
-    // Opportunity cards render with green left border, issue cards with orange
-    const isOpportunity = sic.signal_type === 'opportunity';
     const sicCard = {
       id: 'SEG_' + (sic.finding_key || sic.segment || '') + '_'
           + (currentEngineRow?.snapshot_date || ''),
       finding_key: sic.finding_key,
       title: cardTitle,
       priority: sic.priority || 'medium',
-      segment: sic.segment,
+      segment: sic.display_name || sic.segment,
+      signal_type: sic.signal_type,
       trigger_display: (() => {
         const sv = sic.str_validation || {};
         const mpi = sv.mpi ?? null;
@@ -6466,25 +6703,32 @@ function renderFindings() {
       actions: []
     };
     let sicHtml = renderCard(sicCard);
-    sicHtml = sicHtml.replace(
-      /Observed window:[^<]*/,
-      `Segment: ${escHtml(sic.display_name || sic.segment || '')}`
-    );
-    if (sic.str_validation?.interpretation) {
-      const strInsert = `
-        <div class="finding-section">
-          <div class="section-label">STR VALIDATION</div>
-          <div class="section-text">${escHtml(sic.str_validation.interpretation)}</div>
-        </div>`;
+    if (sic.str_validation) {
+      const sv = sic.str_validation;
+      const mpi = sv.mpi != null ? Number(sv.mpi).toFixed(1) : null;
+      const ari = sv.ari != null ? Number(sv.ari).toFixed(1) : null;
+      const rgi = sv.rgi != null ? Number(sv.rgi).toFixed(1) : null;
+      const interp = sv.interpretation ? String(sv.interpretation).trim() : '';
+
+      const mpiClass = mpi !== null ? (Number(mpi) >= 100 ? 'pos' : Number(mpi) >= 97 ? 'warn' : 'neg') : '';
+      const ariClass = ari !== null ? (Number(ari) >= 100 ? 'pos' : 'neg') : '';
+      const rgiClass = rgi !== null ? (Number(rgi) >= 100 ? 'pos' : Number(rgi) >= 97 ? 'warn' : 'neg') : '';
+
+      const strBlockHtml = `
+    <div class="nc-section">
+      <div class="nc-label">STR validation</div>
+      <div class="nc-str-block">
+        ${mpi !== null ? `<div class="nc-str-metric"><div class="nc-str-metric-val ${mpiClass}">${mpi}</div><div class="nc-str-metric-lbl">MPI</div></div>` : ''}
+        ${ari !== null ? `<div class="nc-str-metric"><div class="nc-str-metric-val ${ariClass}">${ari}</div><div class="nc-str-metric-lbl">ARI</div></div>` : ''}
+        ${rgi !== null ? `<div class="nc-str-metric"><div class="nc-str-metric-val ${rgiClass}">${rgi}</div><div class="nc-str-metric-lbl">RGI</div></div>` : ''}
+        ${interp ? `<div class="nc-str-interpretation">${escHtml(interp)}</div>` : ''}
+      </div>
+    </div>`;
+
+      // Inject STR block after the Signal section, before Impact
       sicHtml = sicHtml.replace(
-        /(<div class="section-label">IMPACT<\/div>)/,
-        strInsert + '$1'
-      );
-    }
-    if (isOpportunity) {
-      sicHtml = sicHtml.replace(
-        'class="finding-card',
-        'class="finding-card opportunity-card'
+        /(<div class="nc-section">\s*<div class="nc-label">Impact<\/div>)/,
+        strBlockHtml + '$1'
       );
     }
     segIssueCardsHtml += sicHtml;
@@ -6826,79 +7070,82 @@ function renderFindings() {
 }
 
 function renderCard(card) {
+  // WHY: New flat card design matching Phase 8 mockup.
+  // Preserves all existing data extraction — only changes HTML output.
   const isActioned = actionedIds.has(card.id);
   const signalLine = buildInsightLine(card);
   const keyInsightLine = (card.key_insight && String(card.key_insight).trim()) || '';
   const signalDisplay = keyInsightLine || signalLine;
   const impactLine = buildWhyLine(card, signalLine);
-  const persistenceSignal = getPersistenceSignal(card);
   const decisionLine = (card.enforced_decision_line || card.decision || '').toString().trim();
   const executionActionsRaw = card.enforced_execution_actions || card.execution_actions || [];
   const executionActions = Array.isArray(executionActionsRaw)
     ? executionActionsRaw
-    : String(executionActionsRaw)
-        .split(/\n|•|;|\u2022/)
-        .map(s => s.trim())
-        .filter(Boolean);
+    : String(executionActionsRaw).split(/\n|•|;|\u2022/).map(s => s.trim()).filter(Boolean);
   const confidence = getConfidenceLevel(card);
-  const confidenceBadge = confidence === 'low' ? '' : `<span class="dept-badge">${escHtml(capitalize(confidence))} confidence</span>`;
-  const evidenceSubline = `Observed window: ${escHtml(getCardTimeframe(card))}`;
-  const executionList = executionActions.map(item => `<li>${escHtml(item)}</li>`).join('');
-
+  const confidenceBadge = confidence === 'low' ? ''
+    : `<span class="dept-badge">${escHtml(capitalize(confidence))} confidence</span>`;
   const findingsPr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
+  const isOpportunity = card.signal_type === 'opportunity';
+
+  const strTrio = card.trigger_display && card.trigger_display !== '—'
+    ? `<div class="nc-str-trio">${escHtml(card.trigger_display)}</div>
+       <div class="nc-str-trio-label">MPI / ARI / RGI</div>` : '';
+
+  const executionListHtml = executionActions.length
+    ? `<ul class="nc-exec-list">${executionActions.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>`
+    : '';
+
+  const analysisHtml = card.commercial_narrative
+    ? `<div class="nc-section">
+         <div class="nc-label">Analysis</div>
+         <div class="nc-text" style="white-space:pre-line;">${escHtml(card.commercial_narrative)}</div>
+       </div>` : '';
+
   return `
-    <div class="finding-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(findingsPr)}">
-      <div class="finding-header">
-        <div class="priority-stripe ${escHtml(card.priority)}"></div>
-
-        <div class="finding-center">
-          <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${evidenceSubline}</div>
+    <div class="finding-card nc-card ${isOpportunity ? 'opportunity' : ''} ${isActioned ? 'actioned' : ''}"
+         data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(findingsPr)}">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">${escHtml(card.title)}</div>
+          <div class="nc-subtitle">${escHtml(card.segment ? 'Segment: ' + card.segment : getCardTimeframe(card))}</div>
         </div>
-
-        <div class="finding-right">
-          <div class="trigger-metric-value">${escHtml(card.trigger_display)}</div>
-          <div class="trigger-metric-label">MPI / ARI / RGI</div>
-
-          <div class="badges-row">
-            <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
-            ${card.execution_owner ? `<span class="dept-badge">${escHtml(card.execution_owner)}</span>` : ''}
+        <div class="nc-header-right">
+          ${strTrio}
+          <div class="nc-badges">
+            <span class="priority-badge ${escHtml(findingsPr)}">${escHtml(capitalize(findingsPr))}</span>
             ${confidenceBadge}
           </div>
         </div>
       </div>
-
-      <div class="finding-body">
-        <div class="finding-section">
-          <div class="section-label">SIGNAL</div>
-          <div class="section-text">${escHtml(signalDisplay)}</div>
-          ${persistenceSignal ? `<div class="impact-meta" style="margin-top:8px;">${escHtml(persistenceSignal)}</div>` : ''}
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">Signal</div>
+          <div class="nc-text">${escHtml(signalDisplay)}</div>
         </div>
-        ${card.commercial_narrative ? `
-        <div class="finding-section">
-          <div class="section-label">ANALYSIS</div>
-          <div class="section-text" style="white-space: pre-line; line-height: 1.7; font-size: 13px;">${escHtml(card.commercial_narrative)}</div>
-        </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">IMPACT</div>
-          <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(impactLine)}</div>
+        ${analysisHtml}
+        <div class="nc-section">
+          <div class="nc-label">Impact</div>
+          <div class="nc-text-bold">${escHtml(impactLine)}</div>
         </div>
-        <div class="finding-section">
-          <div class="section-label">DECISION</div>
-          <div class="decision-line">${escHtml(decisionLine)}</div>
+        <div class="nc-section">
+          <div class="nc-label">Decision</div>
+          <div class="nc-decision-line">${escHtml(decisionLine)}</div>
         </div>
-        <div class="finding-section">
-          <div class="section-label">EXECUTION</div>
-          <ul class="action-line" style="margin-left:16px; display:flex; flex-direction:column; gap:4px;">${executionList}</ul>
+        ${executionListHtml ? `
+        <div class="nc-section">
+          <div class="nc-label">Execution</div>
+          ${executionListHtml}
           <div style="margin-top:10px; text-align:right;">
-            <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
+            <button onclick="markActioned(this,'${escHtml(card.id)}')"
+              ${isActioned ? 'disabled' : ''}
+              style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'};color:${isActioned ? '#6B6B67' : '#FFFFFF'};border:none;border-radius:4px;padding:7px 10px;font-size:11px;cursor:${isActioned ? 'default' : 'pointer'};">
               ${isActioned ? '✓ Actioned' : 'Mark as actioned'}
             </button>
           </div>
-        </div>
+        </div>` : ''}
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 function renderForwardCard(card) {
@@ -7006,93 +7253,108 @@ function renderForwardCard(card) {
         .split(/\n|•|;|\u2022/)
         .map(s => s.trim())
         .filter(Boolean);
-  const executionList = executionActions.map(item => `<li>${escHtml(item)}</li>`).join('');
-
   const dctx = card.demand_context;
   const dctxHol = Number(dctx?.holiday_count) || 0;
   const dctxDisp = Array.isArray(dctx?.displacement_signals)
     ? dctx.displacement_signals.length
     : 0;
   const showDemandContext = dctx && (dctxHol > 0 || dctxDisp > 0);
-  let demandContextHtml = '';
+
+  const fwdFindingsPr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
+
+  // Build demand context block in new style
+  let ncDemandHtml = '';
   if (showDemandContext) {
     const noteRaw = dctx.context_note != null ? String(dctx.context_note).trim() : '';
-    const noteBox = noteRaw
-      ? `<div class="demand-context-info-box">${escHtml(noteRaw)}</div>`
-      : '';
     const holWin = Array.isArray(dctx.holidays_in_window) ? dctx.holidays_in_window : [];
     const holLines = holWin.slice(0, 3).map(h => {
       const hn = (h?.name != null ? String(h.name) : '').trim() || '—';
       const hd = (h?.date != null ? String(h.date) : '').trim() || '—';
-      return `<div class="demand-context-holiday-line">📅 ${escHtml(hn)} on ${escHtml(hd)}</div>`;
+      return `<div style="font-size:12px;color:#1E40AF;margin-top:3px;">📅 ${escHtml(hn)} on ${escHtml(hd)}</div>`;
     }).join('');
-    const sigLine = dctxDisp > 0
-      ? `<div class="demand-context-signal-line">⚡ ${dctxDisp} macro signal(s) suggest potential displacement demand toward this market</div>`
-      : '';
-    demandContextHtml = `
-        <div class="finding-section">
-          <div class="section-label">DEMAND CONTEXT</div>
-          <div class="demand-context-body">
-            ${noteBox}
-            ${holLines}
-            ${sigLine}
-          </div>
-        </div>`;
+    ncDemandHtml = `
+      <div class="nc-section">
+        <div class="nc-label">Demand context</div>
+        <div class="nc-demand-block">
+          ${noteRaw ? `<div>${escHtml(noteRaw)}</div>` : ''}
+          ${holLines}
+        </div>
+      </div>`;
   }
 
-  const fwdFindingsPr = (card.priority != null ? String(card.priority) : 'medium').toLowerCase();
-  return `
-    <div class="finding-card forward-card ${isActioned ? 'actioned' : ''}" data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(fwdFindingsPr)}">
-      <div class="finding-header">
-        <div class="priority-stripe ${escHtml(card.priority)}"></div>
+  const fwdExecList = executionActions.length
+    ? `<ul class="nc-exec-list">${executionActions.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>`
+    : '';
 
-        <div class="finding-center">
-          <div class="finding-title">${escHtml(card.title)}</div>
-          <div class="finding-oneliner">${evidenceSubline}</div>
+  // Build pace bar: show OTB vs reference visually when pace_data available
+  let paceBarHtml = '';
+  const pd = card.pace_data;
+  if (pd && pd.pace_gap_pct != null) {
+    const gap = Math.round(pd.pace_gap_pct * 10) / 10;
+    const isBehind = gap < 0;
+    const barPct = Math.min(Math.abs(gap) * 3, 100); // scale: 33% gap = full bar
+    paceBarHtml = `
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+        <div style="flex:1;height:5px;background:var(--gray-100);border-radius:3px;overflow:hidden;">
+          <div style="width:${barPct}%;height:100%;background:${isBehind ? '#D85A30' : '#3B6D11'};border-radius:3px;"></div>
         </div>
+        <div style="font-size:12px;font-weight:500;color:${isBehind ? '#D85A30' : '#3B6D11'};min-width:42px;text-align:right;">
+          ${gap > 0 ? '+' : ''}${gap}%
+        </div>
+      </div>`;
+  }
 
-        <div class="finding-right">
-          <div class="trigger-metric-value" style="font-size:11px; text-align:right;">${escHtml(card.window_label || '')}</div>
-          <div class="trigger-metric-label">Forward window</div>
-
-          <div class="badges-row">
-            <span class="priority-badge ${escHtml(card.priority)}">${escHtml(capitalize(card.priority))}</span>
+  return `
+    <div class="finding-card forward-card nc-card ${isActioned ? 'actioned' : ''}"
+         data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(fwdFindingsPr)}">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">${escHtml(card.title)}</div>
+          <div class="nc-subtitle">${escHtml(card.window_label || evidenceSubline)}</div>
+        </div>
+        <div class="nc-header-right">
+          <div class="nc-str-trio">${escHtml(card.window_label || '')}</div>
+          <div class="nc-str-trio-label">Forward window</div>
+          <div class="nc-badges">
+            <span class="priority-badge ${escHtml(fwdFindingsPr)}">${escHtml(capitalize(fwdFindingsPr))}</span>
             <span class="forward-badge">Forward</span>
           </div>
         </div>
       </div>
-
-      <div class="finding-body">
-        <div class="finding-section">
-          <div class="section-label">SIGNAL</div>
-          <div class="section-text">${escHtml(signalDisplay)}</div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">Signal</div>
+          <div class="nc-text">${escHtml(signalDisplay)}</div>
+          ${paceBarHtml}
         </div>
         ${forwardAnalysisDisplayHtml ? `
-        <div class="finding-section">
-          <div class="section-label">FORWARD ANALYSIS</div>
-          <div class="section-text" style="line-height: 1.7; font-size: 13px; white-space: pre-line;">${forwardAnalysisDisplayHtml}</div>
+        <div class="nc-section">
+          <div class="nc-label">Forward analysis</div>
+          <div class="nc-text" style="white-space:pre-line;">${forwardAnalysisDisplayHtml}</div>
         </div>` : ''}
-        <div class="finding-section">
-          <div class="section-label">IMPACT</div>
-          <div class="section-text" style="font-weight:700; color:var(--navy);">${escHtml(forwardImpactLine)}</div>
+        <div class="nc-section">
+          <div class="nc-label">Impact</div>
+          <div class="nc-text-bold">${escHtml(forwardImpactLine)}</div>
         </div>
-        <div class="finding-section">
-          <div class="section-label">DECISION</div>
-          <div class="decision-line">${escHtml(decisionLine)}</div>
+        <div class="nc-section">
+          <div class="nc-label">Decision</div>
+          <div class="nc-decision-line">${escHtml(decisionLine)}</div>
         </div>
-        <div class="finding-section">
-          <div class="section-label">EXECUTION</div>
-          <ul class="action-line" style="margin-left:16px; display:flex; flex-direction:column; gap:4px;">${executionList}</ul>
-          <div style="margin-top:10px; text-align:right;">
-            <button onclick="markActioned(this, '${escHtml(card.id)}')" ${isActioned ? 'disabled' : ''} style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'}; color:${isActioned ? '#6B6B67' : '#FFFFFF'}; border:none; border-radius:4px; padding:7px 10px; font-size:11px; cursor:${isActioned ? 'default' : 'pointer'};">
+        ${fwdExecList ? `
+        <div class="nc-section">
+          <div class="nc-label">Execution</div>
+          ${fwdExecList}
+          <div style="margin-top:10px;text-align:right;">
+            <button onclick="markActioned(this,'${escHtml(card.id)}')"
+              ${isActioned ? 'disabled' : ''}
+              style="background:${isActioned ? '#E8E8E5' : '#0F1F3D'};color:${isActioned ? '#6B6B67' : '#FFFFFF'};border:none;border-radius:4px;padding:7px 10px;font-size:11px;cursor:${isActioned ? 'default' : 'pointer'};">
               ${isActioned ? '✓ Actioned' : 'Mark as actioned'}
             </button>
           </div>
-        </div>
-        ${demandContextHtml}
+        </div>` : ''}
+        ${ncDemandHtml}
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 function markActioned(btn, id) {
