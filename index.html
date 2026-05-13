@@ -6671,8 +6671,33 @@ function renderFindings() {
   const segCausalChainHtml = '';
   // Causal chain card moved to hero position above all sections.
   // No longer rendered inside the SEGMENTATION group.
+  // WHY: Sort segment cards in USALI 12th edition order.
+  // Retail Transient → Discount → Negotiated → Wholesale Transient →
+  // Qualified Rate → Corporate Groups → Association & Convention →
+  // Government Groups → SMERF → Wholesale Groups → Contract / Crew
+  const USALI_SEGMENT_ORDER = [
+    'transient_retail',
+    'transient_discount',
+    'transient_negotiated',
+    'transient_wholesale',
+    'transient_qualified',
+    'group_corporate',
+    'group_association',
+    'group_government',
+    'group_smerf',
+    'group_wholesale',
+    'contract'
+  ];
+  const sortedSegmentIssueCards = [...segmentIssueCards].sort((a, b) => {
+    const ai = USALI_SEGMENT_ORDER.indexOf(a.segment || '');
+    const bi = USALI_SEGMENT_ORDER.indexOf(b.segment || '');
+    const aRank = ai === -1 ? 99 : ai;
+    const bRank = bi === -1 ? 99 : bi;
+    return aRank - bRank;
+  });
+
   let segIssueCardsHtml = '';
-  for (const sic of segmentIssueCards) {
+  for (const sic of sortedSegmentIssueCards) {
     if (!sic || typeof sic !== 'object') continue;
     let cardTitle = String(sic.title || sic.display_name || 'Segment signal');
     // Strip scenario codes from title e.g. "(S4)", "(S5)", "(S7)"
