@@ -1832,9 +1832,10 @@ table.fi-account-table th {
 .pace-3col-grid div[style*="margin-top:10px"][style*="text-align:right"] {
   display: none;
 }
-/* Tighten subtitle — show only window dates, not repeated title text */
+/* Tighten subtitle — window label, smaller and muted */
 .pace-3col-grid .nc-subtitle {
   font-size: 11px;
+  color: var(--gray-400);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1847,6 +1848,16 @@ table.fi-account-table th {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Hide priority + forward badges in pace 3-col grid — redundant in compact view */
+.pace-3col-grid .nc-badges { display: none; }
+.pace-3col-grid .nc-str-trio,
+.pace-3col-grid .nc-str-trio-label { display: none; }
+
+/* Left border accent per window urgency — visual hierarchy without badges */
+.pace-3col-grid .nc-card:nth-child(1) { border-left: 3px solid #D85A30; border-radius: 0 8px 8px 0; }
+.pace-3col-grid .nc-card:nth-child(2) { border-left: 3px solid #BA7517; border-radius: 0 8px 8px 0; }
+.pace-3col-grid .nc-card:nth-child(3) { border-left: 3px solid #888780; border-radius: 0 8px 8px 0; }
 </style>
 </head>
 <body>
