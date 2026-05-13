@@ -1737,9 +1737,6 @@ table.fi-account-table th {
   margin-bottom: 0;
   font-size: 12px;
 }
-.pace-3col-grid .nc-title {
-  font-size: 14px;
-}
 .pace-3col-grid .nc-header {
   padding: 10px 12px 8px;
 }
@@ -1823,6 +1820,33 @@ table.fi-account-table th {
 .fi-tile-badge.high { background: #FAEEDA; color: #854F0B; }
 .fi-tile-badge.medium { background: var(--gray-100); color: var(--gray-600); }
 .fi-tile-badge.opportunity { background: #EAF3DE; color: #3B6D11; }
+
+/* Inside pace 3-col grid: hide execution list and demand context,
+   they are too verbose for the compact column view */
+.pace-3col-grid .nc-section:has(.nc-exec-list),
+.pace-3col-grid .nc-section:has(.nc-demand-block),
+.pace-3col-grid .forward-card .nc-section:has(.nc-text[style*="white-space:pre-line"]) {
+  display: none;
+}
+/* Mark as actioned row — narrow selector so pace bar % cell (also text-align:right) stays visible */
+.pace-3col-grid div[style*="margin-top:10px"][style*="text-align:right"] {
+  display: none;
+}
+/* Tighten subtitle — show only window dates, not repeated title text */
+.pace-3col-grid .nc-subtitle {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Tighten title — allow 2 lines max, clip */
+.pace-3col-grid .nc-title {
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 </style>
 </head>
 <body>
@@ -7268,7 +7292,7 @@ function renderForwardCard(card) {
          data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(fwdFindingsPr)}">
       <div class="nc-header">
         <div class="nc-header-left">
-          <div class="nc-title">${escHtml(sanitiseSegmentNames(card.title || ''))}</div>
+          <div class="nc-title">${escHtml(sanitiseSegmentNames((card.title || '').slice(0, 70)))}</div>
           <div class="nc-subtitle">${escHtml(card.window_label || evidenceSubline)}</div>
         </div>
         <div class="nc-header-right">
