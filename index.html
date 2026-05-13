@@ -6319,9 +6319,9 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
     return fiCardTypeCanon(t) === fiCardTypeCanon('corporate_pace_opportunity')
       || fiCardTypeCanon(t).includes('opportunity');
   });
-  const sortedPipeline = [...groupPipelineIssues].sort(
-    (a, b) => fiPipelineWindowSortKey(a) - fiPipelineWindowSortKey(b)
-  );
+  const sortedPipeline = Array.isArray(groupPipelineIssues)
+    ? [...groupPipelineIssues].sort((a, b) => fiPipelineWindowSortKey(a) - fiPipelineWindowSortKey(b))
+    : [];
 
   // WHY: Combine pickup delta + group pipeline per window into one tile.
   // Reduces 6 cards to 3 window tiles + corporate cards.
@@ -6351,9 +6351,9 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
       ? Math.round(Number(pipeline.gap_closure_pct) * 100) : null;
     const tentRn = pipeline?.tentative_rn != null ? Math.round(pipeline.tentative_rn) : null;
     const prospRn = pipeline?.prospect_rn != null ? Math.round(pipeline.prospect_rn) : null;
-    const groupsArr = pipeline && (Array.isArray(pipeline.pipeline_groups) ? pipeline.pipeline_groups
-      : (Array.isArray(pipeline.groups) ? pipeline.groups : []));
-    const topGroup = groupsArr.length ? groupsArr[0] : null;
+    const pipelineGroups = Array.isArray(pipeline?.groups) ? pipeline.groups
+      : Array.isArray(pipeline?.pipeline_groups) ? pipeline.pipeline_groups : [];
+    const topGroup = pipelineGroups[0] ?? null;
 
     // Title: pace gap + pipeline cover in one line
     const titleParts = [];
@@ -6380,9 +6380,8 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
     if (!isClosing && required !== null && weeksLeft !== null) {
       action = `Need ${required} RN/week for ${weeksLeft} weeks — identify dragging segment and intervene now`;
     } else if (topGroup?.group_name && pipeline?.forecast_gap_rn) {
-      const closePct = topGroup.room_nights != null || topGroup.rn != null
-        ? Math.round(((topGroup.room_nights != null ? topGroup.room_nights : topGroup.rn) / pipeline.forecast_gap_rn) * 100)
-        : null;
+      const closePct = topGroup?.room_nights && pipeline?.forecast_gap_rn
+        ? Math.round((topGroup.room_nights / pipeline.forecast_gap_rn) * 100) : null;
       action = `Convert ${topGroup.group_name} to definite this week${closePct ? ` — closes ${closePct}% of window gap` : ''}`;
     } else if (isClosing) {
       action = `Pace closing — hold rate and distribution strategy through window close`;
