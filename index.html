@@ -1726,6 +1726,33 @@ table.fi-account-table th {
 .ng-group-cards .finding-card:has(+ .str-weekly-sparkline-wrap) {
   border-bottom: none;
 }
+
+.pace-3col-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 0 8px;
+}
+.pace-3col-grid .nc-card {
+  margin-bottom: 0;
+  font-size: 12px;
+}
+.pace-3col-grid .nc-title {
+  font-size: 14px;
+}
+.pace-3col-grid .nc-header {
+  padding: 10px 12px 8px;
+}
+.pace-3col-grid .nc-body {
+  padding: 0 12px 10px;
+}
+.pace-3col-grid .nc-text,
+.pace-3col-grid .nc-text-bold {
+  font-size: 12px;
+}
+.pace-3col-grid .nc-exec-list li {
+  font-size: 12px;
+}
 </style>
 </head>
 <body>
@@ -6945,9 +6972,20 @@ function renderFindings() {
   // ── GROUP 4: Pace Analysis ────────────────────────────
   if (forwardCards.length > 0 || synthForPace.length > 0) {
     const s = summaries.forward;
-    let cardsHtml = forwardCards
-      .map(card => renderForwardCard(card))
-      .join('');
+    // WHY: Forward pace cards (Days 1–30, 31–60, 61–90) render in 3 columns
+    // so the GM can scan all windows simultaneously without scrolling.
+    // Synthesis cards that may also be in this group stay full-width below.
+    const paceOnlyCards = forwardCards.filter(c =>
+      c.is_forward_card === true && c.granularity !== 'forecast_gap'
+    );
+    const otherForwardCards = forwardCards.filter(c =>
+      !(c.is_forward_card === true && c.granularity !== 'forecast_gap')
+    );
+    const paceGridHtml = paceOnlyCards.length
+      ? `<div class="pace-3col-grid">${paceOnlyCards.map(c => renderForwardCard(c)).join('')}</div>`
+      : '';
+    const otherFwdHtml = otherForwardCards.map(c => renderForwardCard(c)).join('');
+    let cardsHtml = paceGridHtml + otherFwdHtml;
     synthForPace.forEach((sc, i) => {
       if (!sc || typeof sc !== 'object') return;
       const fin = sc.financial_impact ?? sc.financialImpact;
