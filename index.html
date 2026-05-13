@@ -2098,6 +2098,14 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function sanitiseSegmentNames(text) {
+  // WHY: Replaces legacy "Discount / OTA" with USALI-correct "Discount"
+  // in any text string before rendering. Covers text already stored in
+  // Supabase from prior engine runs where the old name was used.
+  if (!text || typeof text !== 'string') return text;
+  return text.replace(/Discount\s*\/\s*OTA/gi, 'Discount');
+}
+
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
@@ -7022,12 +7030,15 @@ function renderCard(card) {
   const signalLine = buildInsightLine(card);
   const keyInsightLine = (card.key_insight && String(card.key_insight).trim()) || '';
   const signalDisplay = keyInsightLine || signalLine;
+  const decisionLine = sanitiseSegmentNames(
+    (card.enforced_decision_line || card.decision || '').toString().trim()
+  );
   const impactLine = buildWhyLine(card, signalLine);
-  const decisionLine = (card.enforced_decision_line || card.decision || '').toString().trim();
   const executionActionsRaw = card.enforced_execution_actions || card.execution_actions || [];
-  const executionActions = Array.isArray(executionActionsRaw)
+  const executionActions = (Array.isArray(executionActionsRaw)
     ? executionActionsRaw
-    : String(executionActionsRaw).split(/\n|•|;|\u2022/).map(s => s.trim()).filter(Boolean);
+    : String(executionActionsRaw).split(/\n|•|;|\u2022/).map(s => s.trim()).filter(Boolean)
+  ).map(sanitiseSegmentNames);
   const confidence = getConfidenceLevel(card);
   const confidenceBadge = confidence === 'low' ? ''
     : `<span class="dept-badge">${escHtml(capitalize(confidence))} confidence</span>`;
@@ -7053,7 +7064,7 @@ function renderCard(card) {
          data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(findingsPr)}">
       <div class="nc-header">
         <div class="nc-header-left">
-          <div class="nc-title">${escHtml(card.title)}</div>
+          <div class="nc-title">${escHtml(sanitiseSegmentNames(card.title || ''))}</div>
           <div class="nc-subtitle">${escHtml(card.segment ? 'Segment: ' + card.segment : getCardTimeframe(card))}</div>
         </div>
         <div class="nc-header-right">
@@ -7177,6 +7188,7 @@ function renderForwardCard(card) {
     forwardAnalysisNarrative = stripDaysRemainInThisWindowFromText(forwardAnalysisNarrative);
   }
   forwardAnalysisNarrative = cleanupForwardAnalysisDoublePeriods(forwardAnalysisNarrative);
+  decisionLine = sanitiseSegmentNames((decisionLine || '').toString().trim());
   const isForecastGapCard = card.granularity === 'forecast_gap';
   const forwardAnalysisParagraphs = isForecastGapCard
     ? []
@@ -7193,12 +7205,13 @@ function renderForwardCard(card) {
   const evidenceSubline = card.window_label ? `Forward window: ${escHtml(card.window_label)}` : 'Forward window';
   const forwardImpactLine = buildForwardImpactLine(card);
   const executionActionsRaw = card.enforced_execution_actions || [];
-  const executionActions = Array.isArray(executionActionsRaw)
+  const executionActions = (Array.isArray(executionActionsRaw)
     ? executionActionsRaw
     : String(executionActionsRaw)
         .split(/\n|•|;|\u2022/)
         .map(s => s.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+  ).map(sanitiseSegmentNames);
   const dctx = card.demand_context;
   const dctxHol = Number(dctx?.holiday_count) || 0;
   const dctxDisp = Array.isArray(dctx?.displacement_signals)
@@ -7255,7 +7268,7 @@ function renderForwardCard(card) {
          data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(fwdFindingsPr)}">
       <div class="nc-header">
         <div class="nc-header-left">
-          <div class="nc-title">${escHtml(card.title)}</div>
+          <div class="nc-title">${escHtml(sanitiseSegmentNames(card.title || ''))}</div>
           <div class="nc-subtitle">${escHtml(card.window_label || evidenceSubline)}</div>
         </div>
         <div class="nc-header-right">
