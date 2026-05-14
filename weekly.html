@@ -30,213 +30,328 @@
   --gray-400: #9A9A95;
   --gray-600: #6B6B67;
   --gray-900: #1A1A18;
-  --sidebar-w: 260px;
-  --signal-new: #185FA5;
-  --signal-persist: #854F0B;
-  --signal-resolved: #1A6B3C;
+  --color-border-tertiary: var(--gray-200);
+  --color-background-primary: var(--white);
+  --color-text-primary: var(--gray-900);
+  --color-text-secondary: var(--gray-600);
+  --color-text-tertiary: var(--gray-400);
+  --gray-50: #FAFAF9;
+  --gray-500: #73736E;
+  --gray-700: #454542;
+  --gray-800: #2E2E2B;
 }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--gray-900); min-height: 100vh; }
-.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; z-index: 100; border-right: 1px solid rgba(201,168,76,0.15); }
-.sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.logo-text { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--white); letter-spacing: 4px; text-transform: uppercase; }
-.logo-sub { font-size: 9px; color: var(--gold); letter-spacing: 2.5px; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
-.hotel-card { margin: 16px 14px; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); border-radius: 8px; padding: 12px 14px; }
-.hotel-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 600; color: var(--white); }
-.hotel-meta { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.3px; }
-.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
-.nav-section { padding: 12px 20px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
-.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
-.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
-.nav-icon { font-size: 14px; width: 18px; text-align: center; }
-.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; min-width: 18px; text-align: center; }
-.sidebar-bottom { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
-.sync-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.35); }
-.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.main { margin-left: var(--sidebar-w); min-height: 100vh; }
-.topbar { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 0 32px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: sticky; top: 0; z-index: 50; }
-.topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--navy); }
-.topbar-sub { color: var(--gray-600); font-size: 12px; letter-spacing: .04em; }
-.topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.chip { border: 1px solid var(--gray-200); padding: 7px 10px; border-radius: 999px; font-size: 12px; color: var(--gray-600); }
-.btn { border: 1px solid var(--gray-300); border-radius: 999px; font-size: 12px; padding: 8px 12px; background: #fff; cursor: pointer; font-family: inherit; }
-.btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
-.content { padding: 24px 32px 40px; }
-.page-head { margin-bottom: 20px; }
-.page-head h1 { font-family: 'Cormorant Garamond', serif; font-size: 28px; color: var(--navy); margin-bottom: 6px; }
-.page-head-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: var(--gray-600); }
-.compare-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-bottom: 24px; padding: 16px; background: #fff; border: 1px solid #E8E8E2; border-radius: 10px; }
-.field-group label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; }
-.select-input { border: 1px solid var(--gray-300); border-radius: 10px; padding: 9px 12px; font-family: inherit; min-width: 180px; font-size: 13px; }
-.compare-error { color: var(--red); font-size: 13px; width: 100%; }
-.section-card { background: #fff; border: 1px solid #E8E8E2; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-.section-kicker { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--gold); font-weight: 700; margin-bottom: 6px; }
-.section-title { font-size: 18px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
-.section-sub { font-size: 13px; color: var(--gray-600); margin-bottom: 16px; line-height: 1.45; }
-.summary-bar { display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 12px 14px; background: var(--gray-100); border-radius: 8px; font-size: 13px; margin-bottom: 16px; color: var(--gray-900); }
-.muted { color: var(--gray-600); font-size: 13px; }
-.table-wrap { overflow-x: auto; }
-.data-table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 13px; }
-.data-table th { background: var(--gray-100); color: var(--gray-600); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 10px; text-align: left; border-bottom: 1px solid var(--gray-200); }
-.data-table td { padding: 10px; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
-.week-summary td { font-weight: 600; background: #fafaf8; }
-.delta-pos { color: #1A6B3C; font-weight: 600; }
-.delta-neg { color: #C0392B; font-weight: 600; }
-.delta-zero { color: #6B6B67; }
-.week-sum-pos { color: #1A6B3C; }
-.week-sum-neg { color: #C0392B; }
-.week-sum-zero { color: #6B6B67; }
-.week-summary-muted td { color: var(--gray-600); font-style: italic; }
-.show-all-link { margin-top: 10px; font-size: 13px; color: var(--navy-mid); cursor: pointer; text-decoration: underline; display: inline-block; }
-.signal-block { margin-bottom: 18px; }
-.signal-block h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; color: var(--gray-600); }
-.signal-card { display: flex; border: 1px solid #E8E8E2; border-radius: 10px; overflow: hidden; margin-bottom: 10px; background: #fff; }
-.signal-card .priority-stripe { width: 6px; flex-shrink: 0; }
-.signal-card.signal-new .priority-stripe { background: var(--signal-new); }
-.signal-card.signal-persist .priority-stripe { background: var(--signal-persist); }
-.signal-card.signal-resolved .priority-stripe { background: var(--signal-resolved); }
-.signal-body { padding: 12px 16px; flex: 1; }
-.signal-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
-.signal-new .signal-label { color: var(--signal-new); }
-.signal-persist .signal-label { color: var(--signal-persist); }
-.signal-resolved .signal-label { color: var(--signal-resolved); }
-.signal-key { font-weight: 600; color: var(--navy); margin-bottom: 4px; font-size: 14px; }
-.signal-meta { font-size: 12px; color: var(--gray-600); line-height: 1.45; }
-.section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--gold); font-weight: 700; margin-bottom: 8px; }
-.badge-outcome { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
-.badge-improved, .badge-correct { background: var(--green-light); color: var(--green); }
-.badge-none { background: var(--red-light); color: var(--red); }
-.badge-pending { background: var(--gray-100); color: var(--gray-600); }
-.badge-updated { background: var(--amber-light); color: var(--signal-persist); }
-.badge-unchanged { background: var(--gray-100); color: var(--gray-600); }
-.account-decision-cell { font-size: 12px; line-height: 1.45; color: var(--gray-900); max-width: 280px; vertical-align: top; }
-.login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
-.login-card { width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 1px solid rgba(15,31,61,0.1); border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(15,31,61,0.12); }
-.brand-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
-.brand-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; margin-bottom: 8px; color: var(--navy); }
-.brand-copy { color: var(--gray-600); line-height: 1.6; margin-bottom: 18px; }
-.field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); margin: 12px 0 6px; }
-.input { width: 100%; border: 1px solid var(--gray-300); border-radius: 10px; padding: 12px; font-family: inherit; }
-.login-btn { width: 100%; margin-top: 16px; border: none; border-radius: 10px; padding: 12px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
-.login-error { display: none; margin-top: 10px; color: var(--red); font-size: 12px; }
-.app-screen { display: none; }
-@media (max-width: 980px) {
-  .sidebar { display: none; }
-  .main { margin-left: 0; }
-  .content { padding: 18px; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--gray-900);
+  min-height: 100vh;
+}
+
+.topbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-200);
+  padding: 0 32px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.topbar-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--navy);
+  letter-spacing: 0.3px;
+}
+
+.topbar-brand {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+}
+
+.topbar-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.period-select {
+  background: var(--navy);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+}
+
+.refresh-btn {
+  background: transparent;
+  border: 1px solid var(--gray-200);
+  color: var(--gray-600);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+
+.refresh-btn:hover { border-color: var(--navy); color: var(--navy); }
+
+.upload-btn {
+  background: var(--gold);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 18px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.upload-btn:hover { background: var(--gold-light); }
+
+.dash-link {
+  font-size: 12px;
+  color: var(--navy-mid);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-200);
+}
+
+.dash-link:hover { border-color: var(--navy); color: var(--navy); }
+
+.content { padding: 28px 32px 48px; max-width: 1200px; margin: 0 auto; }
+
+.loading-state, .error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-600);
+}
+
+.loading-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--navy);
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-state { color: var(--red); }
+
+/* KPI strip */
+#movement-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-background-primary);
+  margin-bottom: 20px;
+}
+
+.kpi-cell {
+  padding: 14px 20px;
+  border-right: 0.5px solid var(--color-border-tertiary);
+}
+.kpi-cell:last-child { border-right: none; }
+.kpi-cell .kpi-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--color-text-tertiary); margin-bottom: 4px;
+}
+.kpi-cell .kpi-value {
+  font-size: 22px; font-weight: 500; color: var(--color-text-primary);
+}
+.kpi-cell .kpi-value.kpi-neg { color: #D85A30; }
+.kpi-cell .kpi-value.kpi-pos { color: #3B6D11; }
+.kpi-cell .kpi-value.kpi-warn { color: #BA7517; }
+.kpi-cell .kpi-sub {
+  font-size: 11px; color: var(--color-text-tertiary); margin-top: 4px;
+}
+
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gray-400);
+  font-weight: 600;
+  margin: 24px 0 10px;
+}
+
+/* nc-card (subset from index.html) */
+.nc-card {
+  background: var(--white);
+  border: 0.5px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.nc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 0.5px solid var(--gray-100);
+  gap: 12px;
+}
+.nc-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.35;
+}
+.nc-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 0; }
+.nc-section { padding: 10px 0; border-bottom: 0.5px solid var(--gray-100); }
+.nc-section:last-child { border-bottom: none; }
+.nc-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--gray-400);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.nc-text {
+  font-size: 13px;
+  color: var(--gray-800);
+  line-height: 1.65;
+}
+.nc-text-bold {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.65;
+}
+
+.wk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wk-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-400);
+  font-weight: 600;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+.wk-table td {
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: top;
+  color: var(--gray-800);
+}
+.wk-table tr:last-child td { border-bottom: none; }
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-closing { background: var(--green-light); color: var(--green); }
+.badge-widening { background: var(--red-light); color: var(--red); }
+.badge-stable { background: var(--gray-100); color: var(--gray-600); }
+
+.still-open {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--orange);
+  border: 1px solid var(--orange-light);
+  background: var(--orange-light);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.mov-arrow { font-weight: 700; margin-right: 4px; }
+.mov-up { color: var(--green); }
+.mov-down { color: var(--red); }
+.mov-flat { color: var(--gray-400); }
+
+.sub-h {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 12px 0 8px;
 }
 </style>
 </head>
 <body>
-<div class="login-screen" id="login-screen">
-  <div class="login-card">
-    <div class="brand-kicker">Aithenor</div>
-    <h1 class="brand-title">Weekly Intelligence</h1>
-    <div class="brand-copy">Sign in to compare pace snapshots and decision signals for your hotel.</div>
-    <form onsubmit="handleLogin(event)">
-      <label class="field-label">Email</label>
-      <input class="input" type="email" id="login-email" required>
-      <label class="field-label">Password</label>
-      <input class="input" type="password" id="login-password" required>
-      <button class="login-btn" id="login-btn" type="submit">Sign In</button>
-      <div class="login-error" id="login-error"></div>
-    </form>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div>
+      <div class="topbar-brand">Aithenor</div>
+      <div class="topbar-meta">AUREM-PAR · Weekly Intelligence</div>
+    </div>
+    <div class="topbar-title" style="margin-left:8px;">Week on week</div>
+  </div>
+  <div class="topbar-right">
+    <label class="topbar-meta" style="margin:0;">A (older)</label>
+    <select class="period-select" id="snap-a" aria-label="Snapshot A older"></select>
+    <label class="topbar-meta" style="margin:0;">B (newer)</label>
+    <select class="period-select" id="snap-b" aria-label="Snapshot B newer"></select>
+    <button class="upload-btn" type="button" id="btn-compare">Compare</button>
+    <a class="dash-link" href="index.html">Main dashboard</a>
   </div>
 </div>
 
-<div class="app-screen" id="app-screen">
-  <div class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-text">Aithenor</div>
-      <div class="logo-sub">Strategic Intelligence</div>
-    </div>
-    <div class="hotel-card">
-      <div class="hotel-name" id="hotel-name">Hotel</div>
-      <div class="hotel-meta" id="sidebar-period">Weekly Intel</div>
-    </div>
-    <nav class="nav">
-      <div class="nav-section">Executive</div>
-      <a class="nav-item" href="gm.html"><span class="nav-icon">✦</span>GM Briefing</a>
-      <div class="nav-section">Intelligence</div>
-      <div class="nav-item"><span class="nav-icon">◈</span>Insights<span class="nav-badge" id="badge-count">•</span></div>
-      <div class="nav-item"><span class="nav-icon">◇</span>Revenue Modules</div>
-      <div class="nav-item"><span class="nav-icon">◇</span>Cost Modules</div>
-      <div class="nav-section">Execution</div>
-      <div class="nav-item"><span class="nav-icon">◇</span>Value Tracker</div>
-      <a class="nav-item" href="accounts.html"><span class="nav-icon">◉</span>Accounts</a>
-      <a class="nav-item active" href="weekly.html"><span class="nav-icon">◎</span>Weekly Intel</a>
-      <div class="nav-item"><span class="nav-icon">◇</span>Action Tracker</div>
-      <div class="nav-section">Performance</div>
-      <div class="nav-item"><span class="nav-icon">◇</span>Historical Analysis</div>
-      <div class="nav-section">Settings</div>
-      <div class="nav-item"><span class="nav-icon">◇</span>Hotel Profile</div>
-      <div class="nav-item"><span class="nav-icon">◇</span>Upload Data</div>
-    </nav>
-    <div class="sidebar-bottom">
-      <div class="sync-status"><div class="sync-dot"></div><span>Connected to Supabase</span></div>
-      <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
-        <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
-        <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif;">Sign Out</button>
-      </div>
-    </div>
+<div class="content">
+  <div class="error-state" id="error-state" style="display:none;">
+    <p id="error-msg"></p>
   </div>
+  <div class="loading-state" id="loading-state">
+    <div class="loading-spinner"></div>
+    <div>Loading snapshots…</div>
+  </div>
+  <div id="weekly-app" style="display:none;">
+    <div id="movement-strip"></div>
 
-  <div class="main">
-    <div class="topbar">
-      <div>
-        <div class="topbar-title">Weekly Intelligence</div>
-        <div class="topbar-sub">Pickup movement, signal persistence, and decision accountability.</div>
-      </div>
-      <div class="topbar-actions">
-        <a class="btn btn-primary" href="index.html" style="text-decoration:none;">Back to Insights</a>
-      </div>
-    </div>
+    <div class="section-title">Pace gap movement</div>
+    <div id="pace-section"></div>
 
-    <div class="content">
-      <div class="page-head">
-        <h1>Weekly Intelligence</h1>
-        <div class="page-head-meta">
-          <span id="header-hotel">—</span>
-          <span class="chip" id="last-updated-chip">Last updated: —</span>
-        </div>
-      </div>
+    <div class="section-title">Segment signals</div>
+    <div id="segment-section"></div>
 
-      <div class="compare-bar">
-        <div class="field-group">
-          <label for="sel-from">Compare from</label>
-          <select class="select-input" id="sel-from"></select>
-        </div>
-        <div class="field-group">
-          <label for="sel-to">To</label>
-          <select class="select-input" id="sel-to"></select>
-        </div>
-        <button type="button" class="btn btn-primary" id="btn-compare" onclick="handleCompare()">Compare</button>
-        <div class="compare-error" id="compare-error" style="display:none;"></div>
-      </div>
+    <div class="section-title">Corporate accounts movement</div>
+    <div id="corporate-section"></div>
 
-      <div class="section-card" id="card-pickup">
-        <div class="section-kicker">Pace</div>
-        <div class="section-title">Pickup movement</div>
-        <div class="section-sub" id="pickup-subtitle">Room nights and revenue picked up between snapshots.</div>
-        <div id="pickup-body"><div class="muted">Loading...</div></div>
-      </div>
-
-      <div class="section-card" id="card-signals">
-        <div class="section-kicker">Tracking</div>
-        <div class="section-title">Signal persistence</div>
-        <div class="section-sub">Which engine signals are new, persisting, or resolved.</div>
-        <div id="signals-body"><div class="muted">Loading...</div></div>
-      </div>
-
-      <div class="section-card" id="card-accountability">
-        <div class="section-kicker">Outcomes</div>
-        <div class="section-title">Decision accountability</div>
-        <div class="section-sub" id="account-subtitle">Did the metrics move in the right direction since the earlier snapshot?</div>
-        <div id="account-body"><div class="muted">Loading...</div></div>
-      </div>
-    </div>
+    <div class="section-title">Open decisions</div>
+    <div id="decisions-section"></div>
   </div>
 </div>
 
@@ -245,783 +360,589 @@ const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const STATE = {
-  snapshotDates: [],
-  paceRows: [],
-  pickupWeekBlocks: null,
-  decisionRows: [],
-  signalPersistence: null,
-  accountabilityRows: null,
-  allDecisionKeys: [],
-  showAllWeeks: false,
-  lastSnapA: null,
-  lastSnapB: null,
-};
+const HOTEL_CODE = 'AUREM-PAR';
 
-function n(v) { const x = Number(v); return Number.isFinite(x) ? x : 0; }
+let snapshotRows = [];
+
 function escHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
-function normDate(d) {
-  if (d == null || d === '') return '';
-  return String(d).slice(0, 10);
+
+function unwrapEngineJson(raw) {
+  let j = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : (raw || {});
+  const inner = j?.engine;
+  if (inner != null && typeof inner === 'object' && !Array.isArray(inner)) j = inner;
+  return j;
 }
-function fmtInt(x) { return Math.round(n(x)).toLocaleString('en-GB'); }
-function fmtMoney(x) {
-  const abs = Math.abs(n(x));
-  const s = abs.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  return (x < 0 ? '−' : '') + '€' + s;
+
+function uniqueBy(arr, keyFn) {
+  const seen = new Set();
+  const out = [];
+  for (const item of arr || []) {
+    const k = keyFn(item);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
 }
-function fmtDeltaMoney(x) {
-  const v = n(x);
-  if (v === 0) return '€0';
-  const sign = v > 0 ? '+' : '−';
-  const abs = Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  return sign + '€' + abs;
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
-function fmtDeltaRn(x) {
-  const v = n(x);
-  if (v === 0) return '0';
-  return (v > 0 ? '+' : '−') + Math.abs(Math.round(v)).toLocaleString('en-GB');
+
+/** Same merge as index KPI strip: headline_numbers then diagnosis fallbacks. */
+function buildKpiCells(engineJson) {
+  const cv = engineJson?.commercial_verdict;
+  const headlineNumbers = Array.isArray(cv?.headline_numbers) ? cv.headline_numbers : [];
+  const dm = engineJson?.diagnosis?.metrics || {};
+  const fallbacks = [
+    { value: dm.avgMPI, label: 'MPI', direction: 'neutral' },
+    { value: dm.avgARI, label: 'ARI', direction: 'neutral' },
+    { value: dm.avgRGI, label: 'RGI', direction: 'neutral' },
+    { value: null, label: '—', direction: 'neutral' }
+  ].filter(f => f.value != null);
+  const kpiCells = [...headlineNumbers];
+  for (const fb of fallbacks) {
+    if (kpiCells.length >= 4) break;
+    const alreadyPresent = kpiCells.some(k =>
+      String(k.label || '').toLowerCase().includes(String(fb.label || '').toLowerCase())
+    );
+    if (!alreadyPresent) kpiCells.push(fb);
+  }
+  while (kpiCells.length < 4) kpiCells.push({ value: null, label: '—', direction: 'neutral' });
+  return kpiCells.slice(0, 4);
 }
-function deltaClass(v) {
-  if (n(v) > 0) return 'delta-pos';
-  if (n(v) < 0) return 'delta-neg';
-  return 'delta-zero';
-}
-function formatWeekRange(startYmd, endYmd) {
-  const parse = (s) => {
-    const p = normDate(s);
-    if (!p) return null;
-    const [y, m, d] = p.split('-').map(Number);
-    const dt = new Date(y, m - 1, d);
-    return isNaN(dt.getTime()) ? null : dt;
+
+function extractMpiAriRgi(engineJson) {
+  const cells = buildKpiCells(engineJson);
+  const findBy = sub => cells.find(c => String(c.label || '').toLowerCase().includes(sub));
+  return {
+    mpi: num(findBy('mpi')?.value),
+    ari: num(findBy('ari')?.value),
+    rgi: num(findBy('rgi')?.value)
   };
-  const a = parse(startYmd);
-  const b = parse(endYmd);
-  const opts = { day: 'numeric', month: 'short' };
-  if (a && b) return `${a.toLocaleDateString('en-GB', opts)} – ${b.toLocaleDateString('en-GB', opts)}`;
-  return [startYmd, endYmd].filter(Boolean).join(' – ') || '—';
-}
-function weekLabel(weekKey, startYmd, endYmd) {
-  const wk = weekKey != null ? String(weekKey) : '';
-  const range = formatWeekRange(startYmd, endYmd);
-  return `Week [${wk} · ${range}]`;
 }
 
-function getHotelCodeFromSession(session) {
-  const u = session?.user;
-  if (!u) return localStorage.getItem('hotelCode') || '';
-  return (u.user_metadata && (u.user_metadata.hotel || u.user_metadata.hotel_code)) || localStorage.getItem('hotelCode') || '';
+function totalRnOtbTy(engineJson) {
+  return num(engineJson?.segment_overview?.total_rn_ty);
 }
 
-function setSectionsLoading() {
-  document.getElementById('pickup-body').innerHTML = '<div class="muted">Loading...</div>';
-  document.getElementById('signals-body').innerHTML = '<div class="muted">Loading...</div>';
-  document.getElementById('account-body').innerHTML = '<div class="muted">Loading...</div>';
+function isStableRelative(a, b) {
+  if (a == null || b == null) return true;
+  if (a === 0 && b === 0) return true;
+  const base = Math.abs(a) < 1e-6 ? Math.abs(b) : Math.abs(a);
+  const pct = (Math.abs(b - a) / base) * 100;
+  return pct < 0.5;
 }
 
-function aggregatePaceByWeekSegment(rows, snapDate) {
-  const d = normDate(snapDate);
-  const map = new Map();
-  for (const r of rows) {
-    if (normDate(r.snapshot_date) !== d) continue;
-    if (r.row_phase !== 'future_forecast') continue;
-    const seg = (r.market_segment_label != null ? String(r.market_segment_label) : '—').trim() || '—';
-    const wk = r.stay_week_key != null ? String(r.stay_week_key) : '';
-    const k = wk + '\0' + seg;
-    const cur = map.get(k) || {
-      rn: 0, rev: 0, lead: null, start: r.stay_week_start_ymd, end: r.stay_week_end_ymd, weekKey: wk,
-    };
-    cur.rn += n(r.rn_on_books_ty);
-    cur.rev += n(r.booked_revenue_ty);
-    const ld = n(r.lead_days_snapshot_to_stay);
-    if (cur.lead == null || ld > cur.lead) cur.lead = ld;
-    map.set(k, cur);
+/** Higher MPI/ARI/RGI = improving for hotel. */
+function movementArrowDelta(a, b, higherIsBetter) {
+  if (a == null || b == null) {
+    return { arrow: '→', cls: 'mov-flat', deltaStr: '—', stable: true };
   }
-  return map;
+  const d = b - a;
+  if (isStableRelative(a, b)) {
+    return { arrow: '→', cls: 'mov-flat', deltaStr: formatDelta(a, b, d, false), stable: true };
+  }
+  const improved = higherIsBetter ? d > 0 : d < 0;
+  const arrow = improved ? '▲' : '▼';
+  const cls = improved ? 'mov-up' : 'mov-down';
+  return { arrow, cls, deltaStr: formatDelta(a, b, d, true), stable: false };
 }
 
-function buildWeekMeta(rowsSnapB) {
-  const byWeek = new Map();
-  for (const [, v] of rowsSnapB) {
-    if (v.lead == null || n(v.lead) <= 0) continue;
-    const wk = v.weekKey;
-    if (!byWeek.has(wk)) {
-      byWeek.set(wk, { weekKey: wk, start: v.start, end: v.end, maxLead: n(v.lead) });
-    } else {
-      const ex = byWeek.get(wk);
-      if (normDate(v.start) && (!ex.start || normDate(v.start) < normDate(ex.start))) ex.start = v.start;
-      if (normDate(v.end) && (!ex.end || normDate(v.end) > normDate(ex.end))) ex.end = v.end;
-      ex.maxLead = Math.max(ex.maxLead, n(v.lead));
-    }
-  }
-  return byWeek;
+function formatDelta(a, b, d, signed) {
+  const ad = Math.abs(d);
+  const fmt = ad % 1 === 0 ? String(Math.round(ad)) : ad.toFixed(1);
+  if (!signed) return fmt;
+  return (d >= 0 ? '+' : '−') + fmt;
 }
 
-function sumRnPaceForWeeks(paceRows, snapDate, weekKeysSet) {
-  const d = normDate(snapDate);
-  let sum = 0;
-  for (const r of paceRows) {
-    if (normDate(r.snapshot_date) !== d) continue;
-    if (r.row_phase !== 'future_forecast') continue;
-    const wk = r.stay_week_key != null ? String(r.stay_week_key) : '';
-    if (weekKeysSet && !weekKeysSet.has(wk)) continue;
-    if (weekKeysSet == null && n(r.lead_days_snapshot_to_stay) <= 0) continue;
-    sum += n(r.rn_on_books_ty);
-  }
-  return sum;
+function formatKpiDisplay(val) {
+  if (val == null) return '—';
+  if (Math.abs(val) >= 1000) return Math.round(val).toLocaleString('en-GB');
+  return val % 1 === 0 ? String(Math.round(val)) : val.toFixed(1);
 }
 
-function paceWindowWeekKeysFromDecision(row) {
-  const keys = new Set();
-  if (row.stay_week_key != null && String(row.stay_week_key).trim()) {
-    keys.add(String(row.stay_week_key).trim());
-    return keys;
-  }
-  const wk = row.forward_window_stay_week_key || row.metric_window_stay_week_key;
-  if (wk != null && String(wk).trim()) {
-    keys.add(String(wk).trim());
-    return keys;
-  }
+function classifyForwardWindow(issue) {
+  const fk = String(issue.finding_key || '').toLowerCase();
+  const wl = String(issue.window_label || '').toLowerCase();
+  const fw = String(issue.forward_window || '').toLowerCase();
+  const blob = `${fk} ${wl} ${fw}`;
+  if (/window[_\s-]?1\b|\b1\s*[–-]\s*30\b|days\s*1\s*[–-]\s*30|next\s*30/i.test(blob)) return 1;
+  if (/window[_\s-]?2\b|\b31\s*[–-]\s*60\b|days\s*31\s*[–-]\s*60/i.test(blob)) return 2;
+  if (/window[_\s-]?3\b|\b61\s*[–-]\s*90\b|days\s*61\s*[–-]\s*90/i.test(blob)) return 3;
   return null;
 }
 
-async function loadPersistenceCounts(hotelCode, findingKeys) {
-  const set = new Set((findingKeys || []).map(k => String(k).trim()).filter(Boolean));
-  if (!set.size) return new Map();
-  const { data, error } = await supabaseClient
-    .from('decision_tracking')
-    .select('finding_key, snapshot_date')
-    .eq('hotel_code', hotelCode)
-    .in('finding_key', Array.from(set));
-  if (error) throw error;
-  const m = new Map();
-  for (const row of data || []) {
-    const fk = row.finding_key != null ? String(row.finding_key).trim() : '';
-    if (!fk) continue;
-    const sd = normDate(row.snapshot_date);
-    if (!m.has(fk)) m.set(fk, new Set());
-    if (sd) m.get(fk).add(sd);
-  }
-  const out = new Map();
-  for (const [fk, s] of m) out.set(fk, s.size);
-  return out;
+function paceGapRowFromIssue(issue) {
+  const pd = issue?.pace_data;
+  if (!pd || typeof pd !== 'object') return null;
+  const otbTy = num(pd.otb_rn_ty ?? pd.otb_rn);
+  const ref = num(pd.reference_rn ?? pd.ly_rn ?? pd.ref_rn);
+  let gapRn = null;
+  if (ref != null && otbTy != null) gapRn = Math.round(ref - otbTy);
+  const gapPct = num(issue.pace_gap_pct != null ? issue.pace_gap_pct : pd.pace_gap_pct);
+  return { gapRn, gapPct, otbTy, ref };
 }
 
-function extractSignals(ej) {
-  const signals = [];
-  const addCards = (arr, type) => {
-    for (const c of (Array.isArray(arr) ? arr : [])) {
-      if (!c) continue;
-      signals.push({
-        finding_key: c.finding_key || c.id || '',
-        card_type: type,
-        decision: c.decision || c.enforced_decision_line ||
-          c.commercial_narrative || '',
-      });
-    }
-  };
-  addCards(ej.segment_issue_cards, 'segment_issue');
-  addCards(ej.forward_issues, 'forward_pace');
-  addCards(ej.forecast_gap_issues, 'forecast_gap');
-  addCards(ej.corporate_account_pace_issues, 'corporate_pace');
-  addCards(
-    ej.cross_segment_synthesis && ej.cross_segment_synthesis.synthesis_cards,
-    'cross_segment_synthesis',
-  );
-  if (ej.cross_segment_synthesis && ej.cross_segment_synthesis.causal_chain_card) {
-    const cc = ej.cross_segment_synthesis.causal_chain_card;
-    signals.push({
-      finding_key: cc.finding_key || 'CAUSAL_CHAIN',
-      card_type: 'causal_chain',
-      decision: cc.decision || '',
-    });
+function forwardByThreeWindows(engineJson) {
+  const issues = Array.isArray(engineJson?.forward_issues) ? engineJson.forward_issues : [];
+  const buckets = { 1: [], 2: [], 3: [] };
+  for (const iss of issues) {
+    const w = classifyForwardWindow(iss);
+    if (w && buckets[w]) buckets[w].push(iss);
   }
-  return signals;
-}
-
-function dedupeSignalsByFindingKey(arr) {
-  const seen = new Set();
   const out = [];
-  for (const s of arr) {
-    const fk = String(s.finding_key || '').trim();
-    if (!fk || seen.has(fk)) continue;
-    seen.add(fk);
-    out.push(s);
+  for (let w = 1; w <= 3; w++) {
+    let list = buckets[w];
+    if (!list.length) {
+      const unassigned = issues.filter(i => !classifyForwardWindow(i) && i.pace_data);
+      if (unassigned.length === 3) {
+        const sorted = [...unassigned].sort((a, b) =>
+          String(a.pace_data?.window_start_ymd || '').localeCompare(String(b.pace_data?.window_start_ymd || ''))
+        );
+        const pick = sorted[w - 1];
+        if (pick) list = [pick];
+      }
+    }
+    const issue = list[0] || null;
+    const label = w === 1 ? '1–30 days' : w === 2 ? '31–60 days' : '61–90 days';
+    out.push({ window: w, label, issue, metrics: issue ? paceGapRowFromIssue(issue) : null });
   }
   return out;
 }
 
-async function loadSnapshots(hotelCode) {
-  try {
-    // Pull only the snapshot_date column across all rows for this hotel.
-    // No filters on row_phase or future_window_class — we need ALL dates.
-    // Supabase does not support DISTINCT — we deduplicate in JS below.
-    // Use a high limit to ensure all rows are returned (table has ~41k rows).
-    const { data, error } = await supabaseClient
-      .from('engine_outputs')
-      .select('snapshot_date, generated_at')
-      .eq('hotel_code', hotelCode)
-      .not('snapshot_date', 'is', null)
-      .order('generated_at', { ascending: false });
-
-    if (error) throw error;
-
-    // Deduplicate in JS — extract unique snapshot_date values
-    const seen = new Set();
-    const dates = [];
-    for (const row of (data || [])) {
-      const d = row.snapshot_date;
-      if (d && !seen.has(d)) {
-        seen.add(d);
-        dates.push(d);
-      }
-    }
-    // dates is already sorted descending (newest first) from the query
-
-    // Populate both dropdowns (HTML uses sel-from / sel-to)
-    const snapAEl = document.getElementById('sel-from');
-    const snapBEl = document.getElementById('sel-to');
-    if (!snapAEl || !snapBEl) return;
-
-    snapAEl.innerHTML = '';
-    snapBEl.innerHTML = '';
-    dates.forEach(d => {
-      snapAEl.insertAdjacentHTML('beforeend',
-        `<option value="${d}">${d}</option>`);
-      snapBEl.insertAdjacentHTML('beforeend',
-        `<option value="${d}">${d}</option>`);
-    });
-
-    // Default: snapB (To) = most recent, snapA (From) = second most recent
-    if (dates.length >= 2) {
-      snapBEl.value = dates[0];
-      snapAEl.value = dates[1];
-    } else if (dates.length === 1) {
-      snapBEl.value = dates[0];
-      snapAEl.value = dates[0];
-    }
-
-    // Update last updated chip
-    const lastUpdatedEl = document.getElementById('last-updated-chip');
-    if (lastUpdatedEl && dates.length) {
-      lastUpdatedEl.textContent = 'Last updated: ' + dates[0];
-    }
-
-  } catch (err) {
-    console.error('loadSnapshots error:', err);
-  }
-}
-
-async function runComparison(hotelCode, snapA, snapB) {
-  STATE.showAllWeeks = false;
-  const a = normDate(snapA);
-  const b = normDate(snapB);
-  STATE.lastSnapA = a;
-  STATE.lastSnapB = b;
-  document.getElementById('pickup-body').innerHTML = '<div class="muted">Loading...</div>';
-  document.getElementById('signals-body').innerHTML = '<div class="muted">Loading...</div>';
-  document.getElementById('account-body').innerHTML = '<div class="muted">Loading...</div>';
-  document.getElementById('pickup-subtitle').textContent =
-    `Room nights and revenue picked up between ${a} and ${b}`;
-  document.getElementById('account-subtitle').textContent =
-    `Decision text for signals present in both snapshots (${a} vs ${b}).`;
-  document.getElementById('last-updated-chip').textContent = `Last updated: ${b}`;
-
-  const { data: paceData, error: paceError } = await supabaseClient
-    .from('pms_pace_snapshots')
-    .select(`snapshot_date, stay_date_ymd, stay_week_key,
-             stay_week_start_ymd, stay_week_end_ymd,
-             market_segment_label, row_phase,
-             rn_on_books_ty, booked_revenue_ty,
-             lead_days_snapshot_to_stay`)
-    .eq('hotel_code', hotelCode)
-    .in('snapshot_date', [a, b])
-    .eq('row_phase', 'future_forecast')
-    .order('stay_date_ymd', { ascending: true })
-    .limit(100000);
-
-  if (paceError) throw paceError;
-  console.log('pms_pace_snapshots rows:', (paceData || []).length,
-    'snapA rows:', (paceData || []).filter(r => r.snapshot_date === snapA).length,
-    'snapB rows:', (paceData || []).filter(r => r.snapshot_date === snapB).length);
-
-  const mapA = new Map();
-  const mapB = new Map();
-  for (const row of (paceData || [])) {
-    const sd = normDate(row.stay_date_ymd);
-    if (!sd) continue;
-    const seg = (row.market_segment_label != null ? String(row.market_segment_label) : '—').trim() || '—';
-    const key = sd + '|' + seg;
-    if (normDate(row.snapshot_date) === a) {
-      const ex = mapA.get(key);
-      if (ex) {
-        ex.rn_on_books_ty = n(ex.rn_on_books_ty) + n(row.rn_on_books_ty);
-        ex.booked_revenue_ty = n(ex.booked_revenue_ty) + n(row.booked_revenue_ty);
-      } else {
-        mapA.set(key, { ...row });
-      }
-    }
-    if (normDate(row.snapshot_date) === b) {
-      const ex = mapB.get(key);
-      if (ex) {
-        ex.rn_on_books_ty = n(ex.rn_on_books_ty) + n(row.rn_on_books_ty);
-        ex.booked_revenue_ty = n(ex.booked_revenue_ty) + n(row.booked_revenue_ty);
-      } else {
-        mapB.set(key, { ...row });
-      }
-    }
-  }
-
-  const weekSegAgg = new Map();
-  const weekMeta = new Map();
-  for (const [key, rowB] of mapB) {
-    if (n(rowB.lead_days_snapshot_to_stay) <= 0) continue;
-    const wk = rowB.stay_week_key != null ? String(rowB.stay_week_key) : '';
-    const seg = (rowB.market_segment_label != null ? String(rowB.market_segment_label) : '—').trim() || '—';
-    const gk = wk + '\x1f' + seg;
-
-    if (!weekMeta.has(wk)) {
-      weekMeta.set(wk, {
-        start: rowB.stay_week_start_ymd,
-        end: rowB.stay_week_end_ymd,
-        maxLead: n(rowB.lead_days_snapshot_to_stay),
-        hasAnyMatchWithA: false,
-      });
-    } else {
-      const M = weekMeta.get(wk);
-      M.maxLead = Math.max(M.maxLead, n(rowB.lead_days_snapshot_to_stay));
-      if (normDate(rowB.stay_week_start_ymd) && (!M.start || normDate(rowB.stay_week_start_ymd) < normDate(M.start))) {
-        M.start = rowB.stay_week_start_ymd;
-      }
-      if (normDate(rowB.stay_week_end_ymd) && (!M.end || normDate(rowB.stay_week_end_ymd) > normDate(M.end))) {
-        M.end = rowB.stay_week_end_ymd;
-      }
-    }
-    if (mapA.has(key)) weekMeta.get(wk).hasAnyMatchWithA = true;
-
-    if (!weekSegAgg.has(gk)) {
-      weekSegAgg.set(gk, {
-        wk,
-        seg,
-        rnB: 0,
-        revB: 0,
-        rnPick: 0,
-        revPick: 0,
-        rnA: 0,
-        revA: 0,
-        matchedAny: false,
-      });
-    }
-    const S = weekSegAgg.get(gk);
-    S.rnB += n(rowB.rn_on_books_ty);
-    S.revB += n(rowB.booked_revenue_ty);
-    const rowA = mapA.get(key);
-    if (rowA) {
-      S.matchedAny = true;
-      S.rnA += n(rowA.rn_on_books_ty);
-      S.revA += n(rowA.booked_revenue_ty);
-      S.rnPick += n(rowB.rn_on_books_ty) - n(rowA.rn_on_books_ty);
-      S.revPick += n(rowB.booked_revenue_ty) - n(rowA.booked_revenue_ty);
-    }
-  }
-
-  const weekKeysSorted = [...weekMeta.keys()].sort((wk1, wk2) => {
-    const M1 = weekMeta.get(wk1);
-    const M2 = weekMeta.get(wk2);
-    const d1 = normDate(M1.start);
-    const d2 = normDate(M2.start);
-    if (d1 && d2) return d1.localeCompare(d2);
-    return String(wk1).localeCompare(String(wk2));
-  });
-
-  const segmentsByWeek = [];
-  for (const wk of weekKeysSorted) {
-    const Wm = weekMeta.get(wk);
-    const newWindowWeek = !Wm.hasAnyMatchWithA;
-    const rows = [];
-    let weekRn = 0;
-    let weekRev = 0;
-    for (const [, S] of weekSegAgg) {
-      if (S.wk !== wk) continue;
-      weekRn += S.rnPick;
-      weekRev += S.revPick;
-      if (S.rnPick === 0 && S.revPick === 0) continue;
-      rows.push({
-        seg: S.seg,
-        ra: { rn: S.rnA, rev: S.revA },
-        rb: { rn: S.rnB, rev: S.revB },
-        rnDelta: S.rnPick,
-        revDelta: S.revPick,
-        raAbsent: !S.matchedAny,
-      });
-    }
-    if (!rows.length && !newWindowWeek) continue;
-    segmentsByWeek.push({
-      wk,
-      meta: { start: Wm.start, end: Wm.end, weekKey: wk },
-      rows,
-      weekRn,
-      weekRev,
-      newWindowWeek,
-    });
-  }
-
-  STATE.pickupWeekBlocks = segmentsByWeek;
-  STATE.paceRows = paceData || [];
-
-  const { data: engineRows, error: engineError } = await supabaseClient
-    .from('engine_outputs')
-    .select('snapshot_date, engine_json, generated_at')
-    .eq('hotel_code', hotelCode)
-    .in('snapshot_date', [a, b])
-    .order('generated_at', { ascending: true })
-    .limit(10);
-
-  if (engineError) {
-    console.error('engine_outputs query error:', engineError);
-  }
-  console.log('engine_outputs rows returned:',
-    (engineRows || []).length,
-    'for dates:', [a, b]);
-
-  const engineBySnap = {};
-  for (const row of (engineRows || [])) {
-    let ej = {};
-    try {
-      ej = typeof row.engine_json === 'string'
-        ? JSON.parse(row.engine_json || '{}')
-        : (row.engine_json || {});
-    } catch (e) {
-      console.warn('engine_json parse error', e);
-    }
-    const sd = normDate(row.snapshot_date);
-    if (sd) engineBySnap[sd] = ej;
-  }
-
-  const ejA = engineBySnap[a] || {};
-  const ejB = engineBySnap[b] || {};
-
-  const signalsA = extractSignals(ejA);
-  const signalsB = extractSignals(ejB);
-
-  const keysA = new Set(signalsA.map(s => String(s.finding_key || '').trim()).filter(Boolean));
-  const keysB = new Set(signalsB.map(s => String(s.finding_key || '').trim()).filter(Boolean));
-
-  const newSignals = signalsB.filter(s =>
-    s.finding_key && !keysA.has(String(s.finding_key).trim()));
-  const persistingSignals = signalsB.filter(s =>
-    s.finding_key && keysA.has(String(s.finding_key).trim()));
-  const resolvedSignals = signalsA.filter(s =>
-    s.finding_key && !keysB.has(String(s.finding_key).trim()));
-
-  const mapSA = new Map();
-  for (const s of signalsA) {
-    const fk = String(s.finding_key || '').trim();
-    if (fk) mapSA.set(fk, s);
-  }
-  const mapSB = new Map();
-  for (const s of signalsB) {
-    const fk = String(s.finding_key || '').trim();
-    if (fk) mapSB.set(fk, s);
-  }
-  const accountabilityRows = [];
-  for (const fk of keysA) {
-    if (!keysB.has(fk)) continue;
-    const sa = mapSA.get(fk);
-    const sb = mapSB.get(fk);
-    if (!sa || !sb) continue;
-    const da = String(sa.decision || '').trim();
-    const db = String(sb.decision || '').trim();
-    if (!da && !db) continue;
-    accountabilityRows.push({
-      finding_key: fk,
-      card_type: sa.card_type || sb.card_type || '—',
-      decisionA: da,
-      decisionB: db,
-      outcome: da === db ? 'UNCHANGED' : 'UPDATED',
-      outcomeCls: da === db ? 'badge-unchanged' : 'badge-updated',
-    });
-  }
-  accountabilityRows.sort((x, y) => x.finding_key.localeCompare(y.finding_key));
-
-  STATE.signalPersistence = {
-    newList: dedupeSignalsByFindingKey(newSignals),
-    persistList: dedupeSignalsByFindingKey(persistingSignals),
-    resolvedList: dedupeSignalsByFindingKey(resolvedSignals),
-  };
-  STATE.accountabilityRows = accountabilityRows;
-  STATE.decisionRows = [];
-
-  renderPickup(hotelCode, a, b);
-  renderSignals(hotelCode, a, b);
-  renderAccountability(hotelCode, a, b);
-}
-
-function handleCompare() {
-  const errEl = document.getElementById('compare-error');
-  errEl.style.display = 'none';
-  const snapA = normDate(document.getElementById('sel-from').value);
-  const snapB = normDate(document.getElementById('sel-to').value);
-  if (snapA === snapB) {
-    errEl.textContent = 'Please select two different snapshot dates to compare.';
-    errEl.style.display = 'block';
-    return;
-  }
-  const hotelCode = localStorage.getItem('hotelCode') || '';
-  if (!hotelCode) {
-    errEl.textContent = 'Missing hotel code.';
-    errEl.style.display = 'block';
-    return;
-  }
-  runComparison(hotelCode, snapA, snapB).catch(e => {
-    console.error(e);
-    document.getElementById('pickup-body').innerHTML = `<p class="muted" style="color:var(--red)">${escHtml(e.message || e)}</p>`;
-    document.getElementById('signals-body').innerHTML = '';
-    document.getElementById('account-body').innerHTML = '';
-  });
-}
-
-function renderPickup(hotelCode, snapA, snapB) {
-  const segmentsByWeek = Array.isArray(STATE.pickupWeekBlocks) ? STATE.pickupWeekBlocks : [];
-  let totalRn = 0;
-  let totalRev = 0;
-  let gainW = 0;
-  let loseW = 0;
-  let flatW = 0;
-  for (const block of segmentsByWeek) {
-    totalRn += block.weekRn;
-    totalRev += block.weekRev;
-    if (block.weekRn > 0) gainW++;
-    else if (block.weekRn < 0) loseW++;
-    else flatW++;
-  }
-
-  const cap = 12;
-  const capped = !STATE.showAllWeeks && segmentsByWeek.length > cap;
-  const displayWeeks = capped ? segmentsByWeek.slice(0, cap) : segmentsByWeek;
-
-  let html = '';
-  html += `<div class="summary-bar">
-    <span><strong>Total pickup across all weeks:</strong> ${fmtDeltaRn(totalRn)} RN · ${fmtDeltaMoney(totalRev)} revenue</span>
-    <span><strong>Weeks gaining:</strong> ${gainW}</span>
-    <span><strong>Weeks losing:</strong> ${loseW}</span>
-    <span><strong>Weeks flat:</strong> ${flatW}</span>
-  </div>`;
-
-  if (!displayWeeks.length) {
-    html += '<p class="muted">No forward weeks with pickup movement for this comparison.</p>';
-    document.getElementById('pickup-body').innerHTML = html;
-    return;
-  }
-
-  html += '<div class="table-wrap"><table class="data-table"><thead><tr>';
-  html += '<th>Forward week</th><th>Segment</th>';
-  html += `<th>OTB ${escHtml(snapA)}</th><th>OTB ${escHtml(snapB)}</th><th>RN pickup</th><th>Rev pickup</th>`;
-  html += '</tr></thead><tbody>';
-
-  for (const block of displayWeeks) {
-    const { wk, meta, rows, weekRn, weekRev } = block;
-    const newWindowWeek = !!block.newWindowWeek;
-    const wkCls = newWindowWeek
-      ? 'week-sum-zero'
-      : (weekRn > 0 ? 'week-sum-pos' : weekRn < 0 ? 'week-sum-neg' : 'week-sum-zero');
-    const wl = weekLabel(wk, meta.start, meta.end);
-    const newWinSuffix = newWindowWeek ? ' (new window — not in prior snapshot)' : '';
-    html += `<tr class="week-summary${newWindowWeek ? ' week-summary-muted' : ''}"><td colspan="6" class="${wkCls}">${escHtml(wl)}${newWinSuffix} &nbsp;|&nbsp; Total: ${fmtDeltaRn(weekRn)} RN · ${fmtDeltaMoney(weekRev)}</td></tr>`;
-    for (const r of rows) {
-      html += '<tr>';
-      html += '<td></td>';
-      html += `<td>${escHtml(r.seg)}</td>`;
-      html += `<td class="num">${r.raAbsent ? '—' : fmtInt(r.ra.rn)}</td>`;
-      html += `<td class="num">${fmtInt(r.rb.rn)}</td>`;
-      html += `<td class="${deltaClass(r.rnDelta)}">${escHtml(fmtDeltaRn(r.rnDelta))}</td>`;
-      html += `<td class="${deltaClass(r.revDelta)}">${escHtml(fmtDeltaMoney(r.revDelta))}</td>`;
-      html += '</tr>';
-    }
-  }
-  html += '</tbody></table></div>';
-  if (capped) {
-    html += `<a class="show-all-link" role="button" tabindex="0" onclick="STATE.showAllWeeks=true; renderPickup(localStorage.getItem('hotelCode'), STATE.lastSnapA, STATE.lastSnapB)">Show all weeks</a>`;
-  }
-  document.getElementById('pickup-body').innerHTML = html;
-}
-
-function decisionMapForSnapshot(rows, snap) {
-  const d = normDate(snap);
-  const m = new Map();
-  for (const r of rows) {
-    if (normDate(r.snapshot_date) !== d) continue;
-    const fk = r.finding_key != null ? String(r.finding_key).trim() : '';
-    if (!fk) continue;
-    m.set(fk, r);
-  }
-  return m;
-}
-
-function renderSignals(hotelCode, snapA, snapB) {
-  const sp = STATE.signalPersistence;
-  const emptyMsg = '<p class="muted">No signals tracked for this period.</p>';
-  if (!sp) {
-    document.getElementById('signals-body').innerHTML = emptyMsg;
-    return;
-  }
-  const news = sp.newList || [];
-  const persisting = sp.persistList || [];
-  const resolved = sp.resolvedList || [];
-  if (!news.length && !persisting.length && !resolved.length) {
-    document.getElementById('signals-body').innerHTML = emptyMsg;
-    return;
-  }
-
-  function card(cls, label, s) {
-    const fk = s.finding_key || '';
-    const summary = s.decision || '—';
-    return `<div class="signal-card ${cls}">
-      <div class="priority-stripe"></div>
-      <div class="signal-body">
-        <div class="signal-label">${escHtml(label)}</div>
-        <div class="signal-key">${escHtml(fk)}</div>
-        <div class="signal-meta"><strong>Type:</strong> ${escHtml(s.card_type || '—')}</div>
-        <div class="signal-meta">${escHtml(summary)}</div>
-      </div>
-    </div>`;
-  }
-
-  let html = '';
-
-  html += '<div class="signal-block"><h4>New signals</h4>';
-  if (!news.length) html += '<p class="muted">None</p>';
-  else {
-    for (const s of news) {
-      html += card('signal-new', 'NEW THIS WEEK', s);
-    }
-  }
-  html += '</div>';
-
-  html += '<div class="signal-block"><h4>Persisting signals</h4>';
-  if (!persisting.length) html += '<p class="muted">None</p>';
-  else {
-    for (const s of persisting) {
-      html += card('signal-persist', 'PERSISTING', s);
-    }
-  }
-  html += '</div>';
-
-  html += '<div class="signal-block"><h4>Resolved signals</h4>';
-  if (!resolved.length) html += '<p class="muted">None</p>';
-  else {
-    for (const s of resolved) {
-      html += card('signal-resolved', 'RESOLVED', s);
-    }
-  }
-  html += '</div>';
-
-  document.getElementById('signals-body').innerHTML = html;
-}
-
-function renderAccountability(hotelCode, snapA, snapB) {
-  const rows = STATE.accountabilityRows;
-  if (!(rows || []).length) {
-    document.getElementById('account-body').innerHTML = '<p class="muted">No signals tracked for this period.</p>';
-    return;
-  }
-
-  let html = '<div class="table-wrap"><table class="data-table"><thead><tr>';
-  html += `<th>Signal</th><th>Card type</th><th>Decision (${escHtml(snapA)})</th><th>Decision (${escHtml(snapB)})</th><th>Outcome</th>`;
-  html += '</tr></thead><tbody>';
-
-  for (const r of rows) {
-    html += `<tr>
-      <td>${escHtml(r.finding_key)}</td>
-      <td>${escHtml(r.card_type)}</td>
-      <td class="account-decision-cell">${escHtml(r.decisionA || '—')}</td>
-      <td class="account-decision-cell">${escHtml(r.decisionB || '—')}</td>
-      <td><span class="badge-outcome ${r.outcomeCls}">${escHtml(r.outcome)}</span></td>
-    </tr>`;
-  }
-  html += '</tbody></table></div>';
-  document.getElementById('account-body').innerHTML = html;
-}
-
-function showLogin() {
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app-screen').style.display = 'none';
-}
-function showApp(email) {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'block';
-  document.getElementById('user-email').textContent = email || '';
-}
-
-async function handleLogin(e) {
-  e.preventDefault();
-  const btn = document.getElementById('login-btn');
-  const email = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
-  const errorEl = document.getElementById('login-error');
-  btn.textContent = 'Signing in...';
-  btn.disabled = true;
-  errorEl.style.display = 'none';
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) {
-    errorEl.textContent = 'Incorrect email or password. Please try again.';
-    errorEl.style.display = 'block';
-    btn.textContent = 'Sign In';
-    btn.disabled = false;
-    return;
-  }
-  const hotelCode =
-    data.session.user.user_metadata?.hotel ||
-    localStorage.getItem('hotelCode') ||
-    '';
-  if (hotelCode) localStorage.setItem('hotelCode', hotelCode);
-
-  const hotelNameEl = document.getElementById('hotel-name');
-  if (hotelNameEl) hotelNameEl.textContent = hotelCode || 'Hotel';
-
-  showApp(data.session.user.email);
-  btn.textContent = 'Sign In';
-  btn.disabled = false;
-  try {
-    await loadSnapshots(hotelCode);
-  } catch (err) {
-    console.error(err);
-    document.getElementById('pickup-body').innerHTML = `<p style="color:var(--red)">${escHtml(err.message || err)}</p>`;
-  }
-}
-
-async function logout() {
-  await supabaseClient.auth.signOut();
-  localStorage.removeItem('hotelCode');
-  showLogin();
-}
-
-(async () => {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) {
-    // Read hotel code from session metadata first, fall back to localStorage.
-    // index.html writes user_metadata.hotel into localStorage as 'hotelCode'.
-    // weekly.html must use the same source of truth.
-    const hotelCode =
-      session.user.user_metadata?.hotel ||
-      localStorage.getItem('hotelCode') ||
-      '';
-    // Always keep localStorage in sync so other pages can read it too.
-    if (hotelCode) localStorage.setItem('hotelCode', hotelCode);
-
-    // Update the hotel name display in the sidebar
-    const hotelNameEl = document.getElementById('hotel-name');
-    if (hotelNameEl) hotelNameEl.textContent = hotelCode || 'Hotel';
-
-    showApp(session.user.email);
-    loadSnapshots(hotelCode);
+function paceStatusBadge(gapB, gapA, pctB, pctA) {
+  const useRn = gapB != null && gapA != null;
+  let d;
+  if (useRn) d = gapB - gapA;
+  else if (pctB != null && pctA != null) d = pctB - pctA;
+  else return { text: 'Stable', cls: 'badge-stable' };
+  if (Math.abs(d) < 0.51) return { text: 'Stable', cls: 'badge-stable' };
+  /** Positive gapRn = shortfall; decrease = closing */
+  if (useRn) {
+    if (d < 0) return { text: 'Closing', cls: 'badge-closing' };
+    if (d > 0) return { text: 'Widening', cls: 'badge-widening' };
   } else {
-    showLogin();
+    if (d > 0) return { text: 'Closing', cls: 'badge-closing' };
+    if (d < 0) return { text: 'Widening', cls: 'badge-widening' };
   }
-})();
+  return { text: 'Stable', cls: 'badge-stable' };
+}
+
+function segmentKey(card) {
+  return String(card.display_name || card.segment || card.primary_segment || '').trim() || '—';
+}
+
+function segmentStatus(card) {
+  return String(card.scenario_type || card.scenario || card.issue_family || '').trim() || '';
+}
+
+function scenarioRank(s) {
+  const u = s.toUpperCase();
+  if (/S7|CRITICAL|DANGER/.test(u)) return 6;
+  if (/S6|S5/.test(u)) return 5;
+  if (/S4/.test(u)) return 4;
+  if (/PACE|TIMING|MISREAD/.test(u)) return 3;
+  if (/S[12]|NOISE/.test(u)) return 2;
+  if (/OPPORTUNITY|OPP/i.test(u)) return 1;
+  return u ? 2 : 0;
+}
+
+function segmentChange(aStatus, bStatus) {
+  const A = (aStatus || '').trim();
+  const B = (bStatus || '').trim();
+  const aHas = !!A;
+  const bHas = !!B;
+  if (!aHas && bHas) return 'New issue';
+  if (aHas && !bHas) return 'Resolved';
+  if (A === B) return 'Unchanged';
+  if (scenarioRank(B) > scenarioRank(A)) return 'Escalated';
+  if (scenarioRank(B) < scenarioRank(A)) return 'Resolved';
+  return 'Escalated';
+}
+
+function allAccountsAtRisk(engineJson) {
+  const issues = Array.isArray(engineJson?.corporate_account_pace_issues)
+    ? engineJson.corporate_account_pace_issues : [];
+  const accounts = [];
+  for (const c of issues) {
+    if (Array.isArray(c.accounts_at_risk)) accounts.push(...c.accounts_at_risk);
+  }
+  return accounts;
+}
+
+function accountCompanyKey(a) {
+  return String(a.company_name || a.account_name || a.name || '').trim().toLowerCase();
+}
+
+function collectSegmentDecisions(ej) {
+  const cards = Array.isArray(ej?.segment_issue_cards) ? ej.segment_issue_cards : [];
+  return cards.map(c => ({
+    finding_key: String(c.finding_key || '').trim(),
+    line: String(c.enforced_decision_line || c.decision || '').trim()
+  })).filter(x => x.finding_key && x.line);
+}
+
+function collectCausalDecision(ej) {
+  const cc = ej?.cross_segment_synthesis?.causal_chain_card;
+  if (!cc || typeof cc !== 'object') return null;
+  const line = String(cc.enforced_decision_line || cc.decision || '').trim();
+  const fk = String(cc.finding_key || 'causal_chain_card').trim();
+  if (!line) return null;
+  return { finding_key: fk, line };
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-state');
+  document.getElementById('error-msg').textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-state').style.display = 'none';
+}
+
+function setLoading(on) {
+  document.getElementById('loading-state').style.display = on ? 'block' : 'none';
+}
+
+function formatSnapLabel(row) {
+  const d = row.snapshot_date || '';
+  const p = row.period_label ? ` · ${row.period_label}` : '';
+  return `${d}${p}`;
+}
+
+async function loadSnapshots() {
+  setLoading(true);
+  hideError();
+  const { data, error } = await supabaseClient
+    .from('engine_outputs')
+    .select('id, snapshot_date, period_label, engine_json')
+    .eq('hotel_code', HOTEL_CODE)
+    .not('snapshot_date', 'is', null)
+    .order('snapshot_date', { ascending: false });
+
+  if (error) {
+    setLoading(false);
+    showError(error.message || 'Could not load engine_outputs.');
+    return;
+  }
+
+  snapshotRows = uniqueBy(data || [], r => r.snapshot_date);
+  const selA = document.getElementById('snap-a');
+  const selB = document.getElementById('snap-b');
+  selA.innerHTML = '';
+  selB.innerHTML = '';
+  for (const row of snapshotRows) {
+    const lab = escHtml(formatSnapLabel(row));
+    const v = escHtml(row.snapshot_date);
+    selA.insertAdjacentHTML('beforeend', `<option value="${v}">${lab}</option>`);
+    selB.insertAdjacentHTML('beforeend', `<option value="${v}">${lab}</option>`);
+  }
+
+  if (snapshotRows.length >= 2) {
+    selB.value = snapshotRows[0].snapshot_date;
+    selA.value = snapshotRows[1].snapshot_date;
+  } else if (snapshotRows.length === 1) {
+    selB.value = snapshotRows[0].snapshot_date;
+    selA.value = snapshotRows[0].snapshot_date;
+  }
+
+  setLoading(false);
+  if (snapshotRows.length >= 2) {
+    document.getElementById('weekly-app').style.display = 'block';
+    runCompare();
+  } else {
+    document.getElementById('weekly-app').style.display = 'none';
+    if (snapshotRows.length === 1) {
+      showError('Only one snapshot exists — add another weekly engine run to compare.');
+    } else {
+      showError('No engine_outputs rows found for this hotel.');
+    }
+  }
+}
+
+function rowByDate(dateStr) {
+  return snapshotRows.find(r => r.snapshot_date === dateStr) || null;
+}
+
+function runCompare() {
+  hideError();
+  let dateA = document.getElementById('snap-a').value;
+  let dateB = document.getElementById('snap-b').value;
+  if (!dateA || !dateB) {
+    showError('Select two snapshots.');
+    return;
+  }
+  if (new Date(dateA) > new Date(dateB)) {
+    const t = dateA; dateA = dateB; dateB = t;
+    document.getElementById('snap-a').value = dateA;
+    document.getElementById('snap-b').value = dateB;
+  }
+
+  const rowA = rowByDate(dateA);
+  const rowB = rowByDate(dateB);
+  if (!rowA || !rowB) {
+    showError('Selected snapshot not found in loaded rows.');
+    return;
+  }
+
+  const ejA = unwrapEngineJson(rowA.engine_json);
+  const ejB = unwrapEngineJson(rowB.engine_json);
+
+  renderMovementStrip(ejA, ejB, dateA, dateB);
+  renderPaceSection(ejA, ejB, dateA, dateB);
+  renderSegmentSection(ejA, ejB);
+  renderCorporateSection(ejA, ejB);
+  renderDecisionsSection(ejA, ejB, dateA, dateB);
+}
+
+function renderMovementStrip(ejA, ejB, dateA, dateB) {
+  const strip = document.getElementById('movement-strip');
+  const mA = extractMpiAriRgi(ejA);
+  const mB = extractMpiAriRgi(ejB);
+  const rnA = totalRnOtbTy(ejA);
+  const rnB = totalRnOtbTy(ejB);
+
+  const cells = [
+    { label: 'MPI', valB: mB.mpi, a: mA.mpi, higherBetter: true },
+    { label: 'ARI', valB: mB.ari, a: mA.ari, higherBetter: true },
+    { label: 'RGI', valB: mB.rgi, a: mA.rgi, higherBetter: true },
+    { label: 'Total RN OTB', valB: rnB, a: rnA, higherBetter: true }
+  ];
+
+  strip.innerHTML = cells.map(c => {
+    const mov = movementArrowDelta(c.a, c.valB, c.higherBetter);
+    const valDisp = c.label === 'Total RN OTB'
+      ? (c.valB == null ? '—' : Math.round(c.valB).toLocaleString('en-GB'))
+      : formatKpiDisplay(c.valB);
+    return `<div class="kpi-cell">
+      <div class="kpi-label">${escHtml(c.label)}</div>
+      <div class="kpi-value">${escHtml(valDisp)}</div>
+      <div class="kpi-sub"><span class="mov-arrow ${mov.cls}">${mov.arrow}</span><span class="${mov.cls}"> ${escHtml(mov.deltaStr)}</span> vs ${escHtml(dateA)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPaceSection(ejA, ejB, dateA, dateB) {
+  const pA = forwardByThreeWindows(ejA);
+  const pB = forwardByThreeWindows(ejB);
+  const rows = [];
+  for (let i = 0; i < 3; i++) {
+    const b = pB[i];
+    const a = pA[i];
+    const gB = b.metrics?.gapRn;
+    const gA = a.metrics?.gapRn;
+    const pctB = b.metrics?.gapPct;
+    const pctA = a.metrics?.gapPct;
+    const mov = gB != null && gA != null
+      ? movementArrowDelta(gA, gB, false)
+      : (pctB != null && pctA != null ? movementArrowDelta(pctA, pctB, true) : { arrow: '→', cls: 'mov-flat', deltaStr: '—', stable: true });
+    const badge = paceStatusBadge(gB, gA, pctB, pctA);
+    const fmtRn = v => v == null ? '—' : `${Math.round(v).toLocaleString('en-GB')} RN`;
+    rows.push(`<tr>
+      <td><strong>${escHtml(b.label)}</strong></td>
+      <td>${escHtml(fmtRn(gB))}${pctB != null ? `<div class="nc-text" style="font-size:11px;color:var(--gray-500);">${escHtml(Number(pctB).toFixed(1))}% gap</div>` : ''}</td>
+      <td>${escHtml(fmtRn(gA))}${pctA != null ? `<div class="nc-text" style="font-size:11px;color:var(--gray-500);">${escHtml(Number(pctA).toFixed(1))}% gap</div>` : ''}</td>
+      <td><span class="mov-arrow ${mov.cls}">${mov.arrow}</span>${escHtml(mov.deltaStr)}</td>
+      <td><span class="badge ${badge.cls}">${escHtml(badge.text)}</span></td>
+    </tr>`);
+  }
+
+  const html = `
+  <div class="nc-card">
+    <div class="nc-header">
+      <div class="nc-title">Forward windows — ${escHtml(dateB)} vs ${escHtml(dateA)}</div>
+    </div>
+    <div class="nc-body">
+      <div class="nc-section" style="border:none;padding-top:4px;">
+        <table class="wk-table">
+          <thead><tr>
+            <th>Window</th>
+            <th>Gap (B) RN</th>
+            <th>Gap (A) RN</th>
+            <th>Movement</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+        <p class="nc-text" style="margin-top:8px;font-size:11px;color:var(--gray-500);">Gap RN = reference − OTB (TY) when both exist; otherwise pace gap % is shown under the cell.</p>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('pace-section').innerHTML = html;
+}
+
+function renderSegmentSection(ejA, ejB) {
+  const cardsA = Array.isArray(ejA?.segment_issue_cards) ? ejA.segment_issue_cards : [];
+  const cardsB = Array.isArray(ejB?.segment_issue_cards) ? ejB.segment_issue_cards : [];
+  const mapA = new Map();
+  for (const c of cardsA) mapA.set(segmentKey(c), segmentStatus(c));
+  const mapB = new Map();
+  for (const c of cardsB) mapB.set(segmentKey(c), segmentStatus(c));
+  const keys = new Set([...mapA.keys(), ...mapB.keys()]);
+  const bodyRows = [];
+  for (const seg of keys) {
+    if (seg === '—' && !mapA.get(seg) && !mapB.get(seg)) continue;
+    const sa = mapA.get(seg) || '';
+    const sb = mapB.get(seg) || '';
+    const ch = segmentChange(sa, sb);
+    const bHasIssue = !!sb;
+    const changed = sa !== sb;
+    if (!changed && !bHasIssue) continue;
+    bodyRows.push(`<tr>
+      <td>${escHtml(seg)}</td>
+      <td>${escHtml(sa || '—')}</td>
+      <td>${escHtml(sb || '—')}</td>
+      <td>${escHtml(ch)}</td>
+    </tr>`);
+  }
+
+  const empty = !bodyRows.length
+    ? '<div class="nc-card"><div class="nc-body"><p class="nc-text">No segment signal changes for this pair.</p></div></div>'
+    : `<div class="nc-card"><div class="nc-header"><div class="nc-title">Scenario type movement</div></div>
+      <div class="nc-body"><div class="nc-section" style="border:none;">
+        <table class="wk-table"><thead><tr>
+          <th>Segment</th><th>Status A</th><th>Status B</th><th>Change</th>
+        </tr></thead><tbody>${bodyRows.join('')}</tbody></table>
+      </div></div></div>`;
+  document.getElementById('segment-section').innerHTML = empty;
+}
+
+function renderCorporateSection(ejA, ejB) {
+  const accA = allAccountsAtRisk(ejA);
+  const accB = allAccountsAtRisk(ejB);
+  const mapA = new Map();
+  for (const a of accA) {
+    const k = accountCompanyKey(a);
+    if (!k) continue;
+    mapA.set(k, a);
+  }
+  const mapB = new Map();
+  for (const a of accB) {
+    const k = accountCompanyKey(a);
+    if (!k) continue;
+    mapB.set(k, a);
+  }
+
+  const newRisk = [];
+  for (const [k, b] of mapB) {
+    if (!mapA.has(k)) newRisk.push({ a: null, b });
+  }
+
+  const worsened = [];
+  const recovered = [];
+  for (const [k, a] of mapA) {
+    const b = mapB.get(k);
+    if (!b) {
+      recovered.push({ a, b: null, kind: 'off_list' });
+      continue;
+    }
+    const va = num(a.variance_rn);
+    const vb = num(b.variance_rn);
+    if (va == null || vb == null) continue;
+    if (vb < va) worsened.push({ a, b });
+    else if (vb > va) recovered.push({ a, b, kind: 'improved' });
+  }
+
+  function rowHtml(x) {
+    const a = x.a;
+    const b = x.b;
+    const name = escHtml((b || a).company_name || '—');
+    const mgr = escHtml((b || a).account_manager || '—');
+    const va = a ? num(a.variance_rn) : null;
+    const vb = b ? num(b.variance_rn) : null;
+    const fmt = v => v == null ? '—' : `${Math.round(v)} RN`;
+    let mov = '—';
+    if (x.kind === 'off_list') {
+      mov = '<span class="mov-up">▲ Off at-risk list</span>';
+    } else if (va != null && vb != null) {
+      const m = movementArrowDelta(va, vb, true);
+      mov = `<span class="${m.cls}">${m.arrow} ${escHtml(m.deltaStr)}</span>`;
+    }
+    return `<tr><td>${name}</td><td>${mgr}</td><td>${escHtml(fmt(va))}</td><td>${escHtml(fmt(vb))}</td><td>${mov}</td></tr>`;
+  }
+
+  const block = (title, rows, emptyMsg) => {
+    if (!rows.length) {
+      return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div><p class="nc-text">${escHtml(emptyMsg)}</p></div>`;
+    }
+    return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div>
+      <table class="wk-table"><thead><tr>
+        <th>Company</th><th>Account mgr</th><th>Var A</th><th>Var B</th><th>Movement</th>
+      </tr></thead><tbody>${rows.map(rowHtml).join('')}</tbody></table></div>`;
+  };
+
+  const html = `
+  <div class="nc-card">
+    <div class="nc-header"><div class="nc-title">Corporate pace — at-risk accounts</div></div>
+    <div class="nc-body">
+      ${block('New at-risk this week', newRisk, 'None.')}
+      ${block('Worsened', worsened, 'None.')}
+      ${block('Recovered / improved', recovered, 'None.')}
+    </div>
+  </div>`;
+  document.getElementById('corporate-section').innerHTML = html;
+}
+
+function renderDecisionsSection(ejA, ejB, dateA, dateB) {
+  const decB = [...collectSegmentDecisions(ejB)];
+  const causalB = collectCausalDecision(ejB);
+  if (causalB) decB.push(causalB);
+
+  const mapA = new Map(collectSegmentDecisions(ejA).map(d => [d.finding_key, d.line]));
+  const causalA = collectCausalDecision(ejA);
+  if (causalA) mapA.set(causalA.finding_key, causalA.line);
+
+  const open = [];
+  const seenFk = new Set();
+  for (const d of decB) {
+    if (!mapA.has(d.finding_key) || !d.line) continue;
+    if (seenFk.has(d.finding_key)) continue;
+    seenFk.add(d.finding_key);
+    open.push({ fk: d.finding_key, text: d.line });
+  }
+
+  if (!open.length) {
+    document.getElementById('decisions-section').innerHTML =
+      '<div class="nc-card"><div class="nc-body"><p class="nc-text">No enforced decisions carried over with the same finding key between snapshots.</p></div></div>';
+    return;
+  }
+
+  const rows = open.map(o => `<tr>
+    <td>${escHtml(o.text)}</td>
+    <td>${escHtml(dateA)}</td>
+    <td><span class="still-open">Still open</span></td>
+  </tr>`).join('');
+
+  document.getElementById('decisions-section').innerHTML = `
+  <div class="nc-card">
+    <div class="nc-header"><div class="nc-title">Open decisions (${escHtml(dateB)})</div></div>
+    <div class="nc-body">
+      <div class="nc-section" style="border:none;">
+        <p class="nc-text" style="margin-bottom:10px;">Same finding in snapshot A with a decision line still present in B.</p>
+        <table class="wk-table"><thead><tr>
+          <th>Decision</th><th>First seen (A)</th><th></th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('btn-compare').addEventListener('click', () => {
+  hideError();
+  runCompare();
+});
+
+loadSnapshots();
 </script>
 </body>
 </html>
