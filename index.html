@@ -2772,40 +2772,6 @@ function buildCommercialVerdictBlockHtml(cv) {
   if (!cv || typeof cv !== 'object') return '';
   const verdictText = (cv.verdict_text != null ? String(cv.verdict_text) : '').trim();
   if (!verdictText) return '';
-  const engineJson = currentEngineJson || {};
-  const start = engineJson?.period_meta?.period_start
-    || engineJson?.workbook_ingestion?.period_start;
-  const end = engineJson?.period_meta?.period_end
-    || engineJson?.workbook_ingestion?.period_end;
-  const periodLabel = start && end
-    ? formatShortDateRange(start, end) + ' avg'
-    : 'YTD avg';
-
-  const rawHeadlines = Array.isArray(cv.headline_numbers) ? cv.headline_numbers : [];
-  const headlines = rawHeadlines.slice(0, 4);
-  while (headlines.length < 4) headlines.push(null);
-
-  const headlineCells = headlines.map(h => {
-    if (!h || typeof h !== 'object') {
-      return `<div style="flex:1;min-width:0;text-align:center;padding:0 6px;">
-        <div style="font-size:18px;font-weight:500;color:var(--gray-600);">—</div>
-        <div class="vn-lbl">—</div>
-        <div class="vn-period">${escHtml(periodLabel)}</div>
-      </div>`;
-    }
-    const val = h.value != null && String(h.value).trim() !== ''
-      ? parseFloat(String(h.value).replace(/,/g, '')).toFixed(1)
-      : '—';
-    const lab = h.label != null ? String(h.label) : '—';
-    const dir = String(h.direction || '').toLowerCase();
-    const valColor = dir === 'negative' ? 'var(--red)'
-      : dir === 'positive' ? 'var(--green)' : 'var(--navy)';
-    return `<div style="flex:1;min-width:0;text-align:center;padding:0 6px;">
-      <div style="font-size:18px;font-weight:500;color:${valColor};">${escHtml(val)}</div>
-      <div class="vn-lbl">${escHtml(lab)}</div>
-      <div class="vn-period">${escHtml(periodLabel)}</div>
-    </div>`;
-  }).join('');
 
   const primaryDecisionRaw = (cv.primary_decision != null ? String(cv.primary_decision) : '').trim();
   const primaryDecision = applyVerdictPrimaryDecisionRoleMap(primaryDecisionRaw);
@@ -2816,7 +2782,6 @@ function buildCommercialVerdictBlockHtml(cv) {
   return `<div class="commercial-verdict-block" style="margin-bottom:16px;padding:16px 18px 18px 20px;background:var(--white);border:1px solid var(--gray-200);border-radius:10px;border-left:3px solid #D85A30;">
     <div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gray-400);font-weight:600;margin-bottom:8px;">COMMERCIAL VERDICT</div>
     <div style="font-size:14px;line-height:1.7;color:var(--gray-900);">${escHtml(verdictText)}</div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-200);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;">${headlineCells}</div>
     ${decisionBlock}
   </div>`;
 }
