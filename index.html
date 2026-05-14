@@ -6187,7 +6187,8 @@ function renderCorporatePaceOpportunityIssueCard(card, snapshotDate, oppIndex) {
   const top3 = accounts.slice(0, 3);
 
   const facts = top3.map(a => {
-    const name = a.account_name || a.name || '—';
+    // WHY: Engine outputs company_name, not account_name or name.
+    const name = a.company_name || a.account_name || a.name || '—';
     const vari = fiSafeNum(a.variance_rn ?? a.variance ?? a.rn_variance);
     const mgr = a.account_manager || a.manager || '';
     return `${name}${vari != null ? ` — +${Math.round(Math.abs(vari))} RN ahead` : ''}${mgr ? ` (${mgr})` : ''}`;
