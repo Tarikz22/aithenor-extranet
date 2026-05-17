@@ -6585,7 +6585,7 @@ function renderFindings() {
           const strInsert = `
             <div class="nc-section">
               <div class="nc-label">STR validation</div>
-              <div class="nc-text">${escHtml(sv.interpretation)}</div>
+              <div class="nc-text">${escHtml(sanitiseSegmentNames(sv.interpretation))}</div>
             </div>`;
           html = html.replace(
             /(<div class="nc-section">\s*<div class="nc-label">Impact<\/div>)/,
@@ -6749,7 +6749,7 @@ function renderFindings() {
         ${mpi !== null ? `<div class="nc-str-metric"><div class="nc-str-metric-val ${mpiClass}">${mpi}</div><div class="nc-str-metric-lbl">MPI</div></div>` : ''}
         ${ari !== null ? `<div class="nc-str-metric"><div class="nc-str-metric-val ${ariClass}">${ari}</div><div class="nc-str-metric-lbl">ARI</div></div>` : ''}
         ${rgi !== null ? `<div class="nc-str-metric"><div class="nc-str-metric-val ${rgiClass}">${rgi}</div><div class="nc-str-metric-lbl">RGI</div></div>` : ''}
-        ${interp ? `<div class="nc-str-interpretation">${escHtml(interp)}</div>` : ''}
+        ${interp ? `<div class="nc-str-interpretation">${escHtml(sanitiseSegmentNames(interp))}</div>` : ''}
       </div>
     </div>`;
 
