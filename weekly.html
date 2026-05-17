@@ -989,8 +989,59 @@ function renderGroupsSection(ejA, ejB) {
     return map;
   }
 
+  function grpRow(label, grp, note) {
+    const rn = grp.room_nights != null ? Math.round(grp.room_nights) + ' RN' : '—';
+    const rev = grp.room_revenue != null
+      ? '€' + Math.round(grp.room_revenue).toLocaleString('en-GB') : '—';
+    const arr = grp.arrival_date || '—';
+    const owner = grp.owner || grp.sales_manager || '—';
+    const status = grp.status || '—';
+    // WHY: group_name is the correct field — _name is the normalized copy
+    return `<tr>
+      <td><strong>${escHtml(grp._name || grp.group_name || '—')}</strong></td>
+      <td>${escHtml(rn)} / ${escHtml(rev)}</td>
+      <td>${escHtml(arr)}</td>
+      <td>${escHtml(owner)}</td>
+      <td>${escHtml(note || status)}</td>
+    </tr>`;
+  }
+
   const gA = extractGroups(ejA);
   const gB = extractGroups(ejB);
+
+  // WHY: If snapshot A has no group data (group_pipeline_issues empty
+  // because forecast gap issues didn't fire), show B groups as baseline
+  // with a note that A had no data — rather than all None.
+  const noDataA = gA.size === 0;
+  const noDataB = gB.size === 0;
+
+  if (noDataB) {
+    document.getElementById('groups-section').innerHTML =
+      '<div class="nc-card"><div class="nc-body"><p class="nc-text">No group pipeline data in snapshot B.</p></div></div>';
+    return;
+  }
+
+  // If A has no data, show all B groups as "current pipeline" baseline
+  if (noDataA) {
+    const baselineRows = [...gB.values()]
+      .map(g => grpRow('', g, g.status || '—'))
+      .join('');
+    document.getElementById('groups-section').innerHTML = `
+    <div class="nc-card">
+      <div class="nc-header"><div class="nc-title">Group pipeline — current snapshot only</div></div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <p class="nc-text" style="margin-bottom:8px;font-size:12px;color:var(--gray-500);">
+            No group pipeline data in snapshot A — showing current snapshot B as baseline.
+          </p>
+          <table class="wk-table"><thead><tr>
+            <th>Group</th><th>RN / Revenue</th><th>Arrival</th><th>Owner</th><th>Status</th>
+          </tr></thead><tbody>${baselineRows}</tbody></table>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
 
   const converted = [];
   const turnedDown = [];
@@ -1022,36 +1073,12 @@ function renderGroupsSection(ejA, ejB) {
     if (!gA.has(key)) newTentative.push({ grp: grpB });
   }
 
-  function grpRow(label, grp, note) {
-    const rn = grp.room_nights != null ? Math.round(grp.room_nights) + ' RN' : '—';
-    const rev = grp.room_revenue != null
-      ? '€' + Math.round(grp.room_revenue).toLocaleString('en-GB') : '—';
-    const arr = grp.arrival_date || '—';
-    const owner = grp.owner || grp.sales_manager || '—';
-    const status = grp.status || '—';
-    // WHY: group_name is the correct field — _name is the normalized copy
-    return `<tr>
-      <td><strong>${escHtml(grp._name || grp.group_name || '—')}</strong></td>
-      <td>${escHtml(rn)} / ${escHtml(rev)}</td>
-      <td>${escHtml(arr)}</td>
-      <td>${escHtml(owner)}</td>
-      <td>${escHtml(note || status)}</td>
-    </tr>`;
-  }
-
   function block(title, rows, emptyMsg) {
     if (!rows.length) return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div><p class="nc-text">${escHtml(emptyMsg)}</p></div>`;
     return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div>
       <table class="wk-table"><thead><tr>
         <th>Group</th><th>RN / Revenue</th><th>Arrival</th><th>Owner</th><th>Status / Note</th>
       </tr></thead><tbody>${rows}</tbody></table></div>`;
-  }
-
-  const noData = !gA.size && !gB.size;
-  if (noData) {
-    document.getElementById('groups-section').innerHTML =
-      '<div class="nc-card"><div class="nc-body"><p class="nc-text">No group pipeline data in either snapshot.</p></div></div>';
-    return;
   }
 
   document.getElementById('groups-section').innerHTML = `
