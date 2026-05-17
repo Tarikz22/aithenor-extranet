@@ -1,1 +1,2457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Cost & GOP Diagnostic (Demo)</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --navy-light: #243F72;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --gold-pale: #FBF6EA;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --red: #C0392B;
+  --red-light: #FDECEA;
+  --orange: #D35400;
+  --orange-light: #FEF0E7;
+  --amber: #B8860B;
+  --amber-light: #FEF9E7;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+  --sidebar-w: 260px;
+}
 
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--gray-900);
+  min-height: 100vh;
+}
+
+/* ── SIDEBAR ──────────────────────────────────────────── */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--navy);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  border-right: 1px solid rgba(201,168,76,0.15);
+}
+
+.sidebar-logo {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.logo-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.logo-sub {
+  font-size: 9px;
+  color: var(--gold);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.hotel-card {
+  margin: 16px 14px;
+  background: rgba(201,168,76,0.08);
+  border: 1px solid rgba(201,168,76,0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.hotel-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.hotel-meta {
+  font-size: 10px;
+  color: var(--gold);
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+.nav-section {
+  padding: 12px 20px 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.25);
+  font-weight: 600;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+}
+
+.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 20px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.sidebar-bottom {
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+}
+
+.sync-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── MAIN ─────────────────────────────────────────────── */
+.main { margin-left: var(--sidebar-w); min-height: 100vh; }
+
+.topbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-200);
+  padding: 0 32px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+
+.topbar-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--navy);
+  letter-spacing: 0.3px;
+}
+
+.period-select {
+  background: var(--navy);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.refresh-btn {
+  background: transparent;
+  border: 1px solid var(--gray-200);
+  color: var(--gray-600);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.refresh-btn:hover { border-color: var(--navy); color: var(--navy); }
+
+.upload-btn {
+  background: var(--gold);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 18px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s;
+}
+
+.upload-btn:hover { background: var(--gold-light); }
+
+/* ── CONTENT ──────────────────────────────────────────── */
+.content { padding: 28px 32px; }
+
+/* ── LOADING STATE ────────────────────────────────────── */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  font-size: 14px;
+  color: var(--gray-400);
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+}
+
+/* ── ERROR STATE ──────────────────────────────────────── */
+.error-state {
+  background: var(--red-light);
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  padding: 20px 24px;
+  display: none;
+  margin-bottom: 24px;
+}
+
+.error-state p { font-size: 13px; color: var(--red); }
+
+/* ── VALUE BANNER ─────────────────────────────────────── */
+.gop-banner {
+  background: var(--navy);
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gop-banner::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.gop-stat { padding: 0 24px; }
+.gop-stat:first-child { padding-left: 0; }
+.gop-stat:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.08); }
+
+.gop-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.gop-value {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--gold);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.gop-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+}
+
+/* ── PROGRESS BAR ─────────────────────────────────────── */
+.progress-section {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progress-label { font-size: 12px; color: var(--gray-600); min-width: 180px; }
+.progress-track { flex: 1; height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width 1s ease; width: 0%; }
+.progress-pct { font-size: 12px; font-weight: 600; color: var(--navy); min-width: 40px; text-align: right; }
+
+/* ── TABS ─────────────────────────────────────────────── */
+.tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--gray-200);
+  padding-bottom: 0;
+}
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.summary-pill {
+  background: linear-gradient(135deg, rgba(15,31,61,0.97) 0%, rgba(27,58,107,0.94) 100%);
+  border: 1px solid rgba(201,168,76,0.22);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.summary-label {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 6px;
+}
+.summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold-light);
+  line-height: 1.3;
+}
+
+.tab {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-400);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--navy); }
+.tab.active { color: var(--navy); border-bottom-color: var(--gold); }
+.tab-count {
+  display: inline-block;
+  background: var(--gray-200);
+  color: var(--gray-600);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 5px;
+}
+.tab.active .tab-count { background: var(--gold-pale); color: var(--amber); }
+
+/* ── FINDINGS ─────────────────────────────────────────── */
+.findings-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.findings-groups-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 24px 24px;
+}
+
+.findings-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.column-header {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  padding: 0 0 10px 0;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 4px;
+}
+
+.column-header .column-period {
+  font-weight: 400;
+  color: var(--gray-400);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.finding-card.forward-card .priority-stripe {
+  background: #185FA5;
+}
+
+.finding-card.forward-card {
+  border-left: none;
+}
+
+.forward-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: #E6F1FB;
+  color: #185FA5;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+.decision-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.5;
+}
+
+.finding-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.finding-card.opportunity-card {
+  border-left: 3px solid #3B6D11;
+}
+
+/* ── Phase 2: Forecast Gap cards — right column, after pace cards ── */
+/* Purple-violet left border distinguishes from orange (historical)  */
+/* and the existing blue forward pace cards                          */
+.forecast-gap-card {
+  border-left: 3px solid #7C3AED;
+  margin-top: 8px;
+}
+
+.forecast-gap-badge {
+  display: inline-block;
+  background: #EDE9FE;
+  color: #5B21B6;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+/* Phase 2: Monthly detail cards — left column, below period cards */
+.monthly-card {
+  border-left: 3px solid var(--gold);
+  margin-left: 20px;
+  margin-top: 8px;
+  opacity: 0.93;
+}
+
+.monthly-card-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* Phase 2: Mix shift cards — left column, below monthly cards */
+/* Teal border — distinct from orange (period), gold (monthly) */
+.mix-shift-card {
+  border-left: 3px solid #0F6E56;
+  margin-top: 8px;
+}
+
+.mix-shift-badge {
+  display: inline-block;
+  background: #E1F5EE;
+  color: #0F6E56;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+/* ── Phase 3: Grouped collapsible layout ────────────── */
+
+.findings-group {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid var(--gray-200);
+  background: var(--white);
+}
+
+.group-header {
+  display: grid;
+  grid-template-columns: 4px 1fr auto;
+  align-items: stretch;
+  min-height: 64px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--white);
+  transition: background 0.15s;
+}
+
+.group-header:hover {
+  background: var(--gray-100);
+}
+
+.group-accent {
+  border-radius: 4px 0 0 4px;
+}
+
+/* accent colors per group type */
+.group-accent.historical  { background: var(--orange); }
+.group-accent.monthly     { background: var(--gold); }
+.group-accent.mix-shift   { background: #0F6E56; }
+.group-accent.forward     { background: #185FA5; }
+.group-accent.forecast    { background: #7C3AED; }
+.group-accent.forward-intel { background: #0e7490; }
+.group-accent.demand-intel { background: #0369a1; }
+
+.demand-intel-subtitle {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.demand-intel-panel-body {
+  padding: 14px 16px 16px;
+}
+.demand-intel-subsection {
+  margin-bottom: 18px;
+}
+.demand-intel-subsection:last-child {
+  margin-bottom: 0;
+}
+.demand-intel-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin-bottom: 8px;
+}
+.demand-intel-outlook-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gray-900);
+}
+.demand-intel-muted {
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.55;
+}
+ul.demand-holiday-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--gray-900);
+}
+.demand-holiday-list-item {
+  margin-bottom: 4px;
+}
+.demand-news-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.demand-news-row:last-child {
+  border-bottom: none;
+}
+.demand-news-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.demand-news-pill-positive {
+  background: var(--green-light);
+  color: var(--green);
+}
+.demand-news-pill-negative {
+  background: var(--red-light);
+  color: var(--red);
+}
+.demand-news-pill-mixed {
+  background: var(--amber-light);
+  color: var(--amber);
+}
+.demand-news-main {
+  flex: 1;
+  min-width: 0;
+}
+.demand-news-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.35;
+}
+.demand-news-source {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-top: 2px;
+}
+.demand-displacement-badge {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--gold-pale);
+  color: var(--amber);
+  border: 1px solid var(--gray-200);
+}
+.demand-context-info-box {
+  background: #E6F1FB;
+  color: var(--navy);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  border: 1px solid rgba(24, 95, 165, 0.15);
+}
+.demand-context-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.demand-context-holiday-line,
+.demand-context-signal-line {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-900);
+}
+
+/* Forward Intelligence cards (additive; does not alter existing card rules) */
+.fi-collapsible-card:not(.open) .finding-body {
+  display: none !important;
+}
+.fi-collapsible-card .finding-header {
+  cursor: pointer;
+}
+.fi-signal-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+.fi-signal-pill.fi-pill-red {
+  background: var(--red-light);
+  color: var(--red);
+}
+.fi-signal-pill.fi-pill-green {
+  background: var(--green-light);
+  color: var(--green);
+}
+.fi-signal-pill.fi-pill-blue {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.fi-intel-card .priority-stripe.medium {
+  background: #2563eb;
+}
+.fi-intel-card .priority-badge.medium {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.fi-weekly-pickup-card {
+  border-left: 3px solid #b91c1c;
+}
+.fi-corporate-risk-card {
+  border-left: 3px solid var(--red);
+}
+.fi-corporate-opp-card {
+  border-left: 3px solid var(--green);
+}
+.fi-pipeline-card {
+  border-left: 3px solid #185FA5;
+}
+.group-cards .finding-card.fi-weekly-pickup-card {
+  border-left: 3px solid #b91c1c;
+}
+.group-cards .finding-card.fi-corporate-risk-card {
+  border-left: 3px solid var(--red);
+}
+.group-cards .finding-card.fi-corporate-opp-card {
+  border-left: 3px solid var(--green);
+}
+.group-cards .finding-card.fi-pipeline-card {
+  border-left: 3px solid #185FA5;
+}
+.group-cards .fi-weekly-pickup-card,
+.group-cards .fi-corporate-risk-card,
+.group-cards .fi-corporate-opp-card,
+.group-cards .fi-pipeline-card {
+  margin-left: 0;
+}
+.ng-group-cards .finding-card.fi-weekly-pickup-card {
+  border-left: 3px solid #b91c1c;
+}
+.ng-group-cards .finding-card.fi-corporate-risk-card {
+  border-left: 3px solid var(--red);
+}
+.ng-group-cards .finding-card.fi-corporate-opp-card {
+  border-left: 3px solid var(--green);
+}
+.ng-group-cards .finding-card.fi-pipeline-card {
+  border-left: 3px solid #185FA5;
+}
+.ng-group-cards .fi-weekly-pickup-card,
+.ng-group-cards .fi-corporate-risk-card,
+.ng-group-cards .fi-corporate-opp-card,
+.ng-group-cards .fi-pipeline-card {
+  margin-left: 0;
+}
+.fi-progress-wrap {
+  margin-top: 4px;
+}
+.fi-progress-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 6px;
+}
+.fi-progress-track {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--gray-100);
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+}
+.fi-progress-fill {
+  height: 100%;
+  border-radius: 6px 0 0 6px;
+  transition: width 0.25s ease;
+}
+.fi-progress-caption {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-top: 6px;
+}
+.fi-account-table-wrap {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+table.fi-account-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.fi-account-table th,
+table.fi-account-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100);
+}
+table.fi-account-table th {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  font-weight: 700;
+}
+.fi-status-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.fi-status-pill.tentative {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+.fi-status-pill.prospect {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+.fi-var-neg { color: var(--red); font-weight: 600; }
+.fi-var-pos { color: var(--green); font-weight: 600; }
+.fi-opp-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--gray-900);
+}
+.fi-decision-block {
+  background: var(--gold-pale);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.fi-decision-block .decision-line {
+  margin: 0;
+}
+
+.group-header-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.group-header-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.group-count {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--gray-400);
+  background: var(--gray-100);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.group-brief {
+  font-size: 12px;
+  color: var(--gray-600);
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Group header insight pills — structured data points */
+.group-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  white-space: nowrap;
+}
+
+.group-pill .pill-label {
+  color: var(--gray-400);
+  font-weight: 400;
+  margin-right: 1px;
+}
+
+.group-pill.pill-warning {
+  background: var(--orange-light);
+  color: var(--orange);
+}
+
+.group-pill.pill-negative {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.group-pill.pill-positive {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.group-pill.pill-neutral {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.group-header-right {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  min-width: 100px;
+}
+
+.group-metric {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.group-metric.positive { color: var(--green); }
+.group-metric.negative { color: var(--red); }
+.group-metric.warning  { color: var(--orange); }
+
+.group-meta {
+  font-size: 10px;
+  color: var(--gray-400);
+  text-align: right;
+}
+
+.group-chevron {
+  font-size: 11px;
+  color: var(--gray-400);
+  transition: transform 0.2s ease;
+  margin-top: 2px;
+}
+
+.group-header.open .group-chevron {
+  transform: rotate(180deg);
+}
+
+.vn-lbl {
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 4px;
+}
+
+.vn-period {
+  font-size: 10px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
+.group-cards {
+  display: none;
+  flex-direction: column;
+  border-top: 0.5px solid var(--gray-100);
+  /* remove border-radius from cards inside groups */
+  padding: 0;
+}
+
+.group-cards.open {
+  display: flex;
+}
+
+/* cards inside groups lose their outer margin and border-radius */
+.group-cards .finding-card {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 0.5px solid var(--gray-100);
+  margin: 0;
+}
+
+.group-cards .finding-card:last-child {
+  border-bottom: none;
+}
+
+/* monthly cards inside groups keep their gold left border
+   but lose the outer margin/indent */
+.group-cards .monthly-card {
+  margin-left: 0;
+  border-left: 3px solid var(--gold);
+}
+
+/* mix shift cards keep their teal left border */
+.group-cards .mix-shift-card {
+  border-left: 3px solid #0F6E56;
+}
+
+/* forward cards inside groups */
+.group-cards .forward-card {
+  border-left: 3px solid #185FA5;
+}
+
+/* forecast gap cards inside groups */
+.group-cards .forecast-gap-card {
+  border-left: 3px solid #7C3AED;
+}
+
+/* STR weekly sparkline (Historical Analysis group, expanded only) */
+.group-cards .finding-card:has(+ .str-weekly-sparkline-wrap) {
+  border-bottom: none;
+}
+.str-weekly-sparkline-wrap {
+  border-top: 0.5px solid var(--gray-100);
+  padding: 16px 8px 8px 8px;
+  box-sizing: border-box;
+  width: 100%;
+}
+.str-weekly-sparkline-wrap .str-sparkline-svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+.str-sparkline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 18px;
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-600);
+  font-family: 'DM Sans', sans-serif;
+}
+.str-sparkline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.str-sparkline-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* empty group — hide entirely */
+.findings-group.empty {
+  display: none;
+}
+
+.finding-card:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.07); }
+.finding-card.actioned { opacity: 0.58; }
+
+.finding-header { display: grid; grid-template-columns: 6px 1fr auto; align-items: stretch; min-height: 82px; }
+
+.priority-stripe { width: 6px; flex-shrink: 0; }
+.priority-stripe.critical { background: var(--red); }
+.priority-stripe.high     { background: var(--orange); }
+.priority-stripe.medium   { background: var(--amber); }
+.priority-stripe.low      { background: var(--green); }
+
+.finding-center {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.finding-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.3;
+}
+
+.finding-oneliner {
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.finding-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 14px 20px;
+  gap: 5px;
+  min-width: 190px;
+  border-left: 1px solid var(--gray-100);
+  background: linear-gradient(to bottom, #fafaf8, #f5f5f2);
+}
+
+.trigger-metric-value { font-size: 11px; color: var(--gray-600); text-align: right; line-height: 1.4; font-weight: 500; }
+.trigger-metric-label { font-size: 9px; color: var(--gray-400); letter-spacing: 2px; text-transform: uppercase; text-align: right; margin-top: 2px; margin-bottom: 6px; font-weight: 600; }
+
+.badges-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+
+.priority-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.priority-badge.critical { background: var(--red-light); color: var(--red); }
+.priority-badge.high     { background: var(--orange-light); color: var(--orange); }
+.priority-badge.medium   { background: var(--amber-light); color: var(--amber); }
+.priority-badge.low      { background: var(--green-light); color: var(--green); }
+
+.dept-badge {
+  font-size: 10px;
+  color: var(--gray-400);
+  background: var(--white);
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-weight: 500;
+  border: 1px solid var(--gray-200);
+}
+
+.temporal-badge {
+  font-size: 10px;
+  color: var(--navy-mid);
+  background: var(--gold-pale);
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-weight: 600;
+  border: 1px solid rgba(201,168,76,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.finding-temporal-line {
+  font-size: 11px;
+  color: var(--gray-400);
+  line-height: 1.3;
+  margin-top: 1px;
+}
+
+.finding-body { display: flex; flex-direction: column; border-top: 1px solid var(--gray-100); }
+.finding-section { padding: 12px 18px; border-bottom: 1px solid var(--gray-100); }
+.finding-section:last-child { border-bottom: none; }
+
+.section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--gold);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.section-text { font-size: 13px; line-height: 1.55; color: var(--gray-900); }
+.causal-chain-label {
+  color: var(--navy);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.causal-layer-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.causal-layer-pill {
+  background: var(--navy);
+  color: var(--white);
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.causal-prefix {
+  font-weight: 700;
+  color: var(--navy);
+}
+.impact-block {
+  background: var(--gold-pale);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 8px;
+  padding: 10px 10px;
+}
+.impact-value {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  color: var(--navy);
+  line-height: 1;
+}
+.impact-meta { margin-top: 5px; font-size: 11px; color: var(--gray-600); }
+.action-line { font-size: 13px; color: var(--gray-900); line-height: 1.55; }
+
+/* ── EMPTY STATE ──────────────────────────────────────── */
+.empty-state { text-align: center; padding: 60px 20px; display: none; }
+.empty-state-icon { font-size: 40px; margin-bottom: 16px; }
+.empty-state h3 { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--navy); margin-bottom: 8px; }
+.empty-state p { font-size: 13px; color: var(--gray-400); }
+
+/* ── RESPONSIVE ───────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .finding-body { display: flex; flex-direction: column; }
+  .finding-section { border-bottom: 1px solid var(--gray-100); }
+  .summary-strip { grid-template-columns: 1fr; }
+
+  .gop-banner {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 20px;
+  }
+
+  .gop-stat:nth-child(2) { border-right: none; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 20px; }
+  .topbar { padding: 0 20px; }
+  .finding-header { grid-template-columns: 6px 1fr; }
+  .finding-right {
+    grid-column: 2;
+    align-items: flex-start;
+    min-width: auto;
+    border-left: none;
+    border-top: 1px solid var(--gray-100);
+  }
+  .badges-row { justify-content: flex-start; }
+  .trigger-metric-label, .trigger-metric-value { text-align: left; }
+  .finding-body { display: flex; flex-direction: column; }
+  .finding-section { border-right: none !important; border-bottom: 1px solid var(--gray-100); }
+  .finding-section:last-child { border-bottom: none; }
+  .gop-banner { grid-template-columns: 1fr; }
+  .gop-stat { border-right: none !important; padding-left: 0; }
+}
+
+/* ── NATURAL LANGUAGE CHAT ─────────────────────────────── */
+.nl-chat-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent, #1e40af);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(15, 31, 61, 0.28);
+  z-index: 1000;
+}
+.nl-chat-fab:hover { filter: brightness(1.05); }
+.nl-chat-fab:focus-visible,
+.nl-send-btn:focus-visible,
+.nl-close-btn:focus-visible,
+.nl-suggestion-btn:focus-visible,
+.nl-input:focus-visible {
+  outline: 2px solid #1e40af;
+  outline-offset: 2px;
+}
+.nl-chat-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 92px;
+  width: 420px;
+  height: 560px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 20px 50px rgba(15, 31, 61, 0.24);
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nl-chat-panel.open { display: flex; }
+.nl-chat-header {
+  padding: 14px 16px 8px;
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.nl-chat-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--navy);
+}
+.nl-chat-subtitle {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-top: 2px;
+}
+.nl-close-btn {
+  border: none;
+  background: transparent;
+  color: var(--gray-600);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.nl-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fafbfd;
+}
+.nl-message-row {
+  display: flex;
+  width: 100%;
+}
+.nl-message-row.user { justify-content: flex-end; }
+.nl-message-row.assistant { justify-content: flex-start; }
+.nl-message-bubble {
+  max-width: 84%;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.nl-message-row.user .nl-message-bubble {
+  background: #1e40af;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.nl-message-row.assistant .nl-message-bubble {
+  background: #edf0f5;
+  color: #1f2937;
+  border-bottom-left-radius: 4px;
+}
+.nl-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.nl-suggestion-btn {
+  border: none;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.nl-input-wrap {
+  border-top: 1px solid var(--gray-200);
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  background: #fff;
+}
+.nl-input {
+  flex: 1;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+}
+.nl-send-btn {
+  border: none;
+  border-radius: 8px;
+  background: var(--color-accent, #1e40af);
+  color: #fff;
+  font-weight: 600;
+  padding: 0 14px;
+  cursor: pointer;
+}
+.nl-send-btn:disabled,
+.nl-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.nl-loading-dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 4px;
+  background: #475569;
+  border-radius: 50%;
+  animation: nl-bounce 1s infinite ease-in-out;
+}
+.nl-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.nl-loading-dots span:nth-child(3) { animation-delay: 0.3s; margin-right: 0; }
+@keyframes nl-bounce {
+  0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* Aliases for dashboard tokens used in KPI strip / topbar meta */
+:root {
+  --color-border-tertiary: var(--gray-200);
+  --color-background-primary: var(--white);
+  --color-text-primary: var(--gray-900);
+  --color-text-secondary: var(--gray-600);
+  --color-text-tertiary: var(--gray-400);
+  --gray-50: #FAFAF9;
+  --gray-500: #73736E;
+  --gray-700: #454542;
+  --gray-800: #2E2E2B;
+}
+
+/* KPI strip cells */
+.kpi-cell {
+  padding: 14px 20px;
+  border-right: 0.5px solid var(--color-border-tertiary);
+}
+.kpi-cell:last-child { border-right: none; }
+.kpi-cell .kpi-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--color-text-tertiary); margin-bottom: 4px;
+}
+.kpi-cell .kpi-value {
+  font-size: 22px; font-weight: 500; color: var(--color-text-primary);
+}
+.kpi-cell .kpi-value.kpi-neg { color: #D85A30; }
+.kpi-cell .kpi-value.kpi-pos { color: #3B6D11; }
+.kpi-cell .kpi-value.kpi-warn { color: #BA7517; }
+.kpi-cell .kpi-sub {
+  font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px;
+}
+
+/* Topbar brand */
+.topbar-brand {
+  font-size: 13px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-text-primary);
+}
+.topbar-meta {
+  font-size: 12px; color: var(--color-text-secondary); margin-top: 2px;
+}
+
+/* ── NEW CARD DESIGN ── */
+.nc-card {
+  background: var(--white);
+  border: 0.5px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.nc-card.opportunity { border-left: 3px solid #3B6D11; border-radius: 0 8px 8px 0; }
+.nc-card.actioned { opacity: 0.55; }
+
+.nc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 0.5px solid var(--gray-100);
+  gap: 12px;
+}
+.nc-header-left { flex: 1; min-width: 0; }
+.nc-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.35;
+  margin-bottom: 3px;
+}
+.nc-subtitle {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.nc-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.nc-str-trio {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+  text-align: right;
+}
+.nc-str-trio-label {
+  font-size: 10px;
+  color: var(--gray-400);
+  text-align: right;
+}
+.nc-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nc-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 0; }
+
+.nc-section { padding: 10px 0; border-bottom: 0.5px solid var(--gray-100); }
+.nc-section:last-child { border-bottom: none; }
+
+.nc-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--gray-400);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.nc-text {
+  font-size: 13px;
+  color: var(--gray-800);
+  line-height: 1.65;
+}
+.nc-text-bold {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.65;
+}
+
+/* STR inline block inside card */
+.nc-str-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--gray-50);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 4px;
+}
+.nc-str-metric { text-align: center; flex-shrink: 0; }
+.nc-str-metric-val {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--navy);
+}
+.nc-str-metric-val.pos { color: #3B6D11; }
+.nc-str-metric-val.neg { color: #D85A30; }
+.nc-str-metric-val.warn { color: #BA7517; }
+.nc-str-metric-lbl {
+  font-size: 10px;
+  color: var(--gray-400);
+}
+.nc-str-interpretation {
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.55;
+  flex: 1;
+}
+
+/* Decision accent line */
+.nc-decision-line {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: var(--gray-50);
+  border-left: 2px solid #D85A30;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Numbered execution list */
+.nc-exec-list {
+  list-style: none;
+  counter-reset: nc-exec;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0; padding: 0;
+}
+.nc-exec-list li {
+  counter-increment: nc-exec;
+  font-size: 13px;
+  color: var(--gray-800);
+  line-height: 1.55;
+  padding-left: 20px;
+  position: relative;
+}
+.nc-exec-list li::before {
+  content: counter(nc-exec) ".";
+  position: absolute;
+  left: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-400);
+  top: 1px;
+}
+
+/* Demand context block */
+.nc-demand-block {
+  background: #EFF6FF;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #1E40AF;
+  line-height: 1.55;
+}
+
+/* ── NEW GROUP DESIGN ── */
+.ng-group {
+  margin-bottom: 6px;
+}
+.ng-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 4px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 0.5px solid var(--gray-200);
+  margin-bottom: 8px;
+}
+.ng-group-left { display: flex; align-items: center; gap: 8px; }
+.ng-group-name {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gray-500);
+}
+.ng-group-count {
+  font-size: 11px;
+  color: var(--gray-400);
+}
+.ng-group-right { display: flex; align-items: center; gap: 10px; }
+.ng-group-metric {
+  font-size: 13px;
+  font-weight: 500;
+  color: #D85A30;
+}
+.ng-group-chevron {
+  font-size: 10px;
+  color: var(--gray-400);
+  transition: transform 0.15s;
+}
+.ng-group-header.open .ng-group-chevron { transform: rotate(180deg); }
+.ng-group-cards { display: flex; flex-direction: column; }
+.ng-group-cards.collapsed { display: none; }
+
+.ng-group-cards .finding-card {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 0.5px solid var(--gray-100);
+  margin: 0;
+}
+.ng-group-cards .finding-card:last-child { border-bottom: none; }
+.ng-group-cards .monthly-card {
+  margin-left: 0;
+  border-left: 3px solid var(--gold);
+}
+.ng-group-cards .mix-shift-card {
+  border-left: 3px solid #0F6E56;
+}
+.ng-group-cards .forward-card {
+  border-left: 3px solid #185FA5;
+}
+.ng-group-cards .forecast-gap-card {
+  border-left: 3px solid #7C3AED;
+}
+.ng-group-cards .finding-card:has(+ .str-weekly-sparkline-wrap) {
+  border-bottom: none;
+}
+
+.pace-3col-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 0 8px;
+}
+.pace-3col-grid .nc-card {
+  margin-bottom: 0;
+  font-size: 12px;
+}
+.pace-3col-grid .nc-header {
+  padding: 10px 12px 8px;
+}
+.pace-3col-grid .nc-body {
+  padding: 0 12px 10px;
+}
+.pace-3col-grid .nc-text,
+.pace-3col-grid .nc-text-bold {
+  font-size: 12px;
+}
+.pace-3col-grid .nc-exec-list li {
+  font-size: 12px;
+}
+
+.fi-mosaic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.fi-tile {
+  background: var(--white);
+  border: 0.5px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fi-tile-type {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--gray-400);
+}
+.fi-tile-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  line-height: 1.35;
+}
+.fi-tile-facts {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fi-tile-facts li {
+  font-size: 12px;
+  color: var(--gray-700);
+  line-height: 1.5;
+  padding-left: 12px;
+  position: relative;
+}
+.fi-tile-facts li::before {
+  content: '·';
+  position: absolute;
+  left: 2px;
+  color: var(--gray-400);
+}
+.fi-tile-action {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--navy);
+  padding: 6px 8px;
+  background: var(--gray-50);
+  border-left: 2px solid #D85A30;
+  border-radius: 0 4px 4px 0;
+  line-height: 1.5;
+}
+.fi-tile-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+.fi-tile-badge.critical { background: #FCEBEB; color: #A32D2D; }
+.fi-tile-badge.high { background: #FAEEDA; color: #854F0B; }
+.fi-tile-badge.medium { background: var(--gray-100); color: var(--gray-600); }
+.fi-tile-badge.opportunity { background: #EAF3DE; color: #3B6D11; }
+
+/* Inside pace 3-col grid: hide execution list and demand context,
+   they are too verbose for the compact column view */
+.pace-3col-grid .nc-section:has(.nc-exec-list),
+.pace-3col-grid .nc-section:has(.nc-demand-block),
+.pace-3col-grid .forward-card .nc-section:has(.nc-text[style*="white-space:pre-line"]) {
+  display: none;
+}
+/* Mark as actioned row — narrow selector so pace bar % cell (also text-align:right) stays visible */
+.pace-3col-grid div[style*="margin-top:10px"][style*="text-align:right"] {
+  display: none;
+}
+/* Tighten subtitle — window label, smaller and muted */
+.pace-3col-grid .nc-subtitle {
+  font-size: 11px;
+  color: var(--gray-400);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Tighten title — allow 2 lines max, clip */
+.pace-3col-grid .nc-title {
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hide priority + forward badges in pace 3-col grid — redundant in compact view */
+.pace-3col-grid .nc-badges { display: none; }
+.pace-3col-grid .nc-str-trio,
+.pace-3col-grid .nc-str-trio-label { display: none; }
+
+/* Left border accent per window urgency — visual hierarchy without badges */
+.pace-3col-grid .nc-card:nth-child(1) { border-left: 3px solid #D85A30; border-radius: 0 8px 8px 0; }
+.pace-3col-grid .nc-card:nth-child(2) { border-left: 3px solid #BA7517; border-radius: 0 8px 8px 0; }
+.pace-3col-grid .nc-card:nth-child(3) { border-left: 3px solid #888780; border-radius: 0 8px 8px 0; }
+
+.demo-watermark {
+  position: fixed;
+  top: 50%;
+  left: calc(50% + 130px);
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 96px;
+  font-weight: 300;
+  color: rgba(201,168,76,0.07);
+  pointer-events: none;
+  z-index: 0;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.gop-bridge {
+  background: var(--white);
+  border: 0.5px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 20px 24px 16px;
+  margin-bottom: 24px;
+}
+.gop-bridge-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gray-400);
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+.gop-bridge-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 80px;
+  margin-bottom: 8px;
+}
+.bridge-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+}
+.bridge-fill {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+}
+.bridge-val {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--gray-700);
+  white-space: nowrap;
+}
+.bridge-lbl {
+  font-size: 9px;
+  color: var(--gray-400);
+  text-align: center;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+.bridge-connector {
+  width: 4px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+.bridge-connector::after {
+  content: '';
+  width: 100%;
+  height: 1px;
+  background: var(--gray-300);
+  display: block;
+}
+
+.cost-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gray-400);
+  padding: 4px 0 8px;
+  border-bottom: 0.5px solid var(--gray-200);
+  margin-bottom: 10px;
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cost-section-saving {
+  font-size: 11px;
+  font-weight: 500;
+  color: #1A6B3C;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.nc-gop-impact {
+  background: var(--green-light);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nc-gop-impact-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--green);
+}
+.nc-gop-impact-lbl {
+  font-size: 11px;
+  color: #2D7A50;
+  line-height: 1.4;
+}
+
+.nc-badge-critical {
+  font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  background: #FDECEA; color: #C0392B;
+}
+.nc-badge-high {
+  font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  background: #FEF0E7; color: #D35400;
+}
+.nc-badge-medium {
+  font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  background: #FEF9E7; color: #B8860B;
+}
+
+.nc-calc-table { width:100%; border-collapse:collapse; font-size:12px; }
+.nc-calc-table td { padding: 3px 0; color: var(--gray-700); }
+.nc-calc-table td:last-child { text-align:right; font-weight:500; color:var(--navy); }
+.nc-calc-table tr.calc-total td {
+  border-top: 0.5px solid var(--gray-200);
+  padding-top: 6px; font-weight: 600; color: var(--navy);
+}
+.nc-calc-table tr.calc-note td {
+  font-style: italic; color: var(--gray-400); font-size: 11px;
+}
+
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-text">Aithenor</div>
+    <div class="logo-sub">Strategic Intelligence</div>
+  </div>
+
+  <div class="hotel-card">
+    <div class="hotel-name" id="sidebar-hotel">Hotel Aurem</div>
+    <div class="hotel-meta" id="sidebar-period">Paris · 85 rooms · November 2025</div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-section">Executive</div>
+    <a class="nav-item" href="gm.html">
+      <span class="nav-icon">✦</span>
+      GM Briefing
+    </a>
+
+    <div class="nav-section">Intelligence</div>
+    <a class="nav-item" href="index.html">
+      <span class="nav-icon">◈</span>
+      Insights
+      <span class="nav-badge" id="badge-count">12</span>
+    </a>
+    <div class="nav-item">
+      <span class="nav-icon">◇</span>
+      Revenue Modules
+    </div>
+    <a class="nav-item active" href="costs.html">
+      <span class="nav-icon">◇</span>
+      Cost Modules
+    </a>
+
+    <div class="nav-section">Execution</div>
+    <div class="nav-item">
+      <span class="nav-icon">◇</span>
+      Value Tracker
+    </div>
+    <a class="nav-item" href="accounts.html">
+      <span class="nav-icon">◉</span>
+      Accounts
+    </a>
+    <a class="nav-item" href="weekly.html">
+      <span class="nav-icon">◎</span>
+      Weekly Intel
+    </a>
+    <div class="nav-item">
+      <span class="nav-icon">◇</span>
+      Action Tracker
+    </div>
+
+    <div class="nav-section">Performance</div>
+    <div class="nav-item">
+      <span class="nav-icon">◇</span>
+      Historical Analysis
+    </div>
+
+    <div class="nav-section">Settings</div>
+    <div class="nav-item">
+      <span class="nav-icon">◇</span>
+      Hotel Profile
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">◇</span>
+      Upload Data
+    </div>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <div class="sync-status">
+      <div class="sync-dot"></div>
+      <span id="sync-label">Connected to Supabase</span>
+    </div>
+    <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
+      <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
+      <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.2s;" onmouseover="this.style.color='white'; this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'; this.style.borderColor='rgba(255,255,255,0.1)'">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="demo-watermark">Demo</div>
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-brand">Aithenor</div>
+      <div class="topbar-meta">Cost & GOP Diagnostic — Hotel Aurem · November 2025</div>
+    </div>
+    <div class="topbar-right">
+      <span style="font-size:11px; font-weight:600; letter-spacing:1.5px;
+        text-transform:uppercase; color:#B8860B; background:#FEF9E7;
+        padding:4px 10px; border-radius:3px; border:1px solid #E8D88A;">
+        DEMO MODULE — IN DEVELOPMENT
+      </span>
+    </div>
+  </div>
+  <div class="content" style="position:relative; z-index:1;">
+
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); border-bottom:0.5px solid var(--gray-200); background:var(--white); margin-bottom:24px;">
+      <div class="kpi-cell">
+        <div class="kpi-label">FORECASTED GOP</div>
+        <div class="kpi-value">€5,000,000</div>
+        <div class="kpi-sub">Annualised · Hotel Aurem</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">RECOVERABLE GOP</div>
+        <div class="kpi-value kpi-pos">€224,880</div>
+        <div class="kpi-sub">If all findings actioned at 75%</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">PAYROLL % REVENUE</div>
+        <div class="kpi-value kpi-warn">34.2%</div>
+        <div class="kpi-sub">Target ≤32% · +2.2pts above threshold</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">FOOD COST %</div>
+        <div class="kpi-value kpi-neg">33.4%</div>
+        <div class="kpi-sub">Target 28.0% · +5.4pts variance</div>
+      </div>
+    </div>
+    <div class="gop-bridge">
+      <div class="gop-bridge-title">GOP Bridge — Identified Recovery Opportunity</div>
+      <div class="gop-bridge-bars">
+        <div class="bridge-bar">
+          <div class="bridge-val">€5,000,000</div>
+          <div class="bridge-fill" style="height:80px; background:#0F1F3D;"></div>
+          <div class="bridge-lbl">Forecasted<br>GOP</div>
+        </div>
+        <div class="bridge-connector"></div>
+        <div class="bridge-bar">
+          <div class="bridge-val" style="color:#C0392B;">−€103,680</div>
+          <div class="bridge-fill" style="height:37px; background:#FDECEA; border:1px solid #C0392B;"></div>
+          <div class="bridge-lbl">Rooms<br>Labour</div>
+        </div>
+        <div class="bridge-connector"></div>
+        <div class="bridge-bar">
+          <div class="bridge-val" style="color:#C0392B;">−€50,400</div>
+          <div class="bridge-fill" style="height:18px; background:#FDECEA; border:1px solid #C0392B;"></div>
+          <div class="bridge-lbl">F&B<br>Labour</div>
+        </div>
+        <div class="bridge-connector"></div>
+        <div class="bridge-bar">
+          <div class="bridge-val" style="color:#D35400;">−€37,200</div>
+          <div class="bridge-fill" style="height:13px; background:#FEF0E7; border:1px solid #D35400;"></div>
+          <div class="bridge-lbl">Leave<br>Clustering</div>
+        </div>
+        <div class="bridge-connector"></div>
+        <div class="bridge-bar">
+          <div class="bridge-val" style="color:#D35400;">−€33,600</div>
+          <div class="bridge-fill" style="height:12px; background:#FEF0E7; border:1px solid #D35400;"></div>
+          <div class="bridge-lbl">Food<br>Cost</div>
+        </div>
+        <div class="bridge-connector"></div>
+        <div class="bridge-bar">
+          <div class="bridge-val" style="color:#1A6B3C;">€5,168,660</div>
+          <div class="bridge-fill" style="height:76px; background:#E8F5ED; border:1px solid #1A6B3C;"></div>
+          <div class="bridge-lbl">Projected<br>GOP</div>
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">
+        At 75% action effectiveness · +€168,660 · +3.4% GOP improvement
+      </div>
+    </div>
+    <div class="cost-section-label">
+      <span>Rooms Division</span>
+      <span class="cost-section-saving">€103,680 / yr identified</span>
+    </div>
+    <div class="nc-card">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">Housekeeping Labour — Systematic Overstaffing vs Forecast</div>
+          <div class="nc-subtitle">Rooms Division · November 2025</div>
+        </div>
+        <div class="nc-header-right">
+          <span class="nc-badge-critical">CRITICAL</span>
+        </div>
+      </div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">SITUATION</div>
+          <div class="nc-text">26 valets scheduled daily against a forecast requirement of 18. Based on average daily departures (22), stayovers (39), and arrivals (24), the staffing model calculates a daily need of 1,790 cleaning minutes — covered by 18 valets at 435 net productive minutes each. The hotel is running 8 excess valets every day of the month.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DIAGNOSIS</div>
+          <div class="nc-text">Scheduling is operating on a fixed headcount model, not a forecast-driven one. The schedule does not flex with occupancy. On 55% occupancy days the model shows 14 valets required — the gap widens to 12 excess valets on those days.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">CALCULATION</div>
+          <table class="nc-calc-table"><tbody><tr><td>Daily overstaffing</td><td>8 valets</td></tr><tr><td>Cost per day</td><td>8 × €18 × 8h = €1,152</td></tr><tr><td>Gross monthly cost</td><td>€34,560</td></tr><tr><td>Recoverable (25% flex constraint)</td><td>€8,640 / month</td></tr><tr class="calc-total"><td>Annual GOP saving</td><td>€103,680</td></tr></tbody></table>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DECISION</div>
+          <div class="nc-decision-line">Reduce daily scheduled valets from 26 to 18 on average occupancy days. Implement a rolling 7-day schedule review every Monday against the upcoming week's occupancy forecast.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">EXECUTION</div>
+          <ol class="nc-exec-list"><li>Reconcile the November housekeeping schedule against the occupancy forecast immediately — cut to 18 valets on average-occupancy days.</li><li>On high-occupancy days above 85%, scale to 22 valets — but do not default to 26 as the floor on standard days.</li><li>Share the staffing calculation model with the Executive Housekeeper so scheduling decisions become data-driven.</li><li>Extend the same forecast-linked scheduling model to January — apply it before the schedule is issued, not after.</li></ol>
+        </div>
+        <div class="nc-section">
+          <div class="nc-label">GOP IMPACT</div>
+          <div class="nc-gop-impact">
+            <div class="nc-gop-impact-val">+€103,680 / yr</div>
+            <div class="nc-gop-impact-lbl">+2.1% GOP · Rooms Labour · High confidence</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cost-section-label">
+      <span>Food & Beverage</span>
+      <span class="cost-section-saving">€84,000 / yr identified</span>
+    </div>
+    <div class="nc-card">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">F&B Service Labour — 2.25× Cover Ratio Overrun</div>
+          <div class="nc-subtitle">Food & Beverage · November 2025</div>
+        </div>
+        <div class="nc-header-right">
+          <span class="nc-badge-critical">CRITICAL</span>
+        </div>
+      </div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">SITUATION</div>
+          <div class="nc-text">9 servers scheduled per service against an average of 38 breakfast covers (58% of 65-cover capacity) and 41 dinner covers. The luxury hotel benchmark is 1 server per 12 covers. At current volumes, 4 servers are sufficient for both services.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DIAGNOSIS</div>
+          <div class="nc-text">F&B scheduling defaults to full-team deployment regardless of actual reservation levels. Each server is handling an average of 4.2 covers per service — the luxury benchmark allows up to 12 while maintaining service quality. The hotel is using 2.25× more service staff than required.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">CALCULATION</div>
+          <table class="nc-calc-table"><tbody><tr><td>Servers required (benchmark 1:12)</td><td>4 per service</td></tr><tr><td>Servers currently scheduled</td><td>9 per service</td></tr><tr><td>Daily excess server shifts</td><td>10 (breakfast + dinner)</td></tr><tr><td>Cost per day</td><td>10 × €16 × 4h = €640</td></tr><tr><td>Gross monthly cost</td><td>€19,200</td></tr><tr><td>Recoverable saving</td><td>€4,200 / month</td></tr><tr class="calc-total"><td>Annual GOP saving</td><td>€50,400</td></tr></tbody></table>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DECISION</div>
+          <div class="nc-decision-line">Schedule 1 server per 12 confirmed covers plus 1 buffer. For 38 covers that means 5 servers — not 9. Build a direct link between the reservations system and F&B scheduling.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">EXECUTION</div>
+          <ol class="nc-exec-list"><li>Review F&B scheduling against the daily reservation and occupancy forecast with immediate effect — reschedule November from today.</li><li>Implement covers-based staffing: 1 server per 12 confirmed covers plus 1 buffer server. For 38 covers = 5 servers.</li><li>On high-occupancy days above 80% with 55+ projected covers, scale to 6–7 servers — not the current default of 9.</li><li>Consider split shifts on lower-occupancy days to reduce total paid hours without compromising service window coverage.</li></ol>
+        </div>
+        <div class="nc-section">
+          <div class="nc-label">GOP IMPACT</div>
+          <div class="nc-gop-impact">
+            <div class="nc-gop-impact-val">+€50,400 / yr</div>
+            <div class="nc-gop-impact-lbl">+1.0% GOP · F&B Labour · High confidence</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cost-section-label">
+      <span>Cross-Department</span>
+      <span class="cost-section-saving">€37,200 / yr identified</span>
+    </div>
+    <div class="nc-card">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">Annual Leave Clustering — Agency Premium During Peak Week</div>
+          <div class="nc-subtitle">Housekeeping · Week of 17–23 November</div>
+        </div>
+        <div class="nc-header-right">
+          <span class="nc-badge-high">HIGH</span>
+        </div>
+      </div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">SITUATION</div>
+          <div class="nc-text">6 housekeeping valets have simultaneous leave booked during the week of 17–23 November — the highest forecasted occupancy period of the month at 84%. The hotel's replacement policy uses agency staff at €28/hour versus the internal rate of €18/hour.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DIAGNOSIS</div>
+          <div class="nc-text">Leave requests are approved on a first-come first-served basis without cross-referencing the 90-day occupancy forecast. The result: the hotel pays a 56% hourly rate premium precisely when it needs the most rooms serviced. Agency valets unfamiliar with Hotel Aurem's room configurations are also 15–20% slower, compounding the cost.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">CALCULATION</div>
+          <table class="nc-calc-table"><tbody><tr><td>Agency cost — 6 valets × 7 days</td><td>€9,408</td></tr><tr><td>Internal cost equivalent</td><td>€6,048</td></tr><tr><td>Rate premium</td><td>€3,360</td></tr><tr><td>Productivity loss (15% slower)</td><td>~€740</td></tr><tr class="calc-total"><td>Recoverable monthly saving</td><td>€3,100</td></tr><tr class="calc-total"><td>Annual GOP saving</td><td>€37,200</td></tr></tbody></table>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DECISION</div>
+          <div class="nc-decision-line">Enforce a maximum of 2 simultaneous leave days during any period with forecasted occupancy above 75%. Cross-reference the leave calendar against the 90-day forecast at the start of each quarter.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">EXECUTION</div>
+          <ol class="nc-exec-list"><li>Review the November 17–23 leave schedule immediately — negotiate with at least 3 of the 6 valets to defer to a lower-occupancy week.</li><li>Implement a leave management policy: maximum 2 valets on simultaneous leave when forecasted occupancy exceeds 75%.</li><li>Build a leave calendar cross-referenced against the 90-day occupancy forecast each quarter before leave is approved.</li><li>Where agency replacement is unavoidable, pre-brief agency staff with room configuration guides to close the productivity gap.</li></ol>
+        </div>
+        <div class="nc-section">
+          <div class="nc-label">GOP IMPACT</div>
+          <div class="nc-gop-impact">
+            <div class="nc-gop-impact-val">+€37,200 / yr</div>
+            <div class="nc-gop-impact-lbl">+0.7% GOP · Cross-dept · Medium confidence</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="nc-card">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">Food Cost % — 5.4pts Above Target</div>
+          <div class="nc-subtitle">F&B Purchasing & Cost Control · November YTD</div>
+        </div>
+        <div class="nc-header-right">
+          <span class="nc-badge-medium">MEDIUM</span>
+        </div>
+      </div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">SITUATION</div>
+          <div class="nc-text">F&B food cost is running at 33.4% of F&B revenue against a target of 28.0% — a variance of 5.4 percentage points. Based on projected November F&B revenue of €52,000, this represents €2,808 in excess food cost for the month alone.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DIAGNOSIS</div>
+          <div class="nc-text">A variance of this magnitude sustained over multiple months typically points to one or more of: over-purchasing relative to actual covers, inadequate portion control, untracked wastage and spoilage, or menu mix skewed toward low-margin dishes. The magnitude confirms this is not a minor fluctuation.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">CALCULATION</div>
+          <table class="nc-calc-table"><tbody><tr><td>Projected November F&B revenue</td><td>€52,000</td></tr><tr><td>Target food cost at 28%</td><td>€14,560</td></tr><tr><td>Actual food cost at 33.4%</td><td>€17,368</td></tr><tr><td>Monthly overage</td><td>€2,808</td></tr><tr><td>Conservative recovery to 30%</td><td>€14,976 / yr</td></tr><tr class="calc-total"><td>Full recovery to 28% target</td><td>€33,600 / yr</td></tr></tbody></table>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DECISION</div>
+          <div class="nc-decision-line">Conduct a purchasing audit for November this week — compare actual purchases against theoretical consumption based on covers served. Implement weekly food cost tracking by outlet rather than waiting for the monthly P&L.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">EXECUTION</div>
+          <ol class="nc-exec-list"><li>Conduct an immediate purchasing audit — compare actual purchases against theoretical consumption based on covers served.</li><li>Review portion sizes against standardized recipe cards — verify the kitchen brigade is following documented portions consistently.</li><li>Analyze the menu sales mix — identify the 5 highest-volume items and verify their actual food cost % against target.</li><li>Implement a daily wastage log — categorize all food waste to identify whether the issue is over-production, spoilage, or loss.</li><li>Implement weekly food cost reporting by outlet — do not wait for the monthly P&L to detect in-month overruns.</li></ol>
+        </div>
+        <div class="nc-section">
+          <div class="nc-label">GOP IMPACT</div>
+          <div class="nc-gop-impact">
+            <div class="nc-gop-impact-val">+€33,600 / yr</div>
+            <div class="nc-gop-impact-lbl">+0.7% GOP · F&B Cost · Medium confidence</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cost-section-label">
+      <span>Purchasing & Contrôle de Gestion</span>
+      <span class="cost-section-saving" style="color:var(--amber);">In analysis — module in development</span>
+    </div>
+    <div class="nc-card">
+      <div class="nc-header">
+        <div class="nc-header-left">
+          <div class="nc-title">Consumables Purchasing — Theoretical vs Actual Order Variance</div>
+          <div class="nc-subtitle">Housekeeping Consumables · November Forecast</div>
+        </div>
+        <div class="nc-header-right">
+          <span class="forecast-gap-badge">IN DEVELOPMENT</span>
+        </div>
+      </div>
+      <div class="nc-body">
+        <div class="nc-section">
+          <div class="nc-label">SITUATION</div>
+          <div class="nc-text">The November purchase order for toilet tissue stands at 9,000 units against a theoretical consumption of 3,622 units — a 148% overorder relative to forecasted occupancy of 1,811 room nights at the hotel standard of 2 rolls per guest night.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DIAGNOSIS</div>
+          <div class="nc-text">Purchasing decisions for housekeeping consumables are being made on habit or fixed par levels rather than occupancy-linked theoretical consumption models. This pattern — replicated across all consumable lines — generates systematic stock accumulation, cash flow drag, and unmeasured cost overrun that does not appear on the monthly P&L until wastage or write-offs are reported.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">CALCULATION</div>
+          <table class="nc-calc-table"><tbody><tr><td>Forecasted room nights (November)</td><td>1,811 RN</td></tr><tr><td>Hotel standard (toilet tissue)</td><td>2 rolls per guest night</td></tr><tr><td>Theoretical consumption</td><td>3,622 units</td></tr><tr><td>Actual purchase order</td><td>9,000 units</td></tr><tr><td>Overorder variance</td><td>+5,378 units · +148%</td></tr><tr><td>Estimated excess cost (at €0.18/unit)</td><td>€968 this order alone</td></tr><tr class="calc-note"><td>Pattern repeated across all consumable lines — full audit pending</td><td></td></tr></tbody></table>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">DECISION</div>
+          <div class="nc-decision-line">Freeze non-essential consumable purchase orders pending a full theoretical consumption audit. All future POs for housekeeping consumables must be generated from the occupancy forecast — not from fixed par levels or prior-period replication.</div>
+        </div>
+<div class="nc-section">
+          <div class="nc-label">EXECUTION</div>
+          <ol class="nc-exec-list"><li>Freeze the current toilet tissue PO — reissue at 3,622 units aligned to the November forecast.</li><li>Run the same theoretical consumption calculation across all housekeeping consumable lines (amenities, linen bags, cleaning products) before the next order cycle.</li><li>Build an occupancy-linked PO model: theoretical consumption = forecasted RN × hotel standard per guest night per item.</li><li>Require all housekeeping POs to be countersigned against the current 30-day occupancy forecast before approval.</li></ol>
+        </div>
+        <div class="nc-section">
+          <div class="nc-label">GOP IMPACT</div>
+          <div class="nc-gop-impact" style="background:var(--amber-light);">
+            <div class="nc-gop-impact-val" style="color:var(--amber);">Quantification in progress</div>
+            <div class="nc-gop-impact-lbl" style="color:var(--amber);">Full consumables audit required to size annual saving · Module in active development</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--white); border:0.5px solid var(--gray-200); border-radius:8px; overflow:hidden; margin-top:24px; margin-bottom:32px;">
+  <div style="padding:14px 16px 10px; border-bottom:0.5px solid var(--gray-100);">
+    <div class="nc-label">Priority Summary — GOP Impact</div>
+  </div>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead>
+      <tr style="background:var(--gray-100);">
+        <th style="padding:8px 16px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Priority</th>
+        <th style="padding:8px 16px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Finding</th>
+        <th style="padding:8px 16px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Department</th>
+        <th style="padding:8px 16px; text-align:right; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Monthly Saving</th>
+        <th style="padding:8px 16px; text-align:right; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Annual GOP Impact</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:0.5px solid var(--gray-100);">
+        <td style="padding:10px 16px; color:var(--gray-400);">1</td>
+        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Housekeeping Overstaffing</td>
+        <td style="padding:10px 16px; color:var(--gray-600);">Rooms — Labour</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€8,640</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€103,680</td>
+      </tr>
+      <tr style="border-bottom:0.5px solid var(--gray-100);">
+        <td style="padding:10px 16px; color:var(--gray-400);">2</td>
+        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">F&B Service Labour Variance</td>
+        <td style="padding:10px 16px; color:var(--gray-600);">F&B — Labour</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€4,200</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€50,400</td>
+      </tr>
+      <tr style="border-bottom:0.5px solid var(--gray-100);">
+        <td style="padding:10px 16px; color:var(--gray-400);">3</td>
+        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Annual Leave Clustering</td>
+        <td style="padding:10px 16px; color:var(--gray-600);">Cross-dept</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€3,100</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€37,200</td>
+      </tr>
+      <tr style="border-bottom:0.5px solid var(--gray-100);">
+        <td style="padding:10px 16px; color:var(--gray-400);">4</td>
+        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Food Cost % Overage</td>
+        <td style="padding:10px 16px; color:var(--gray-600);">F&B — Cost</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€2,800</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€33,600</td>
+      </tr>
+      <tr style="border-bottom:0.5px solid var(--gray-100);">
+        <td style="padding:10px 16px; color:var(--gray-400);">5</td>
+        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Consumables Overordering</td>
+        <td style="padding:10px 16px; color:var(--gray-600);">Purchasing</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--amber);">In analysis</td>
+        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--amber);">TBC</td>
+      </tr>
+      <tr style="background:var(--navy);">
+        <td colspan="3" style="padding:12px 16px; font-weight:600; color:var(--gold); font-size:13px;">Total identified GOP saving</td>
+        <td style="padding:12px 16px; text-align:right; font-weight:600; color:var(--white);">€18,740 / mo</td>
+        <td style="padding:12px 16px; text-align:right; font-weight:600; color:var(--gold); font-size:15px;">€224,880 / yr</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+  </div>
+</div>
+
+</body>
+</html>
