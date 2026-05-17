@@ -612,10 +612,21 @@ function accountCompanyKey(a) {
   return String(a.company_name || a.account_name || a.name || '').trim().toLowerCase();
 }
 
+function normaliseForMatchingKey(fk) {
+  // WHY: Strip trailing date suffix (YYYY-MM-DD or YYYYMMDD) and
+  // snapshot week key (YYYY-Www) from finding_key so causal chain
+  // and synthesis cards match across different snapshot dates.
+  return String(fk || '')
+    .replace(/_\d{4}-\d{2}-\d{2}$/, '')   // strip _YYYY-MM-DD
+    .replace(/_\d{8}$/, '')               // strip _YYYYMMDD
+    .replace(/_\d{4}-W\d{2}$/, '')        // strip _YYYY-Www
+    .trim();
+}
+
 function collectSegmentDecisions(ej) {
   const cards = Array.isArray(ej?.segment_issue_cards) ? ej.segment_issue_cards : [];
   return cards.map(c => ({
-    finding_key: String(c.finding_key || '').trim(),
+    finding_key: normaliseForMatchingKey(c.finding_key),
     line: String(c.enforced_decision_line || c.decision || '').trim()
   })).filter(x => x.finding_key && x.line);
 }
@@ -624,7 +635,7 @@ function collectCausalDecision(ej) {
   const cc = ej?.cross_segment_synthesis?.causal_chain_card;
   if (!cc || typeof cc !== 'object') return null;
   const line = String(cc.enforced_decision_line || cc.decision || '').trim();
-  const fk = String(cc.finding_key || 'causal_chain_card').trim();
+  const fk = normaliseForMatchingKey(cc.finding_key || 'causal_chain_card');
   if (!line) return null;
   return { finding_key: fk, line };
 }
@@ -966,10 +977,13 @@ function renderGroupsSection(ejA, ejB) {
     for (const issue of issues) {
       const groups = Array.isArray(issue.groups) ? issue.groups : [];
       for (const g of groups) {
-        const name = String(g.group_name || g.name || '').trim();
+        // WHY: Engine stores group name as group_name only — g.name does
+        // not exist. Key on lowercase group_name for cross-snapshot matching.
+        const name = String(g.group_name || '').trim();
         if (!name) continue;
         const key = name.toLowerCase();
-        if (!map.has(key)) map.set(key, { ...g, name });
+        // Keep the entry with the most recent data (B wins over A)
+        map.set(key, { ...g, _name: name });
       }
     }
     return map;
@@ -1015,8 +1029,9 @@ function renderGroupsSection(ejA, ejB) {
     const arr = grp.arrival_date || '—';
     const owner = grp.owner || grp.sales_manager || '—';
     const status = grp.status || '—';
+    // WHY: group_name is the correct field — _name is the normalized copy
     return `<tr>
-      <td><strong>${escHtml(grp.name || grp.group_name || '—')}</strong></td>
+      <td><strong>${escHtml(grp._name || grp.group_name || '—')}</strong></td>
       <td>${escHtml(rn)} / ${escHtml(rev)}</td>
       <td>${escHtml(arr)}</td>
       <td>${escHtml(owner)}</td>
