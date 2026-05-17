@@ -350,6 +350,9 @@ body {
     <div class="section-title">Corporate accounts movement</div>
     <div id="corporate-section"></div>
 
+    <div class="section-title">Group pipeline</div>
+    <div id="groups-section"></div>
+
     <div class="section-title">Open decisions</div>
     <div id="decisions-section"></div>
   </div>
@@ -538,7 +541,9 @@ function paceStatusBadge(gapB, gapA, pctB, pctA) {
 }
 
 function segmentKey(card) {
-  return String(card.display_name || card.segment || card.primary_segment || '').trim() || '—';
+  // WHY: Old snapshots stored "Discount / OTA" before the naming fix.
+  const raw = String(card.display_name || card.segment || card.primary_segment || '').trim() || '—';
+  return raw.replace(/Discount\s*\/\s*OTA/gi, 'Discount');
 }
 
 function segmentStatus(card) {
@@ -567,6 +572,30 @@ function segmentChange(aStatus, bStatus) {
   if (scenarioRank(B) > scenarioRank(A)) return 'Escalated';
   if (scenarioRank(B) < scenarioRank(A)) return 'Resolved';
   return 'Escalated';
+}
+
+// WHY: S4, S5, S7 etc are internal codes — meaningless to a GM.
+// Map to readable commercial labels for the weekly comparison table.
+const SCENARIO_LABELS = {
+  'S1': 'Stable — no signal',
+  'S2': 'Minor noise',
+  'S3': 'Rate opportunity',
+  'S4': 'Volume behind, rate holding',
+  'S5': 'Both volume and rate declining',
+  'S6': 'Pace timing misread',
+  'S7': 'Volume growing, rate diluting',
+  'S8': 'Full compression opportunity',
+  'opportunity': 'Opportunity',
+  'noise': 'Stable',
+  'pace_timing_misread': 'Pace timing misread'
+};
+function readableScenarioLabel(code) {
+  if (!code) return '—';
+  const upper = code.toUpperCase();
+  for (const [k, v] of Object.entries(SCENARIO_LABELS)) {
+    if (upper === k.toUpperCase()) return v;
+  }
+  return code; // fallback: show raw value if not mapped
 }
 
 function allAccountsAtRisk(engineJson) {
@@ -738,6 +767,7 @@ async function runCompare() {
   renderPaceSection(ejA, ejB, dateA, dateB);
   renderSegmentSection(ejA, ejB);
   renderCorporateSection(ejA, ejB);
+  renderGroupsSection(ejA, ejB);
   renderDecisionsSection(ejA, ejB, dateA, dateB);
 }
 
@@ -828,11 +858,13 @@ function renderSegmentSection(ejA, ejB) {
   const bodyRows = [];
   for (const seg of keys) {
     if (seg === '—' && !mapA.get(seg) && !mapB.get(seg)) continue;
-    const sa = mapA.get(seg) || '';
-    const sb = mapB.get(seg) || '';
-    const ch = segmentChange(sa, sb);
-    const bHasIssue = !!sb;
-    const changed = sa !== sb;
+    const rawA = mapA.get(seg) || '';
+    const rawB = mapB.get(seg) || '';
+    const ch = segmentChange(rawA, rawB);
+    const bHasIssue = !!rawB;
+    const changed = rawA !== rawB;
+    const sa = readableScenarioLabel(rawA);
+    const sb = readableScenarioLabel(rawB);
     if (!changed && !bHasIssue) continue;
     bodyRows.push(`<tr>
       <td>${escHtml(seg)}</td>
@@ -859,43 +891,39 @@ function renderCorporateSection(ejA, ejB) {
   const mapA = new Map();
   for (const a of accA) {
     const k = accountCompanyKey(a);
-    if (!k) continue;
-    mapA.set(k, a);
-  }
-  const mapB = new Map();
-  for (const a of accB) {
-    const k = accountCompanyKey(a);
-    if (!k) continue;
-    mapB.set(k, a);
+    if (k) mapA.set(k, a);
   }
 
-  const newRisk = [];
-  for (const [k, b] of mapB) {
-    if (!mapA.has(k)) newRisk.push({ a: null, b });
-  }
+  const newRisk = [], worsened = [], unchanged = [], recovered = [];
 
-  const worsened = [];
-  const recovered = [];
-  for (const [k, a] of mapA) {
-    const b = mapB.get(k);
-    if (!b) {
-      recovered.push({ a, b: null, kind: 'off_list' });
-      continue;
-    }
+  // Accounts in B — classify vs A
+  for (const b of accB) {
+    const k = accountCompanyKey(b);
+    if (!k) continue;
+    const a = mapA.get(k);
+    if (!a) { newRisk.push({ a: null, b }); continue; }
     const va = num(a.variance_rn);
     const vb = num(b.variance_rn);
-    if (va == null || vb == null) continue;
-    if (vb < va) worsened.push({ a, b });
-    else if (vb > va) recovered.push({ a, b, kind: 'improved' });
+    if (va == null || vb == null) { unchanged.push({ a, b }); continue; }
+    if (vb < va - 1) worsened.push({ a, b });
+    else if (vb > va + 1) recovered.push({ a, b, kind: 'improved' });
+    else unchanged.push({ a, b });
+  }
+
+  // Accounts in A but not B — off the at-risk list
+  const offList = [];
+  for (const [k, a] of mapA) {
+    if (!accB.find(b => accountCompanyKey(b) === k)) {
+      offList.push({ a, b: null, kind: 'off_list' });
+    }
   }
 
   function rowHtml(x) {
-    const a = x.a;
-    const b = x.b;
-    const name = escHtml((b || a).company_name || '—');
-    const mgr = escHtml((b || a).account_manager || '—');
-    const va = a ? num(a.variance_rn) : null;
-    const vb = b ? num(b.variance_rn) : null;
+    const src = x.b || x.a;
+    const name = escHtml(src.company_name || src.account_name || '—');
+    const mgr = escHtml(src.account_manager || '—');
+    const va = x.a ? num(x.a.variance_rn) : null;
+    const vb = x.b ? num(x.b.variance_rn) : null;
     const fmt = v => v == null ? '—' : `${Math.round(v)} RN`;
     let mov = '—';
     if (x.kind === 'off_list') {
@@ -908,25 +936,119 @@ function renderCorporateSection(ejA, ejB) {
   }
 
   const block = (title, rows, emptyMsg) => {
-    if (!rows.length) {
-      return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div><p class="nc-text">${escHtml(emptyMsg)}</p></div>`;
-    }
+    if (!rows.length) return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div><p class="nc-text">${escHtml(emptyMsg)}</p></div>`;
     return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div>
       <table class="wk-table"><thead><tr>
         <th>Company</th><th>Account mgr</th><th>Var A</th><th>Var B</th><th>Movement</th>
       </tr></thead><tbody>${rows.map(rowHtml).join('')}</tbody></table></div>`;
   };
 
-  const html = `
+  document.getElementById('corporate-section').innerHTML = `
   <div class="nc-card">
     <div class="nc-header"><div class="nc-title">Corporate pace — at-risk accounts</div></div>
     <div class="nc-body">
       ${block('New at-risk this week', newRisk, 'None.')}
       ${block('Worsened', worsened, 'None.')}
-      ${block('Recovered / improved', recovered, 'None.')}
+      ${block('Unchanged', unchanged, 'None.')}
+      ${block('Recovered / off at-risk list', [...recovered, ...offList], 'None.')}
     </div>
   </div>`;
-  document.getElementById('corporate-section').innerHTML = html;
+}
+
+function renderGroupsSection(ejA, ejB) {
+  // WHY: Compare group pipeline status between snapshots.
+  // Surface: newly converted, turned down, new tentatives, disappeared.
+  // Source: group_pipeline_issues[].groups[] array in each snapshot.
+  function extractGroups(ej) {
+    const issues = Array.isArray(ej?.group_pipeline_issues)
+      ? ej.group_pipeline_issues : [];
+    const map = new Map();
+    for (const issue of issues) {
+      const groups = Array.isArray(issue.groups) ? issue.groups : [];
+      for (const g of groups) {
+        const name = String(g.group_name || g.name || '').trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (!map.has(key)) map.set(key, { ...g, name });
+      }
+    }
+    return map;
+  }
+
+  const gA = extractGroups(ejA);
+  const gB = extractGroups(ejB);
+
+  const converted = [];
+  const turnedDown = [];
+  const newTentative = [];
+  const statusChanged = [];
+
+  for (const [key, grpA] of gA) {
+    const grpB = gB.get(key);
+    const stA = String(grpA.status || '').toLowerCase().trim();
+    const stB = grpB ? String(grpB.status || '').toLowerCase().trim() : null;
+
+    if (!grpB) {
+      if (stA === 'tentative' || stA === 'prospect') {
+        converted.push({ grp: grpA, note: 'No longer in pipeline — converted or removed' });
+      }
+      continue;
+    }
+    if (stA === stB) continue;
+
+    const isTurnedDown = /turn|cancel|declin|lost|refused/i.test(stB);
+    if (isTurnedDown) {
+      turnedDown.push({ grpA, grpB });
+    } else {
+      statusChanged.push({ grpA, grpB });
+    }
+  }
+
+  for (const [key, grpB] of gB) {
+    if (!gA.has(key)) newTentative.push({ grp: grpB });
+  }
+
+  function grpRow(label, grp, note) {
+    const rn = grp.room_nights != null ? Math.round(grp.room_nights) + ' RN' : '—';
+    const rev = grp.room_revenue != null
+      ? '€' + Math.round(grp.room_revenue).toLocaleString('en-GB') : '—';
+    const arr = grp.arrival_date || '—';
+    const owner = grp.owner || grp.sales_manager || '—';
+    const status = grp.status || '—';
+    return `<tr>
+      <td><strong>${escHtml(grp.name || grp.group_name || '—')}</strong></td>
+      <td>${escHtml(rn)} / ${escHtml(rev)}</td>
+      <td>${escHtml(arr)}</td>
+      <td>${escHtml(owner)}</td>
+      <td>${escHtml(note || status)}</td>
+    </tr>`;
+  }
+
+  function block(title, rows, emptyMsg) {
+    if (!rows.length) return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div><p class="nc-text">${escHtml(emptyMsg)}</p></div>`;
+    return `<div class="nc-section"><div class="sub-h">${escHtml(title)}</div>
+      <table class="wk-table"><thead><tr>
+        <th>Group</th><th>RN / Revenue</th><th>Arrival</th><th>Owner</th><th>Status / Note</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  const noData = !gA.size && !gB.size;
+  if (noData) {
+    document.getElementById('groups-section').innerHTML =
+      '<div class="nc-card"><div class="nc-body"><p class="nc-text">No group pipeline data in either snapshot.</p></div></div>';
+    return;
+  }
+
+  document.getElementById('groups-section').innerHTML = `
+  <div class="nc-card">
+    <div class="nc-header"><div class="nc-title">Group pipeline movement</div></div>
+    <div class="nc-body">
+      ${block('Converted / removed from pipeline', converted.map(x => grpRow('', x.grp, x.note)), 'None.')}
+      ${block('Turned down / cancelled', turnedDown.map(x => grpRow('', x.grpB, x.grpB.status)), 'None.')}
+      ${block('New in pipeline this week', newTentative.map(x => grpRow('', x.grp, x.grp.status)), 'None.')}
+      ${block('Status changed', statusChanged.map(x => grpRow('', x.grpB, x.grpA.status + ' → ' + x.grpB.status)), 'None.')}
+    </div>
+  </div>`;
 }
 
 function renderDecisionsSection(ejA, ejB, dateA, dateB) {
