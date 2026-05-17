@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aithenor — Cost & GOP Diagnostic (Demo)</title>
+<title>Aithenor — Cost & GOP Diagnostic</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 <style>
 :root {
@@ -1860,153 +1860,212 @@ table.fi-account-table th {
 .pace-3col-grid .nc-card:nth-child(2) { border-left: 3px solid #BA7517; border-radius: 0 8px 8px 0; }
 .pace-3col-grid .nc-card:nth-child(3) { border-left: 3px solid #888780; border-radius: 0 8px 8px 0; }
 
-.demo-watermark {
-  position: fixed;
-  top: 50%;
-  left: calc(50% + 130px);
-  transform: translate(-50%, -50%) rotate(-30deg);
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 96px;
-  font-weight: 300;
-  color: rgba(201,168,76,0.07);
-  pointer-events: none;
-  z-index: 0;
-  letter-spacing: 12px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.gop-bridge {
-  background: var(--white);
-  border: 0.5px solid var(--gray-200);
-  border-radius: 8px;
-  padding: 20px 24px 16px;
-  margin-bottom: 24px;
-}
-.gop-bridge-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--gray-400);
-  font-weight: 500;
-  margin-bottom: 16px;
-}
-.gop-bridge-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 80px;
-  margin-bottom: 8px;
-}
-.bridge-bar {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  flex: 1;
-  gap: 4px;
-}
-.bridge-fill {
-  width: 100%;
-  border-radius: 3px 3px 0 0;
-  min-height: 4px;
-}
-.bridge-val {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--gray-700);
-  white-space: nowrap;
-}
-.bridge-lbl {
-  font-size: 9px;
-  color: var(--gray-400);
-  text-align: center;
-  margin-top: 6px;
-  white-space: nowrap;
-}
-.bridge-connector {
-  width: 4px;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-}
-.bridge-connector::after {
-  content: '';
-  width: 100%;
-  height: 1px;
-  background: var(--gray-300);
-  display: block;
-}
+/* ── COSTS PAGE SPECIFIC ───────────────────────── */
 
 .cost-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--gray-400);
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--gray-400);
   padding: 4px 0 8px;
   border-bottom: 0.5px solid var(--gray-200);
-  margin-bottom: 10px;
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
+  margin-bottom: 10px; margin-top: 24px;
+  display: flex; align-items: center;
   justify-content: space-between;
 }
 .cost-section-saving {
-  font-size: 11px;
-  font-weight: 500;
-  color: #1A6B3C;
-  letter-spacing: 0;
-  text-transform: none;
+  font-size: 11px; font-weight: 500; color: var(--green);
+  letter-spacing: 0; text-transform: none;
 }
-
-.nc-gop-impact {
-  background: var(--green-light);
-  border-radius: 6px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.nc-gop-impact-val {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--green);
-}
-.nc-gop-impact-lbl {
-  font-size: 11px;
-  color: #2D7A50;
-  line-height: 1.4;
-}
+.cost-section-saving.pending { color: var(--amber); }
 
 .nc-badge-critical {
   font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
-  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 3px;
   background: #FDECEA; color: #C0392B;
 }
 .nc-badge-high {
   font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
-  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 3px;
   background: #FEF0E7; color: #D35400;
 }
 .nc-badge-medium {
   font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
-  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 3px;
   background: #FEF9E7; color: #B8860B;
 }
-
-.nc-calc-table { width:100%; border-collapse:collapse; font-size:12px; }
-.nc-calc-table td { padding: 3px 0; color: var(--gray-700); }
-.nc-calc-table td:last-child { text-align:right; font-weight:500; color:var(--navy); }
-.nc-calc-table tr.calc-total td {
-  border-top: 0.5px solid var(--gray-200);
-  padding-top: 6px; font-weight: 600; color: var(--navy);
+.nc-badge-dev {
+  font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 3px;
+  background: #EDE9FE; color: #5B21B6;
 }
-.nc-calc-table tr.calc-note td {
-  font-style: italic; color: var(--gray-400); font-size: 11px;
+
+.nc-gop-impact {
+  background: var(--green-light); border-radius: 6px;
+  padding: 10px 14px;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 12px;
+}
+.nc-gop-impact.pending { background: var(--amber-light); }
+.nc-gop-impact-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px; font-weight: 500; color: var(--green);
+}
+.nc-gop-impact-val.pending { color: var(--amber); }
+.nc-gop-impact-lbl { font-size: 11px; color: #2D7A50; line-height: 1.4; }
+.nc-gop-impact-lbl.pending { color: var(--amber); }
+
+.nc-visual {
+  background: var(--gray-100);
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 4px;
+  position: relative;
+}
+.nc-visual-title {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--gray-400);
+  font-weight: 500; margin-bottom: 12px;
+}
+
+.staffing-bars { display: flex; flex-direction: column; gap: 10px; }
+.staffing-row { display: flex; align-items: center; gap: 10px; }
+.staffing-row-label {
+  font-size: 11px; color: var(--gray-600);
+  min-width: 110px; flex-shrink: 0;
+}
+.staffing-bar-track {
+  flex: 1; height: 22px; background: var(--gray-200);
+  border-radius: 3px; overflow: hidden; position: relative;
+}
+.staffing-bar-fill {
+  height: 100%; border-radius: 3px;
+  display: flex; align-items: center;
+  padding-left: 8px;
+  font-size: 11px; font-weight: 600; color: white;
+  transition: width 0.8s ease;
+}
+.staffing-bar-fill.required { background: var(--green); }
+.staffing-bar-fill.scheduled { background: #C0392B; }
+.staffing-val {
+  font-size: 11px; font-weight: 600;
+  min-width: 30px; text-align: right;
+  flex-shrink: 0;
+}
+
+.dot-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.dot-grid-dot {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+}
+.dot-grid-dot.needed { background: var(--green); }
+.dot-grid-dot.excess { background: #C0392B; }
+.dot-grid-legend {
+  display: flex; gap: 16px; margin-top: 10px;
+}
+.dot-legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--gray-600);
+}
+.dot-legend-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+
+.leave-calendar {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.leave-day {
+  border-radius: 4px; padding: 6px 4px;
+  text-align: center;
+  background: var(--gray-200);
+}
+.leave-day-name {
+  font-size: 9px; color: var(--gray-400);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.leave-day-date { font-size: 11px; font-weight: 500; color: var(--navy); margin: 2px 0; }
+.leave-day-occ {
+  font-size: 10px; font-weight: 600;
+}
+.leave-day-icon { font-size: 10px; margin-top: 2px; }
+.leave-day.peak { background: #FDECEA; }
+.leave-day.peak .leave-day-date { color: #C0392B; }
+.leave-day.peak .leave-day-occ { color: #C0392B; }
+
+.po-comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.po-box {
+  border-radius: 6px; padding: 14px 16px; text-align: center;
+}
+.po-box.theoretical { background: var(--green-light); }
+.po-box.actual { background: #FDECEA; }
+.po-box-label {
+  font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.1em; font-weight: 500;
+  margin-bottom: 6px;
+}
+.po-box.theoretical .po-box-label { color: #2D7A50; }
+.po-box.actual .po-box-label { color: #C0392B; }
+.po-box-value {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px; font-weight: 500; line-height: 1;
+}
+.po-box.theoretical .po-box-value { color: var(--green); }
+.po-box.actual .po-box-value { color: #C0392B; }
+.po-box-sub { font-size: 11px; margin-top: 4px; color: var(--gray-600); }
+.po-overorder-badge {
+  margin-top: 10px; text-align: center;
+  font-size: 13px; font-weight: 600;
+  color: #C0392B;
+  background: #FDECEA; border-radius: 4px; padding: 6px 12px;
+}
+
+.gop-bridge {
+  background: var(--white); border: 0.5px solid var(--gray-200);
+  border-radius: 8px; padding: 20px 24px 16px; margin-bottom: 24px;
+}
+.gop-bridge-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--gray-400); font-weight: 500; margin-bottom: 16px;
+}
+
+.cost-summary-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.cost-summary-table th {
+  padding: 8px 16px; text-align: left; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--gray-400); font-weight: 500;
+  background: var(--gray-100);
+}
+.cost-summary-table th:last-child,
+.cost-summary-table th:nth-child(4) { text-align: right; }
+.cost-summary-table td { padding: 10px 16px; border-bottom: 0.5px solid var(--gray-100); }
+.cost-summary-table td:last-child,
+.cost-summary-table td:nth-child(4) { text-align: right; }
+.cost-summary-table tr.total-row td {
+  background: var(--navy); color: var(--white); font-weight: 600;
+  border-bottom: none;
+}
+.cost-summary-table tr.total-row td:last-child {
+  color: var(--gold); font-size: 15px;
+}
+
+.demo-watermark {
+  position: fixed; top: 50%;
+  left: calc(50% + 130px);
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 96px; font-weight: 300;
+  color: rgba(201,168,76,0.06);
+  pointer-events: none; z-index: 0;
+  letter-spacing: 12px; text-transform: uppercase;
+  white-space: nowrap; user-select: none;
+}
+
+.sidebar-bottom .sync-dot.demo-dot {
+  background: var(--amber);
+  animation: none;
 }
 
 </style>
@@ -2017,19 +2076,16 @@ table.fi-account-table th {
     <div class="logo-text">Aithenor</div>
     <div class="logo-sub">Strategic Intelligence</div>
   </div>
-
   <div class="hotel-card">
     <div class="hotel-name" id="sidebar-hotel">Hotel Aurem</div>
     <div class="hotel-meta" id="sidebar-period">Paris · 85 rooms · November 2025</div>
   </div>
-
   <nav class="nav">
     <div class="nav-section">Executive</div>
     <a class="nav-item" href="gm.html">
       <span class="nav-icon">✦</span>
       GM Briefing
     </a>
-
     <div class="nav-section">Intelligence</div>
     <a class="nav-item" href="index.html">
       <span class="nav-icon">◈</span>
@@ -2044,7 +2100,6 @@ table.fi-account-table th {
       <span class="nav-icon">◇</span>
       Cost Modules
     </a>
-
     <div class="nav-section">Execution</div>
     <div class="nav-item">
       <span class="nav-icon">◇</span>
@@ -2062,13 +2117,11 @@ table.fi-account-table th {
       <span class="nav-icon">◇</span>
       Action Tracker
     </div>
-
     <div class="nav-section">Performance</div>
     <div class="nav-item">
       <span class="nav-icon">◇</span>
       Historical Analysis
     </div>
-
     <div class="nav-section">Settings</div>
     <div class="nav-item">
       <span class="nav-icon">◇</span>
@@ -2079,15 +2132,10 @@ table.fi-account-table th {
       Upload Data
     </div>
   </nav>
-
   <div class="sidebar-bottom">
     <div class="sync-status">
-      <div class="sync-dot"></div>
-      <span id="sync-label">Connected to Supabase</span>
-    </div>
-    <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
-      <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
-      <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.2s;" onmouseover="this.style.color='white'; this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'; this.style.borderColor='rgba(255,255,255,0.1)'">Sign Out</button>
+      <div class="sync-dot demo-dot"></div>
+      <span id="sync-label">Demo Mode — Static Data</span>
     </div>
   </div>
 </div>
@@ -2097,361 +2145,398 @@ table.fi-account-table th {
   <div class="topbar">
     <div class="topbar-left">
       <div class="topbar-brand">Aithenor</div>
-      <div class="topbar-meta">Cost & GOP Diagnostic — Hotel Aurem · November 2025</div>
+      <div class="topbar-meta">Cost &amp; GOP Diagnostic — Hotel Aurem · November 2025</div>
     </div>
     <div class="topbar-right">
-      <span style="font-size:11px; font-weight:600; letter-spacing:1.5px;
-        text-transform:uppercase; color:#B8860B; background:#FEF9E7;
-        padding:4px 10px; border-radius:3px; border:1px solid #E8D88A;">
-        DEMO MODULE — IN DEVELOPMENT
-      </span>
+      <span style="font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:#B8860B; background:#FEF9E7; padding:4px 10px; border-radius:3px; border:1px solid #E8D88A;">DEMO MODULE — IN DEVELOPMENT</span>
     </div>
   </div>
   <div class="content" style="position:relative; z-index:1;">
 
-    <div style="display:grid; grid-template-columns:repeat(4,1fr); border-bottom:0.5px solid var(--gray-200); background:var(--white); margin-bottom:24px;">
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); border:0.5px solid var(--gray-200); border-radius:8px; background:var(--white); margin-bottom:24px; overflow:hidden;">
       <div class="kpi-cell">
-        <div class="kpi-label">FORECASTED GOP</div>
+        <div class="kpi-label">Forecasted GOP</div>
         <div class="kpi-value">€5,000,000</div>
         <div class="kpi-sub">Annualised · Hotel Aurem</div>
       </div>
       <div class="kpi-cell">
-        <div class="kpi-label">RECOVERABLE GOP</div>
+        <div class="kpi-label">Recoverable GOP</div>
         <div class="kpi-value kpi-pos">€224,880</div>
         <div class="kpi-sub">If all findings actioned at 75%</div>
       </div>
       <div class="kpi-cell">
-        <div class="kpi-label">PAYROLL % REVENUE</div>
+        <div class="kpi-label">Payroll % Revenue</div>
         <div class="kpi-value kpi-warn">34.2%</div>
         <div class="kpi-sub">Target ≤32% · +2.2pts above threshold</div>
       </div>
       <div class="kpi-cell">
-        <div class="kpi-label">FOOD COST %</div>
+        <div class="kpi-label">Food Cost %</div>
         <div class="kpi-value kpi-neg">33.4%</div>
         <div class="kpi-sub">Target 28.0% · +5.4pts variance</div>
       </div>
     </div>
+
     <div class="gop-bridge">
       <div class="gop-bridge-title">GOP Bridge — Identified Recovery Opportunity</div>
-      <div class="gop-bridge-bars">
-        <div class="bridge-bar">
-          <div class="bridge-val">€5,000,000</div>
-          <div class="bridge-fill" style="height:80px; background:#0F1F3D;"></div>
-          <div class="bridge-lbl">Forecasted<br>GOP</div>
-        </div>
-        <div class="bridge-connector"></div>
-        <div class="bridge-bar">
-          <div class="bridge-val" style="color:#C0392B;">−€103,680</div>
-          <div class="bridge-fill" style="height:37px; background:#FDECEA; border:1px solid #C0392B;"></div>
-          <div class="bridge-lbl">Rooms<br>Labour</div>
-        </div>
-        <div class="bridge-connector"></div>
-        <div class="bridge-bar">
-          <div class="bridge-val" style="color:#C0392B;">−€50,400</div>
-          <div class="bridge-fill" style="height:18px; background:#FDECEA; border:1px solid #C0392B;"></div>
-          <div class="bridge-lbl">F&B<br>Labour</div>
-        </div>
-        <div class="bridge-connector"></div>
-        <div class="bridge-bar">
-          <div class="bridge-val" style="color:#D35400;">−€37,200</div>
-          <div class="bridge-fill" style="height:13px; background:#FEF0E7; border:1px solid #D35400;"></div>
-          <div class="bridge-lbl">Leave<br>Clustering</div>
-        </div>
-        <div class="bridge-connector"></div>
-        <div class="bridge-bar">
-          <div class="bridge-val" style="color:#D35400;">−€33,600</div>
-          <div class="bridge-fill" style="height:12px; background:#FEF0E7; border:1px solid #D35400;"></div>
-          <div class="bridge-lbl">Food<br>Cost</div>
-        </div>
-        <div class="bridge-connector"></div>
-        <div class="bridge-bar">
-          <div class="bridge-val" style="color:#1A6B3C;">€5,168,660</div>
-          <div class="bridge-fill" style="height:76px; background:#E8F5ED; border:1px solid #1A6B3C;"></div>
-          <div class="bridge-lbl">Projected<br>GOP</div>
-        </div>
-      </div>
-      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">
+      <canvas id="gopBridgeChart" height="90"></canvas>
+      <div style="font-size:11px; color:var(--gray-400); margin-top:10px;">
         At 75% action effectiveness · +€168,660 · +3.4% GOP improvement
       </div>
     </div>
+
+    
     <div class="cost-section-label">
-      <span>Rooms Division</span>
+      Rooms Division
       <span class="cost-section-saving">€103,680 / yr identified</span>
     </div>
+
     <div class="nc-card">
       <div class="nc-header">
         <div class="nc-header-left">
           <div class="nc-title">Housekeeping Labour — Systematic Overstaffing vs Forecast</div>
           <div class="nc-subtitle">Rooms Division · November 2025</div>
         </div>
-        <div class="nc-header-right">
-          <span class="nc-badge-critical">CRITICAL</span>
-        </div>
+        <div class="nc-header-right"><span class="nc-badge-critical">Critical</span></div>
       </div>
       <div class="nc-body">
-        <div class="nc-section">
-          <div class="nc-label">SITUATION</div>
-          <div class="nc-text">26 valets scheduled daily against a forecast requirement of 18. Based on average daily departures (22), stayovers (39), and arrivals (24), the staffing model calculates a daily need of 1,790 cleaning minutes — covered by 18 valets at 435 net productive minutes each. The hotel is running 8 excess valets every day of the month.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DIAGNOSIS</div>
-          <div class="nc-text">Scheduling is operating on a fixed headcount model, not a forecast-driven one. The schedule does not flex with occupancy. On 55% occupancy days the model shows 14 valets required — the gap widens to 12 excess valets on those days.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">CALCULATION</div>
-          <table class="nc-calc-table"><tbody><tr><td>Daily overstaffing</td><td>8 valets</td></tr><tr><td>Cost per day</td><td>8 × €18 × 8h = €1,152</td></tr><tr><td>Gross monthly cost</td><td>€34,560</td></tr><tr><td>Recoverable (25% flex constraint)</td><td>€8,640 / month</td></tr><tr class="calc-total"><td>Annual GOP saving</td><td>€103,680</td></tr></tbody></table>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DECISION</div>
-          <div class="nc-decision-line">Reduce daily scheduled valets from 26 to 18 on average occupancy days. Implement a rolling 7-day schedule review every Monday against the upcoming week's occupancy forecast.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">EXECUTION</div>
-          <ol class="nc-exec-list"><li>Reconcile the November housekeeping schedule against the occupancy forecast immediately — cut to 18 valets on average-occupancy days.</li><li>On high-occupancy days above 85%, scale to 22 valets — but do not default to 26 as the floor on standard days.</li><li>Share the staffing calculation model with the Executive Housekeeper so scheduling decisions become data-driven.</li><li>Extend the same forecast-linked scheduling model to January — apply it before the schedule is issued, not after.</li></ol>
-        </div>
-        <div class="nc-section">
-          <div class="nc-label">GOP IMPACT</div>
-          <div class="nc-gop-impact">
-            <div class="nc-gop-impact-val">+€103,680 / yr</div>
-            <div class="nc-gop-impact-lbl">+2.1% GOP · Rooms Labour · High confidence</div>
+        <div class="nc-section"><div class="nc-label">Situation</div><div class="nc-text">26 valets scheduled daily against a forecast requirement of 18. Based on average daily departures (22), stayovers (39), and arrivals (24), the staffing model calculates a daily need of 1,790 cleaning minutes — covered by 18 valets at 435 net productive minutes each. The hotel is running 8 excess valets every day of the month.</div></div>
+        <div class="nc-section"><div class="nc-label">Staffing vs Requirement</div>
+          <div class="nc-visual">
+            <div class="nc-visual-title">Daily Valets — Required vs Scheduled</div>
+            <div class="staffing-bars">
+              <div class="staffing-row"><div class="staffing-row-label">Required (model)</div><div class="staffing-bar-track"><div class="staffing-bar-fill required" style="width:69%;">18</div></div><div class="staffing-val" style="color:var(--green);">18</div></div>
+              <div class="staffing-row"><div class="staffing-row-label">Currently scheduled</div><div class="staffing-bar-track"><div class="staffing-bar-fill scheduled" style="width:100%;">26</div></div><div class="staffing-val" style="color:#C0392B;">26</div></div>
+              <div class="staffing-row"><div class="staffing-row-label">On 55% occ. days</div><div class="staffing-bar-track"><div class="staffing-bar-fill required" style="width:54%;">14</div></div><div class="staffing-val" style="color:var(--green);">14</div></div>
+            </div>
+            <div style="margin-top:12px; font-size:11px; color:#C0392B; font-weight:500;">8 excess valets/day · €1,152/day · €34,560 gross monthly cost</div>
           </div>
         </div>
+        <div class="nc-section"><div class="nc-label">Diagnosis</div><div class="nc-text">Scheduling is operating on a fixed headcount model, not a forecast-driven one. The schedule does not flex with occupancy. On 55% occupancy days the gap widens to 12 excess valets.</div></div>
+        <div class="nc-section"><div class="nc-label">Decision</div><div class="nc-decision-line">Reduce daily scheduled valets from 26 to 18 on average occupancy days. Implement a rolling 7-day schedule review every Monday against the upcoming week's occupancy forecast.</div></div>
+        <div class="nc-section"><div class="nc-label">Execution</div><ol class="nc-exec-list"><li>Reconcile the November housekeeping schedule against the occupancy forecast immediately — cut to 18 valets on average-occupancy days.</li><li>On high-occupancy days above 85%, scale to 22 valets — do not default to 26 as the floor on standard days.</li><li>Share the staffing calculation model with the Executive Housekeeper so scheduling decisions become data-driven.</li><li>Apply the same forecast-linked model to January before the schedule is issued, not after.</li></ol></div>
+        <div class="nc-section"><div class="nc-gop-impact"><div class="nc-gop-impact-val">+€103,680 / yr</div><div class="nc-gop-impact-lbl">+2.1% GOP · Rooms Labour · High confidence</div></div></div>
       </div>
     </div>
-    <div class="cost-section-label">
-      <span>Food & Beverage</span>
+
+    <div class="cost-section-label" style="margin-top:24px;">
+      Food &amp; Beverage
       <span class="cost-section-saving">€84,000 / yr identified</span>
     </div>
+
     <div class="nc-card">
       <div class="nc-header">
         <div class="nc-header-left">
-          <div class="nc-title">F&B Service Labour — 2.25× Cover Ratio Overrun</div>
-          <div class="nc-subtitle">Food & Beverage · November 2025</div>
+          <div class="nc-title">F&amp;B Service Labour — 2.25× Cover Ratio Overrun</div>
+          <div class="nc-subtitle">Food &amp; Beverage · November 2025</div>
         </div>
-        <div class="nc-header-right">
-          <span class="nc-badge-critical">CRITICAL</span>
-        </div>
+        <div class="nc-header-right"><span class="nc-badge-critical">Critical</span></div>
       </div>
       <div class="nc-body">
-        <div class="nc-section">
-          <div class="nc-label">SITUATION</div>
-          <div class="nc-text">9 servers scheduled per service against an average of 38 breakfast covers (58% of 65-cover capacity) and 41 dinner covers. The luxury hotel benchmark is 1 server per 12 covers. At current volumes, 4 servers are sufficient for both services.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DIAGNOSIS</div>
-          <div class="nc-text">F&B scheduling defaults to full-team deployment regardless of actual reservation levels. Each server is handling an average of 4.2 covers per service — the luxury benchmark allows up to 12 while maintaining service quality. The hotel is using 2.25× more service staff than required.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">CALCULATION</div>
-          <table class="nc-calc-table"><tbody><tr><td>Servers required (benchmark 1:12)</td><td>4 per service</td></tr><tr><td>Servers currently scheduled</td><td>9 per service</td></tr><tr><td>Daily excess server shifts</td><td>10 (breakfast + dinner)</td></tr><tr><td>Cost per day</td><td>10 × €16 × 4h = €640</td></tr><tr><td>Gross monthly cost</td><td>€19,200</td></tr><tr><td>Recoverable saving</td><td>€4,200 / month</td></tr><tr class="calc-total"><td>Annual GOP saving</td><td>€50,400</td></tr></tbody></table>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DECISION</div>
-          <div class="nc-decision-line">Schedule 1 server per 12 confirmed covers plus 1 buffer. For 38 covers that means 5 servers — not 9. Build a direct link between the reservations system and F&B scheduling.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">EXECUTION</div>
-          <ol class="nc-exec-list"><li>Review F&B scheduling against the daily reservation and occupancy forecast with immediate effect — reschedule November from today.</li><li>Implement covers-based staffing: 1 server per 12 confirmed covers plus 1 buffer server. For 38 covers = 5 servers.</li><li>On high-occupancy days above 80% with 55+ projected covers, scale to 6–7 servers — not the current default of 9.</li><li>Consider split shifts on lower-occupancy days to reduce total paid hours without compromising service window coverage.</li></ol>
-        </div>
-        <div class="nc-section">
-          <div class="nc-label">GOP IMPACT</div>
-          <div class="nc-gop-impact">
-            <div class="nc-gop-impact-val">+€50,400 / yr</div>
-            <div class="nc-gop-impact-lbl">+1.0% GOP · F&B Labour · High confidence</div>
+        <div class="nc-section"><div class="nc-label">Situation</div><div class="nc-text">9 servers scheduled per service against an average of 38 breakfast covers and 41 dinner covers. The luxury hotel benchmark is 1 server per 12 covers. At current volumes, 4 servers are sufficient for both services — the hotel is using 2.25× more staff than required.</div></div>
+        <div class="nc-section"><div class="nc-label">Servers Scheduled vs Required</div>
+          <div class="nc-visual">
+            <div class="nc-visual-title">9 servers scheduled · 4 required · 5 excess</div>
+            <div class="dot-grid" id="serverDotGrid"></div>
+            <div class="dot-grid-legend">
+              <div class="dot-legend-item"><div class="dot-legend-dot" style="background:var(--green);"></div>Required (4)</div>
+              <div class="dot-legend-item"><div class="dot-legend-dot" style="background:#C0392B;"></div>Excess (5)</div>
+            </div>
+            <div style="margin-top:10px; font-size:11px; color:#C0392B; font-weight:500;">10 excess server shifts/day · €640/day · €19,200 gross monthly cost</div>
           </div>
         </div>
+        <div class="nc-section"><div class="nc-label">Diagnosis</div><div class="nc-text">F&amp;B scheduling defaults to full-team deployment regardless of reservation levels. Each server handles an average of 4.2 covers per service — the luxury benchmark allows up to 12 while maintaining service quality.</div></div>
+        <div class="nc-section"><div class="nc-label">Decision</div><div class="nc-decision-line">Schedule 1 server per 12 confirmed covers plus 1 buffer. For 38 covers that means 5 servers — not 9. Build a direct link between the reservations system and F&amp;B scheduling.</div></div>
+        <div class="nc-section"><div class="nc-label">Execution</div><ol class="nc-exec-list"><li>Review F&amp;B scheduling against the daily reservation and occupancy forecast with immediate effect — reschedule November from today.</li><li>Implement covers-based staffing: 1 server per 12 confirmed covers plus 1 buffer. For 38 covers = 5 servers.</li><li>On high-occupancy days above 80% with 55+ projected covers, scale to 6–7 servers.</li><li>Consider split shifts on lower-occupancy days to reduce total paid hours without compromising service coverage.</li></ol></div>
+        <div class="nc-section"><div class="nc-gop-impact"><div class="nc-gop-impact-val">+€50,400 / yr</div><div class="nc-gop-impact-lbl">+1.0% GOP · F&amp;B Labour · High confidence</div></div></div>
       </div>
     </div>
+
     <div class="cost-section-label">
-      <span>Cross-Department</span>
+      Cross-Department
       <span class="cost-section-saving">€37,200 / yr identified</span>
     </div>
+
     <div class="nc-card">
       <div class="nc-header">
         <div class="nc-header-left">
           <div class="nc-title">Annual Leave Clustering — Agency Premium During Peak Week</div>
           <div class="nc-subtitle">Housekeeping · Week of 17–23 November</div>
         </div>
-        <div class="nc-header-right">
-          <span class="nc-badge-high">HIGH</span>
-        </div>
+        <div class="nc-header-right"><span class="nc-badge-high">High</span></div>
       </div>
       <div class="nc-body">
-        <div class="nc-section">
-          <div class="nc-label">SITUATION</div>
-          <div class="nc-text">6 housekeeping valets have simultaneous leave booked during the week of 17–23 November — the highest forecasted occupancy period of the month at 84%. The hotel's replacement policy uses agency staff at €28/hour versus the internal rate of €18/hour.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DIAGNOSIS</div>
-          <div class="nc-text">Leave requests are approved on a first-come first-served basis without cross-referencing the 90-day occupancy forecast. The result: the hotel pays a 56% hourly rate premium precisely when it needs the most rooms serviced. Agency valets unfamiliar with Hotel Aurem's room configurations are also 15–20% slower, compounding the cost.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">CALCULATION</div>
-          <table class="nc-calc-table"><tbody><tr><td>Agency cost — 6 valets × 7 days</td><td>€9,408</td></tr><tr><td>Internal cost equivalent</td><td>€6,048</td></tr><tr><td>Rate premium</td><td>€3,360</td></tr><tr><td>Productivity loss (15% slower)</td><td>~€740</td></tr><tr class="calc-total"><td>Recoverable monthly saving</td><td>€3,100</td></tr><tr class="calc-total"><td>Annual GOP saving</td><td>€37,200</td></tr></tbody></table>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DECISION</div>
-          <div class="nc-decision-line">Enforce a maximum of 2 simultaneous leave days during any period with forecasted occupancy above 75%. Cross-reference the leave calendar against the 90-day forecast at the start of each quarter.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">EXECUTION</div>
-          <ol class="nc-exec-list"><li>Review the November 17–23 leave schedule immediately — negotiate with at least 3 of the 6 valets to defer to a lower-occupancy week.</li><li>Implement a leave management policy: maximum 2 valets on simultaneous leave when forecasted occupancy exceeds 75%.</li><li>Build a leave calendar cross-referenced against the 90-day occupancy forecast each quarter before leave is approved.</li><li>Where agency replacement is unavoidable, pre-brief agency staff with room configuration guides to close the productivity gap.</li></ol>
-        </div>
-        <div class="nc-section">
-          <div class="nc-label">GOP IMPACT</div>
-          <div class="nc-gop-impact">
-            <div class="nc-gop-impact-val">+€37,200 / yr</div>
-            <div class="nc-gop-impact-lbl">+0.7% GOP · Cross-dept · Medium confidence</div>
+        <div class="nc-section"><div class="nc-label">Situation</div><div class="nc-text">6 housekeeping valets have simultaneous leave during the week of 17–23 November — the highest forecasted occupancy period of the month at 84%. The hotel's agency replacement rate is €28/hour vs the internal rate of €18/hour — a 56% premium.</div></div>
+        <div class="nc-section"><div class="nc-label">Leave vs Occupancy — Week 17–23 November</div>
+          <div class="nc-visual">
+            <div class="nc-visual-title">Occupancy forecast · 🔴 = valets on leave that day</div>
+            <div class="leave-calendar">
+              <div class="leave-day peak">
+                <div class="leave-day-name">Mon</div>
+                <div class="leave-day-date">17</div>
+                <div class="leave-day-occ">81%</div>
+                <div class="leave-day-icon">🔴🔴</div>
+              </div>
+              <div class="leave-day peak">
+                <div class="leave-day-name">Tue</div>
+                <div class="leave-day-date">18</div>
+                <div class="leave-day-occ">83%</div>
+                <div class="leave-day-icon">🔴🔴</div>
+              </div>
+              <div class="leave-day peak">
+                <div class="leave-day-name">Wed</div>
+                <div class="leave-day-date">19</div>
+                <div class="leave-day-occ">85%</div>
+                <div class="leave-day-icon">🔴🔴🔴</div>
+              </div>
+              <div class="leave-day peak">
+                <div class="leave-day-name">Thu</div>
+                <div class="leave-day-date">20</div>
+                <div class="leave-day-occ">87%</div>
+                <div class="leave-day-icon">🔴🔴🔴</div>
+              </div>
+              <div class="leave-day peak">
+                <div class="leave-day-name">Fri</div>
+                <div class="leave-day-date">21</div>
+                <div class="leave-day-occ">84%</div>
+                <div class="leave-day-icon">🔴🔴</div>
+              </div>
+              <div class="leave-day peak">
+                <div class="leave-day-name">Sat</div>
+                <div class="leave-day-date">22</div>
+                <div class="leave-day-occ">89%</div>
+                <div class="leave-day-icon">🔴🔴</div>
+              </div>
+              <div class="leave-day peak">
+                <div class="leave-day-name">Sun</div>
+                <div class="leave-day-date">23</div>
+                <div class="leave-day-occ">82%</div>
+                <div class="leave-day-icon">🔴</div>
+              </div></div>
+            <div style="margin-top:10px; font-size:11px; color:#C0392B; font-weight:500;">Agency premium: +€3,360 · Productivity loss: ~€740 · Total recoverable: €3,100</div>
           </div>
         </div>
+        <div class="nc-section"><div class="nc-label">Diagnosis</div><div class="nc-text">Leave requests are approved on a first-come first-served basis without cross-referencing the 90-day occupancy forecast. Agency valets unfamiliar with Hotel Aurem's room configurations are also 15–20% slower, compounding the cost.</div></div>
+        <div class="nc-section"><div class="nc-label">Decision</div><div class="nc-decision-line">Enforce a maximum of 2 simultaneous leave days during any period with forecasted occupancy above 75%. Cross-reference the leave calendar against the 90-day forecast at the start of each quarter.</div></div>
+        <div class="nc-section"><div class="nc-label">Execution</div><ol class="nc-exec-list"><li>Review the November 17–23 leave schedule immediately — negotiate with at least 3 of the 6 valets to defer to a lower-occupancy week.</li><li>Implement a leave management policy: maximum 2 valets on simultaneous leave when forecasted occupancy exceeds 75%.</li><li>Build a leave calendar cross-referenced against the 90-day occupancy forecast each quarter before leave is approved.</li><li>Where agency replacement is unavoidable, pre-brief agency staff with room configuration guides to reduce the productivity gap.</li></ol></div>
+        <div class="nc-section"><div class="nc-gop-impact"><div class="nc-gop-impact-val">+€37,200 / yr</div><div class="nc-gop-impact-lbl">+0.7% GOP · Cross-dept · Medium confidence</div></div></div>
       </div>
     </div>
-    
+
+    <div class="cost-section-label">
+      Food &amp; Beverage — Cost Control
+      <span class="cost-section-saving">€33,600 / yr identified</span>
+    </div>
+
     <div class="nc-card">
       <div class="nc-header">
         <div class="nc-header-left">
           <div class="nc-title">Food Cost % — 5.4pts Above Target</div>
-          <div class="nc-subtitle">F&B Purchasing & Cost Control · November YTD</div>
+          <div class="nc-subtitle">F&amp;B Purchasing &amp; Cost Control · November YTD</div>
         </div>
-        <div class="nc-header-right">
-          <span class="nc-badge-medium">MEDIUM</span>
-        </div>
+        <div class="nc-header-right"><span class="nc-badge-medium">Medium</span></div>
       </div>
       <div class="nc-body">
-        <div class="nc-section">
-          <div class="nc-label">SITUATION</div>
-          <div class="nc-text">F&B food cost is running at 33.4% of F&B revenue against a target of 28.0% — a variance of 5.4 percentage points. Based on projected November F&B revenue of €52,000, this represents €2,808 in excess food cost for the month alone.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DIAGNOSIS</div>
-          <div class="nc-text">A variance of this magnitude sustained over multiple months typically points to one or more of: over-purchasing relative to actual covers, inadequate portion control, untracked wastage and spoilage, or menu mix skewed toward low-margin dishes. The magnitude confirms this is not a minor fluctuation.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">CALCULATION</div>
-          <table class="nc-calc-table"><tbody><tr><td>Projected November F&B revenue</td><td>€52,000</td></tr><tr><td>Target food cost at 28%</td><td>€14,560</td></tr><tr><td>Actual food cost at 33.4%</td><td>€17,368</td></tr><tr><td>Monthly overage</td><td>€2,808</td></tr><tr><td>Conservative recovery to 30%</td><td>€14,976 / yr</td></tr><tr class="calc-total"><td>Full recovery to 28% target</td><td>€33,600 / yr</td></tr></tbody></table>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DECISION</div>
-          <div class="nc-decision-line">Conduct a purchasing audit for November this week — compare actual purchases against theoretical consumption based on covers served. Implement weekly food cost tracking by outlet rather than waiting for the monthly P&L.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">EXECUTION</div>
-          <ol class="nc-exec-list"><li>Conduct an immediate purchasing audit — compare actual purchases against theoretical consumption based on covers served.</li><li>Review portion sizes against standardized recipe cards — verify the kitchen brigade is following documented portions consistently.</li><li>Analyze the menu sales mix — identify the 5 highest-volume items and verify their actual food cost % against target.</li><li>Implement a daily wastage log — categorize all food waste to identify whether the issue is over-production, spoilage, or loss.</li><li>Implement weekly food cost reporting by outlet — do not wait for the monthly P&L to detect in-month overruns.</li></ol>
-        </div>
-        <div class="nc-section">
-          <div class="nc-label">GOP IMPACT</div>
-          <div class="nc-gop-impact">
-            <div class="nc-gop-impact-val">+€33,600 / yr</div>
-            <div class="nc-gop-impact-lbl">+0.7% GOP · F&B Cost · Medium confidence</div>
+        <div class="nc-section"><div class="nc-label">Situation</div><div class="nc-text">F&amp;B food cost is running at 33.4% of F&amp;B revenue against a target of 28.0% — a variance of 5.4 percentage points. Based on projected November F&amp;B revenue of €52,000, this represents €2,808 in excess food cost for the month alone.</div></div>
+        <div class="nc-section"><div class="nc-label">Food Cost % — Target vs Actual</div>
+          <div class="nc-visual" style="display:flex; align-items:center; gap:24px;">
+            <div style="position:relative; width:140px; height:140px; flex-shrink:0;">
+              <canvas id="foodCostChart"></canvas>
+              <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none;">
+                <div style="font-size:11px; color:var(--gray-400);">Actual</div>
+                <div style="font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:500; color:#C0392B; line-height:1;">33.4%</div>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <div style="margin-bottom:10px;">
+                <div style="font-size:11px; color:var(--gray-400); margin-bottom:3px;">Target food cost (28%)</div>
+                <div style="height:8px; background:var(--gray-200); border-radius:4px; overflow:hidden;">
+                  <div style="width:28%; height:100%; background:var(--green); border-radius:4px;"></div>
+                </div>
+              </div>
+              <div style="margin-bottom:10px;">
+                <div style="font-size:11px; color:var(--gray-400); margin-bottom:3px;">Actual food cost (33.4%)</div>
+                <div style="height:8px; background:var(--gray-200); border-radius:4px; overflow:hidden;">
+                  <div style="width:33.4%; height:100%; background:#C0392B; border-radius:4px;"></div>
+                </div>
+              </div>
+              <div style="font-size:12px; color:#C0392B; font-weight:500; margin-top:8px;">€2,808 excess cost this month · €33,600 annualised</div>
+            </div>
           </div>
         </div>
+        <div class="nc-section"><div class="nc-label">Diagnosis</div><div class="nc-text">A variance of this magnitude sustained over multiple months typically points to: over-purchasing relative to actual covers, inadequate portion control, untracked wastage, or menu mix skewed toward low-margin dishes. The magnitude confirms this is not a minor fluctuation.</div></div>
+        <div class="nc-section"><div class="nc-label">Decision</div><div class="nc-decision-line">Conduct a purchasing audit for November this week — compare actual purchases against theoretical consumption based on covers served. Implement weekly food cost tracking by outlet rather than waiting for the monthly P&amp;L.</div></div>
+        <div class="nc-section"><div class="nc-label">Execution</div><ol class="nc-exec-list"><li>Conduct an immediate purchasing audit — compare actual purchases against theoretical consumption based on covers served.</li><li>Review portion sizes against standardized recipe cards — verify the kitchen brigade is following documented portions consistently.</li><li>Analyze the menu sales mix — identify the 5 highest-volume items and verify their actual food cost % against target.</li><li>Implement a daily wastage log — categorize all food waste to identify whether the issue is over-production, spoilage, or loss.</li><li>Implement weekly food cost reporting by outlet — do not wait for the monthly P&amp;L to detect in-month overruns.</li></ol></div>
+        <div class="nc-section"><div class="nc-gop-impact"><div class="nc-gop-impact-val">+€33,600 / yr</div><div class="nc-gop-impact-lbl">+0.7% GOP · F&amp;B Cost · Medium confidence</div></div></div>
       </div>
     </div>
+
     <div class="cost-section-label">
-      <span>Purchasing & Contrôle de Gestion</span>
-      <span class="cost-section-saving" style="color:var(--amber);">In analysis — module in development</span>
+      Purchasing &amp; Contrôle de Gestion
+      <span class="cost-section-saving pending">In analysis — module in development</span>
     </div>
+
     <div class="nc-card">
       <div class="nc-header">
         <div class="nc-header-left">
           <div class="nc-title">Consumables Purchasing — Theoretical vs Actual Order Variance</div>
           <div class="nc-subtitle">Housekeeping Consumables · November Forecast</div>
         </div>
-        <div class="nc-header-right">
-          <span class="forecast-gap-badge">IN DEVELOPMENT</span>
-        </div>
+        <div class="nc-header-right"><span class="nc-badge-dev">In Development</span></div>
       </div>
       <div class="nc-body">
-        <div class="nc-section">
-          <div class="nc-label">SITUATION</div>
-          <div class="nc-text">The November purchase order for toilet tissue stands at 9,000 units against a theoretical consumption of 3,622 units — a 148% overorder relative to forecasted occupancy of 1,811 room nights at the hotel standard of 2 rolls per guest night.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DIAGNOSIS</div>
-          <div class="nc-text">Purchasing decisions for housekeeping consumables are being made on habit or fixed par levels rather than occupancy-linked theoretical consumption models. This pattern — replicated across all consumable lines — generates systematic stock accumulation, cash flow drag, and unmeasured cost overrun that does not appear on the monthly P&L until wastage or write-offs are reported.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">CALCULATION</div>
-          <table class="nc-calc-table"><tbody><tr><td>Forecasted room nights (November)</td><td>1,811 RN</td></tr><tr><td>Hotel standard (toilet tissue)</td><td>2 rolls per guest night</td></tr><tr><td>Theoretical consumption</td><td>3,622 units</td></tr><tr><td>Actual purchase order</td><td>9,000 units</td></tr><tr><td>Overorder variance</td><td>+5,378 units · +148%</td></tr><tr><td>Estimated excess cost (at €0.18/unit)</td><td>€968 this order alone</td></tr><tr class="calc-note"><td>Pattern repeated across all consumable lines — full audit pending</td><td></td></tr></tbody></table>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">DECISION</div>
-          <div class="nc-decision-line">Freeze non-essential consumable purchase orders pending a full theoretical consumption audit. All future POs for housekeeping consumables must be generated from the occupancy forecast — not from fixed par levels or prior-period replication.</div>
-        </div>
-<div class="nc-section">
-          <div class="nc-label">EXECUTION</div>
-          <ol class="nc-exec-list"><li>Freeze the current toilet tissue PO — reissue at 3,622 units aligned to the November forecast.</li><li>Run the same theoretical consumption calculation across all housekeeping consumable lines (amenities, linen bags, cleaning products) before the next order cycle.</li><li>Build an occupancy-linked PO model: theoretical consumption = forecasted RN × hotel standard per guest night per item.</li><li>Require all housekeeping POs to be countersigned against the current 30-day occupancy forecast before approval.</li></ol>
-        </div>
-        <div class="nc-section">
-          <div class="nc-label">GOP IMPACT</div>
-          <div class="nc-gop-impact" style="background:var(--amber-light);">
-            <div class="nc-gop-impact-val" style="color:var(--amber);">Quantification in progress</div>
-            <div class="nc-gop-impact-lbl" style="color:var(--amber);">Full consumables audit required to size annual saving · Module in active development</div>
+        <div class="nc-section"><div class="nc-label">Situation</div><div class="nc-text">The November purchase order for toilet tissue stands at 9,000 units against a theoretical consumption of 3,622 units — a 148% overorder relative to forecasted occupancy of 1,811 room nights at the hotel standard of 2 rolls per guest night.</div></div>
+        <div class="nc-section"><div class="nc-label">Theoretical vs Actual Order</div>
+          <div class="nc-visual">
+            <div class="nc-visual-title">Toilet Tissue — November Purchase Order</div>
+            <div class="po-comparison">
+              <div class="po-box theoretical"><div class="po-box-label">Theoretical Need</div><div class="po-box-value">3,622</div><div class="po-box-sub">1,811 RN × 2 rolls</div></div>
+              <div class="po-box actual"><div class="po-box-label">Actual PO Raised</div><div class="po-box-value">9,000</div><div class="po-box-sub">Fixed par level ordering</div></div>
+            </div>
+            <div class="po-overorder-badge">+5,378 units over · 148% excess · ~€968 this order alone</div>
           </div>
         </div>
+        <div class="nc-section"><div class="nc-label">Diagnosis</div><div class="nc-text">Purchasing decisions for housekeeping consumables are made on habit or fixed par levels rather than occupancy-linked theoretical consumption models. This pattern — replicated across all consumable lines — generates systematic stock accumulation, cash flow drag, and unmeasured cost overrun that does not appear on the monthly P&amp;L until wastage or write-offs are reported.</div></div>
+        <div class="nc-section"><div class="nc-label">Decision</div><div class="nc-decision-line">Freeze non-essential consumable purchase orders pending a full theoretical consumption audit. All future POs for housekeeping consumables must be generated from the occupancy forecast — not from fixed par levels or prior-period replication.</div></div>
+        <div class="nc-section"><div class="nc-label">Execution</div><ol class="nc-exec-list"><li>Freeze the current toilet tissue PO — reissue at 3,622 units aligned to the November forecast.</li><li>Run the same theoretical consumption calculation across all housekeeping consumable lines before the next order cycle.</li><li>Build an occupancy-linked PO model: theoretical consumption = forecasted RN × hotel standard per guest night per item.</li><li>Require all housekeeping POs to be countersigned against the current 30-day occupancy forecast before approval.</li></ol></div>
+        <div class="nc-section"><div class="nc-gop-impact pending"><div class="nc-gop-impact-val pending">Quantification in progress</div><div class="nc-gop-impact-lbl pending">Full consumables audit required to size annual saving · Module in active development</div></div></div>
       </div>
     </div>
-    <div style="background:var(--white); border:0.5px solid var(--gray-200); border-radius:8px; overflow:hidden; margin-top:24px; margin-bottom:32px;">
-  <div style="padding:14px 16px 10px; border-bottom:0.5px solid var(--gray-100);">
-    <div class="nc-label">Priority Summary — GOP Impact</div>
-  </div>
-  <table style="width:100%; border-collapse:collapse; font-size:13px;">
-    <thead>
-      <tr style="background:var(--gray-100);">
-        <th style="padding:8px 16px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Priority</th>
-        <th style="padding:8px 16px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Finding</th>
-        <th style="padding:8px 16px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Department</th>
-        <th style="padding:8px 16px; text-align:right; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Monthly Saving</th>
-        <th style="padding:8px 16px; text-align:right; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--gray-400); font-weight:500;">Annual GOP Impact</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr style="border-bottom:0.5px solid var(--gray-100);">
-        <td style="padding:10px 16px; color:var(--gray-400);">1</td>
-        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Housekeeping Overstaffing</td>
-        <td style="padding:10px 16px; color:var(--gray-600);">Rooms — Labour</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€8,640</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€103,680</td>
-      </tr>
-      <tr style="border-bottom:0.5px solid var(--gray-100);">
-        <td style="padding:10px 16px; color:var(--gray-400);">2</td>
-        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">F&B Service Labour Variance</td>
-        <td style="padding:10px 16px; color:var(--gray-600);">F&B — Labour</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€4,200</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€50,400</td>
-      </tr>
-      <tr style="border-bottom:0.5px solid var(--gray-100);">
-        <td style="padding:10px 16px; color:var(--gray-400);">3</td>
-        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Annual Leave Clustering</td>
-        <td style="padding:10px 16px; color:var(--gray-600);">Cross-dept</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€3,100</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€37,200</td>
-      </tr>
-      <tr style="border-bottom:0.5px solid var(--gray-100);">
-        <td style="padding:10px 16px; color:var(--gray-400);">4</td>
-        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Food Cost % Overage</td>
-        <td style="padding:10px 16px; color:var(--gray-600);">F&B — Cost</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--navy);">€2,800</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--green);">€33,600</td>
-      </tr>
-      <tr style="border-bottom:0.5px solid var(--gray-100);">
-        <td style="padding:10px 16px; color:var(--gray-400);">5</td>
-        <td style="padding:10px 16px; font-weight:500; color:var(--navy);">Consumables Overordering</td>
-        <td style="padding:10px 16px; color:var(--gray-600);">Purchasing</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:500; color:var(--amber);">In analysis</td>
-        <td style="padding:10px 16px; text-align:right; font-weight:600; color:var(--amber);">TBC</td>
-      </tr>
-      <tr style="background:var(--navy);">
-        <td colspan="3" style="padding:12px 16px; font-weight:600; color:var(--gold); font-size:13px;">Total identified GOP saving</td>
-        <td style="padding:12px 16px; text-align:right; font-weight:600; color:var(--white);">€18,740 / mo</td>
-        <td style="padding:12px 16px; text-align:right; font-weight:600; color:var(--gold); font-size:15px;">€224,880 / yr</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+
+    <div style="background:var(--white); border:0.5px solid var(--gray-200); border-radius:8px; overflow:hidden; margin-top:24px; margin-bottom:40px;">
+      <div style="padding:14px 16px 10px; border-bottom:0.5px solid var(--gray-100);">
+        <div class="nc-label">Priority Summary — GOP Impact</div>
+      </div>
+      <table class="cost-summary-table">
+        <thead><tr>
+          <th>#</th><th>Finding</th><th>Department</th><th>Monthly Saving</th><th>Annual GOP Impact</th>
+        </tr></thead>
+        <tbody>
+          <tr><td style="color:var(--gray-400);">1</td><td style="font-weight:500; color:var(--navy);">Housekeeping Overstaffing</td><td style="color:var(--gray-600);">Rooms — Labour</td><td style="font-weight:500;">€8,640</td><td style="font-weight:600; color:var(--green);">€103,680</td></tr>
+          <tr><td style="color:var(--gray-400);">2</td><td style="font-weight:500; color:var(--navy);">F&amp;B Service Labour Variance</td><td style="color:var(--gray-600);">F&amp;B — Labour</td><td style="font-weight:500;">€4,200</td><td style="font-weight:600; color:var(--green);">€50,400</td></tr>
+          <tr><td style="color:var(--gray-400);">3</td><td style="font-weight:500; color:var(--navy);">Annual Leave Clustering</td><td style="color:var(--gray-600);">Cross-dept</td><td style="font-weight:500;">€3,100</td><td style="font-weight:600; color:var(--green);">€37,200</td></tr>
+          <tr><td style="color:var(--gray-400);">4</td><td style="font-weight:500; color:var(--navy);">Food Cost % Overage</td><td style="color:var(--gray-600);">F&amp;B — Cost</td><td style="font-weight:500;">€2,800</td><td style="font-weight:600; color:var(--green);">€33,600</td></tr>
+          <tr><td style="color:var(--gray-400);">5</td><td style="font-weight:500; color:var(--navy);">Consumables Overordering</td><td style="color:var(--gray-600);">Purchasing</td><td style="font-weight:500; color:var(--amber);">In analysis</td><td style="font-weight:600; color:var(--amber);">TBC</td></tr>
+          <tr class="total-row"><td colspan="3">Total identified GOP saving</td><td>€18,740 / mo</td><td>€224,880 / yr</td></tr>
+        </tbody>
+      </table>
+    </div>
+
 
   </div>
 </div>
 
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+
+  const bridgeCtx = document.getElementById('gopBridgeChart').getContext('2d');
+  new Chart(bridgeCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Forecasted GOP', 'Rooms Labour', 'F&B Labour',
+               'Leave Clustering', 'Food Cost', 'Projected GOP'],
+      datasets: [{
+        data: [5000000, -103680, -50400, -37200, -33600, 5168660],
+        backgroundColor: [
+          '#0F1F3D',
+          '#FDECEA',
+          '#FDECEA',
+          '#FEF0E7',
+          '#FEF0E7',
+          '#E8F5ED'
+        ],
+        borderColor: [
+          '#0F1F3D',
+          '#C0392B',
+          '#C0392B',
+          '#D35400',
+          '#D35400',
+          '#1A6B3C'
+        ],
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const v = ctx.raw;
+              return ' €' + Math.abs(v).toLocaleString('fr-FR');
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            callback: function(v) {
+              if (Math.abs(v) >= 1000000)
+                return '€' + (v/1000000).toFixed(1) + 'M';
+              if (Math.abs(v) >= 1000)
+                return (v < 0 ? '-' : '') + '€' + (Math.abs(v)/1000).toFixed(0) + 'k';
+              return v;
+            },
+            font: { family: 'DM Sans', size: 11 },
+            color: '#9A9A95'
+          },
+          grid: { color: '#E8E8E5' }
+        },
+        y: {
+          ticks: {
+            font: { family: 'DM Sans', size: 12 },
+            color: '#454542'
+          },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  const foodCtx = document.getElementById('foodCostChart').getContext('2d');
+  new Chart(foodCtx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [28, 5.4, 66.6],
+        backgroundColor: ['#1A6B3C', '#C0392B', '#E8E8E5'],
+        borderWidth: 0,
+        hoverOffset: 0
+      }]
+    },
+    options: {
+      cutout: '72%',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const labels = ['Target (28%)', 'Excess (5.4%)', 'Remaining'];
+              return ' ' + labels[ctx.dataIndex] + ': ' + ctx.raw + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const grid = document.getElementById('serverDotGrid');
+  if (grid) {
+    for (let i = 0; i < 9; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot-grid-dot ' + (i < 4 ? 'needed' : 'excess');
+      dot.title = i < 4 ? 'Required server' : 'Excess server';
+      grid.appendChild(dot);
+    }
+  }
+
+});
+
+</script>
 </body>
 </html>
