@@ -623,12 +623,16 @@ function formatSnapLabel(row) {
 async function loadSnapshots() {
   setLoading(true);
   hideError();
+  // WHY: Fetching engine_json for all snapshots on load causes a
+  // statement timeout. Only fetch lightweight fields for the dropdown.
+  // Full engine_json is fetched per-snapshot when Compare is clicked.
   const { data, error } = await supabaseClient
     .from('engine_outputs')
-    .select('id, snapshot_date, period_label, engine_json')
+    .select('id, snapshot_date, period_label')
     .eq('hotel_code', HOTEL_CODE)
     .not('snapshot_date', 'is', null)
-    .order('snapshot_date', { ascending: false });
+    .order('snapshot_date', { ascending: false })
+    .limit(30);
 
   if (error) {
     setLoading(false);
@@ -674,7 +678,7 @@ function rowByDate(dateStr) {
   return snapshotRows.find(r => r.snapshot_date === dateStr) || null;
 }
 
-function runCompare() {
+async function runCompare() {
   hideError();
   let dateA = document.getElementById('snap-a').value;
   let dateB = document.getElementById('snap-b').value;
@@ -695,8 +699,40 @@ function runCompare() {
     return;
   }
 
-  const ejA = unwrapEngineJson(rowA.engine_json);
-  const ejB = unwrapEngineJson(rowB.engine_json);
+  const idA = rowA.id;
+  const idB = rowB.id;
+
+  // WHY: engine_json not loaded at dropdown time — fetch now for
+  // only the two selected snapshots.
+  setLoading(true);
+  hideError();
+
+  const { data: fetchedRows, error: fetchErr } = await supabaseClient
+    .from('engine_outputs')
+    .select('id, snapshot_date, period_label, engine_json')
+    .in('id', [idA, idB]);
+
+  if (fetchErr || !fetchedRows || fetchedRows.length < 2) {
+    setLoading(false);
+    showError(fetchErr?.message || 'Could not load snapshot data.');
+    return;
+  }
+
+  const fullA = fetchedRows.find(r => r.id === idA);
+  const fullB = fetchedRows.find(r => r.id === idB);
+  const jsonA = fullA?.engine_json;
+  const jsonB = fullB?.engine_json;
+
+  if (!jsonA || !jsonB) {
+    setLoading(false);
+    showError('One or both snapshots have no engine data.');
+    return;
+  }
+
+  setLoading(false);
+
+  const ejA = unwrapEngineJson(jsonA);
+  const ejB = unwrapEngineJson(jsonB);
 
   renderMovementStrip(ejA, ejB, dateA, dateB);
   renderPaceSection(ejA, ejB, dateA, dateB);
