@@ -104,6 +104,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   color: var(--gray-600);
 }
 .follow-toggle button.active { background: var(--gold-pale); color: var(--navy); font-weight: 600; }
+.filter-toggle-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-600); margin-right: 2px; }
+.potential-badge {
+  display: inline-block;
+  background: #22c55e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.account-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.expanded-potential { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--gray-300); }
+.expanded-potential .potential-line { margin-top: 4px; }
 .panel { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 1100px; }
@@ -374,6 +389,12 @@ textarea { min-height: 100px; resize: vertical; }
             <button type="button" data-follow="overdue">Overdue</button>
             <button type="button" data-follow="done">Done</button>
           </div>
+          <span class="filter-toggle-label">Potential</span>
+          <div class="follow-toggle" id="filter-potential">
+            <button type="button" class="active" data-potential="all">All</button>
+            <button type="button" data-potential="yes">Yes</button>
+            <button type="button" data-potential="no">No</button>
+          </div>
           <input type="date" id="filter-date-from" title="From date">
           <input type="date" id="filter-date-to" title="To date">
           <input class="search" type="text" id="filter-search" placeholder="Search account or contact">
@@ -389,6 +410,8 @@ textarea { min-height: 100px; resize: vertical; }
                   <th data-col="account_name">Account<span class="sort-ind"></span></th>
                   <th data-col="contact_name">Contact<span class="sort-ind"></span></th>
                   <th data-col="outcome">Outcome<span class="sort-ind"></span></th>
+                  <th data-col="potential_room_nights">Potential RN<span class="sort-ind"></span></th>
+                  <th data-col="potential_revenue">Potential Rev (€)<span class="sort-ind"></span></th>
                   <th data-col="follow_up_date">Follow-up<span class="sort-ind"></span></th>
                   <th data-col="entered_by">Entered By<span class="sort-ind"></span></th>
                   <th data-col="comments">Comments<span class="sort-ind"></span></th>
@@ -623,7 +646,8 @@ const STATE = {
   editingId: null,
   sortCol: 'activity_date',
   sortDir: 'desc',
-  followFilter: 'all'
+  followFilter: 'all',
+  potentialFilter: 'all'
 };
 
 function escHtml(str) {
@@ -761,6 +785,7 @@ function getFilters() {
     accountType: document.getElementById('filter-account-type').value,
     outcome: document.getElementById('filter-outcome').value,
     follow: STATE.followFilter,
+    potential: STATE.potentialFilter,
     dateFrom: document.getElementById('filter-date-from').value,
     dateTo: document.getElementById('filter-date-to').value,
     search: document.getElementById('filter-search').value.trim().toLowerCase()
@@ -775,6 +800,8 @@ function applyFilters(rows) {
     if (f.outcome && row.outcome !== f.outcome) return false;
     if (f.follow === 'overdue' && !isOverdue(row)) return false;
     if (f.follow === 'done' && !row.follow_up_done) return false;
+    if (f.potential === 'yes' && row.business_potential !== true) return false;
+    if (f.potential === 'no' && row.business_potential === true) return false;
     if (f.dateFrom) {
       const ad = parseDateOnly(row.activity_date);
       const from = parseDateOnly(f.dateFrom);
@@ -800,6 +827,11 @@ function sortRows(rows) {
     if (col === 'activity_date' || col === 'follow_up_date') {
       const av = parseDateOnly(a[col])?.getTime() ?? 0;
       const bv = parseDateOnly(b[col])?.getTime() ?? 0;
+      return (av - bv) * dir;
+    }
+    if (col === 'potential_room_nights' || col === 'potential_revenue') {
+      const av = Number(a[col]) || 0;
+      const bv = Number(b[col]) || 0;
       return (av - bv) * dir;
     }
     const av = (a[col] ?? '').toString().toLowerCase();
@@ -848,6 +880,32 @@ function outcomePill(outcome) {
   return `<span class="outcome-pill" style="background:${color}">${escHtml(outcome || '—')}</span>`;
 }
 
+function hasBusinessPotential(row) {
+  return row.business_potential === true;
+}
+
+function formatPotentialRevenue(val) {
+  if (val == null || val === '') return '—';
+  const num = Number(val);
+  if (!Number.isFinite(num)) return '—';
+  return '€' + new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 }).format(num);
+}
+
+function businessPotentialExpandedHtml(row) {
+  if (!hasBusinessPotential(row)) {
+    return '<div class="expanded-potential"><strong>Business Potential:</strong> No business potential recorded</div>';
+  }
+  const from = row.potential_date_from ? formatDate(row.potential_date_from) : '—';
+  const to = row.potential_date_to ? formatDate(row.potential_date_to) : '—';
+  return `<div class="expanded-potential">
+    <strong>Business Potential:</strong>
+    <div class="potential-line">Room Nights: ${escHtml(row.potential_room_nights ?? '—')}</div>
+    <div class="potential-line">Revenue: ${escHtml(formatPotentialRevenue(row.potential_revenue))}</div>
+    <div class="potential-line">Travel Dates: ${escHtml(from)} → ${escHtml(to)}</div>
+    <div class="potential-line">Type: ${escHtml(row.potential_business_type || '—')}</div>
+  </div>`;
+}
+
 function rowHtml(row) {
   const expanded = STATE.expandedId === row.id;
   const overdue = isOverdue(row);
@@ -860,11 +918,18 @@ function rowHtml(row) {
     ? `<span class="follow-date">${formatDate(row.follow_up_date)}</span>`
     : '<span class="follow-date">—</span>';
 
+  const hasPotential = hasBusinessPotential(row);
+  const potentialRn = hasPotential && row.potential_room_nights != null
+    ? escHtml(row.potential_room_nights) : '—';
+  const potentialRev = hasPotential ? formatPotentialRevenue(row.potential_revenue) : '—';
+  const euroBadge = hasPotential ? '<span class="potential-badge">€</span>' : '';
+
   const detailRow = expanded ? `
     <tr class="expanded-row">
-      <td class="expanded-panel-cell" colspan="8">
+      <td class="expanded-panel-cell" colspan="10">
         <div class="expanded-panel">
           <div><strong>Comments:</strong> ${escHtml(row.comments || '—')}</div>
+          ${businessPotentialExpandedHtml(row)}
           <div class="expanded-actions">
             <button type="button" class="btn btn-primary" data-edit-id="${row.id}">Edit</button>
           </div>
@@ -877,11 +942,16 @@ function rowHtml(row) {
       <td>${formatDate(row.activity_date)}</td>
       <td>${escHtml(row.activity_type)}</td>
       <td>
-        <div>${escHtml(row.account_name)}</div>
+        <div class="account-name-row">
+          <div>${escHtml(row.account_name)}</div>
+          ${euroBadge}
+        </div>
         <div class="contact-sub">${escHtml(row.account_type)}</div>
       </td>
       <td><div>${contactLine}</div>${titleLine}</td>
       <td>${outcomePill(row.outcome)}</td>
+      <td class="num">${potentialRn}</td>
+      <td class="num">${escHtml(potentialRev)}</td>
       <td class="follow-cell" onclick="event.stopPropagation()">
         ${followDisplay}
         <input type="checkbox" data-follow-toggle="${row.id}" ${row.follow_up_done ? 'checked' : ''} title="Mark follow-up done">
@@ -895,7 +965,7 @@ function renderTable() {
   const filtered = sortRows(applyFilters(STATE.activities));
   const tbody = document.getElementById('activity-tbody');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;color:var(--gray-600);">No activities match the current filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="padding:24px;color:var(--gray-600);">No activities match the current filters.</td></tr>`;
     updateSortIndicators();
     return;
   }
@@ -1384,6 +1454,15 @@ document.getElementById('filter-follow').querySelectorAll('button').forEach(btn 
     document.getElementById('filter-follow').querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     STATE.followFilter = btn.dataset.follow;
+    renderTable();
+  });
+});
+
+document.getElementById('filter-potential').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('filter-potential').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.potentialFilter = btn.dataset.potential;
     renderTable();
   });
 });
