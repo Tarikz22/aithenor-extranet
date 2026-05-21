@@ -1,1 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Sales Activity Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --navy-light: #243F72;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --gold-pale: #FBF6EA;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --red: #C0392B;
+  --red-light: #FDECEA;
+  --orange: #D35400;
+  --orange-light: #FEF0E7;
+  --amber: #B8860B;
+  --amber-light: #FEF9E7;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+  --sidebar-w: 260px;
+  --overdue-bg: #fef2f2;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--gray-900); min-height: 100vh; }
+.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; z-index: 100; border-right: 1px solid rgba(201,168,76,0.15); }
+.sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.logo-text { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--white); letter-spacing: 4px; text-transform: uppercase; }
+.logo-sub { font-size: 9px; color: var(--gold); letter-spacing: 2.5px; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
+.hotel-card { margin: 16px 14px; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); border-radius: 8px; padding: 12px 14px; }
+.hotel-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 600; color: var(--white); }
+.hotel-meta { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.3px; }
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+.nav-section { padding: 12px 20px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
+.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; min-width: 18px; text-align: center; }
+.sidebar-bottom { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+.sync-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.35); }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.main { margin-left: var(--sidebar-w); min-height: 100vh; }
+.topbar { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--navy); }
+.topbar-sub { color: var(--gray-600); font-size: 12px; letter-spacing: .04em; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.btn { border: 1px solid var(--gray-300); border-radius: 999px; font-size: 12px; padding: 8px 12px; background: #fff; cursor: pointer; font-family: inherit; }
+.btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.content { padding: 24px 32px 80px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.summary-tile { background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; }
+.summary-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-600); margin-bottom: 8px; }
+.summary-value { font-size: 24px; color: var(--navy); font-weight: 600; }
+.summary-sub { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.filter-bar select,
+.filter-bar input[type="date"],
+.filter-bar input[type="text"] {
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  background: #fff;
+}
+.filter-bar .search { min-width: 220px; flex: 1; }
+.follow-toggle { display: flex; gap: 0; border: 1px solid var(--gray-300); border-radius: 10px; overflow: hidden; }
+.follow-toggle button {
+  border: none;
+  background: #fff;
+  padding: 9px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--gray-600);
+}
+.follow-toggle button.active { background: var(--gold-pale); color: var(--navy); font-weight: 600; }
+.panel { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+thead th {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-200);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th:hover { color: var(--navy); }
+thead th .sort-ind { margin-left: 4px; opacity: 0.5; font-size: 10px; }
+thead th.sorted .sort-ind { opacity: 1; color: var(--navy); }
+tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 13px; vertical-align: middle; }
+.activity-row { cursor: pointer; }
+.activity-row:hover { background: #fcfcfa; }
+.activity-row.overdue { background: var(--overdue-bg); }
+.activity-row.overdue:hover { background: #fde8e8; }
+.comment-cell { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outcome-pill { border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; display: inline-block; white-space: nowrap; }
+.follow-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.follow-cell input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--navy); }
+.follow-date { font-size: 12px; color: var(--gray-600); }
+.contact-sub { font-size: 11px; color: var(--gray-600); margin-top: 2px; }
+.expanded-panel-cell { padding: 0; background: #fff; }
+.expanded-panel {
+  padding: 14px 16px;
+  border-top: 1px dashed var(--gray-300);
+  background: #fff;
+  color: var(--gray-900);
+  line-height: 1.6;
+}
+.expanded-panel strong { color: var(--navy); }
+.expanded-actions { margin-top: 12px; }
+.state { display: none; align-items: center; justify-content: center; min-height: 280px; color: var(--gray-600); }
+.state.visible { display: flex; }
+.login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
+.login-card { width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 1px solid rgba(15,31,61,0.1); border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(15,31,61,0.12); }
+.brand-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.brand-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; margin-bottom: 8px; color: var(--navy); }
+.brand-copy { color: var(--gray-600); line-height: 1.6; margin-bottom: 18px; }
+.field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); margin: 12px 0 6px; }
+.input, .select-input, textarea {
+  width: 100%;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 13px;
+}
+textarea { min-height: 100px; resize: vertical; }
+.login-btn { width: 100%; margin-top: 16px; border: none; border-radius: 10px; padding: 12px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
+.login-error { display: none; margin-top: 10px; color: var(--red); font-size: 12px; }
+.app-screen { display: none; }
+.fab {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 200;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 8px 24px rgba(15,31,61,0.25);
+  transition: background 0.15s;
+}
+.fab:hover { background: var(--navy-mid); }
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15,31,61,0.45);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.modal-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--navy); }
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--gray-400); line-height: 1; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.readonly-field { background: var(--gray-100); color: var(--gray-600); cursor: not-allowed; }
+.combobox-wrap { position: relative; }
+.combobox-list {
+  display: none;
+  position: absolute;
+  left: 0; right: 0;
+  top: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  margin-top: 4px;
+  z-index: 10;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+.combobox-list.open { display: block; }
+.combobox-group-label {
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--gray-400);
+  font-weight: 600;
+  background: var(--gray-100);
+  position: sticky;
+  top: 0;
+}
+.combobox-option { padding: 9px 12px; font-size: 13px; cursor: pointer; }
+.combobox-option:hover, .combobox-option.highlighted { background: var(--gold-pale); }
+.combobox-option.special { font-style: italic; color: var(--gray-600); border-top: 1px solid var(--gray-200); }
+.other-input-wrap { margin-top: 8px; display: none; }
+.other-input-wrap.visible { display: block; }
+@media (max-width: 980px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 18px 18px 80px; }
+  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .fab { right: 18px; bottom: 18px; }
+}
+</style>
+</head>
+<body>
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="brand-kicker">Aithenor</div>
+    <h1 class="brand-title">Sales Activity Tracker</h1>
+    <div class="brand-copy">Log sales calls, visits, and follow-ups for your hotel.</div>
+    <form onsubmit="handleLogin(event)">
+      <label class="field-label">Email</label>
+      <input class="input" type="email" id="login-email" required>
+      <label class="field-label">Password</label>
+      <input class="input" type="password" id="login-password" required>
+      <button class="login-btn" id="login-btn" type="submit">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
 
+<div class="app-screen" id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Aithenor</div>
+      <div class="logo-sub">Strategic Intelligence</div>
+    </div>
+    <div class="hotel-card">
+      <div class="hotel-name" id="sidebar-hotel">Hotel</div>
+      <div class="hotel-meta" id="sidebar-period">Sales Activity</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Executive</div>
+      <a class="nav-item" href="gm.html"><span class="nav-icon">✦</span>GM Briefing</a>
+      <div class="nav-section">Intelligence</div>
+      <a class="nav-item" href="index.html"><span class="nav-icon">◈</span>Insights<span class="nav-badge">•</span></a>
+      <div class="nav-item"><span class="nav-icon">◇</span>Revenue Modules</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Cost Modules</div>
+      <div class="nav-section">Execution</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Value Tracker</div>
+      <a class="nav-item" href="accounts.html"><span class="nav-icon">◉</span>Accounts</a>
+      <a class="nav-item" href="weekly.html"><span class="nav-icon">◎</span>Weekly</a>
+      <a class="nav-item" href="groups.html"><span class="nav-icon">◇</span>Groups</a>
+      <a class="nav-item active" href="sales.html"><span class="nav-icon">◈</span>Sales</a>
+      <div class="nav-item"><span class="nav-icon">◇</span>Action Tracker</div>
+      <div class="nav-section">Performance</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Historical Analysis</div>
+      <div class="nav-section">Settings</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Hotel Profile</div>
+      <div class="nav-item"><span class="nav-icon">◇</span>Upload Data</div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sync-status"><div class="sync-dot"></div><span>Connected to Supabase</span></div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
+        <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
+        <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Sales Activity Tracker</div>
+        <div class="topbar-sub">Log calls, visits, and follow-ups — filter and track pipeline momentum.</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" onclick="loadActivities()">Refresh</button>
+        <a class="btn btn-primary" href="index.html" style="text-decoration:none;">Back to Insights</a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="state visible" id="loading-state">Loading sales activities...</div>
+      <div class="state" id="error-state">Could not load sales activities.</div>
+      <div class="state" id="empty-state">No sales activities found for this hotel.</div>
+
+      <div id="dashboard" style="display:none;">
+        <div class="summary-grid">
+          <div class="summary-tile">
+            <div class="summary-label">Activities this month</div>
+            <div class="summary-value" id="kpi-month">0</div>
+            <div class="summary-sub" id="kpi-month-sub">Current calendar month</div>
+          </div>
+          <div class="summary-tile">
+            <div class="summary-label">Open follow-ups overdue</div>
+            <div class="summary-value" id="kpi-overdue">0</div>
+            <div class="summary-sub">Not done and past due date</div>
+          </div>
+          <div class="summary-tile">
+            <div class="summary-label">Accounts visited this month</div>
+            <div class="summary-value" id="kpi-accounts">0</div>
+            <div class="summary-sub">Distinct account names</div>
+          </div>
+          <div class="summary-tile">
+            <div class="summary-label">Last activity entered</div>
+            <div class="summary-value" id="kpi-last" style="font-size:20px;">—</div>
+            <div class="summary-sub" id="kpi-last-sub">Most recent record</div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <select id="filter-type"><option value="">All activity types</option></select>
+          <select id="filter-account-type">
+            <option value="">All account types</option>
+            <option>Corporate</option>
+            <option>Travel Agency</option>
+            <option>Prospect</option>
+            <option>Other</option>
+          </select>
+          <select id="filter-outcome"><option value="">All outcomes</option></select>
+          <div class="follow-toggle" id="filter-follow">
+            <button type="button" class="active" data-follow="all">All</button>
+            <button type="button" data-follow="overdue">Overdue</button>
+            <button type="button" data-follow="done">Done</button>
+          </div>
+          <input type="date" id="filter-date-from" title="From date">
+          <input type="date" id="filter-date-to" title="To date">
+          <input class="search" type="text" id="filter-search" placeholder="Search account or contact">
+        </div>
+
+        <div class="panel">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-col="activity_date">Date<span class="sort-ind"></span></th>
+                  <th data-col="activity_type">Type<span class="sort-ind"></span></th>
+                  <th data-col="account_name">Account<span class="sort-ind"></span></th>
+                  <th data-col="contact_name">Contact<span class="sort-ind"></span></th>
+                  <th data-col="outcome">Outcome<span class="sort-ind"></span></th>
+                  <th data-col="follow_up_date">Follow-up<span class="sort-ind"></span></th>
+                  <th data-col="entered_by">Entered By<span class="sort-ind"></span></th>
+                  <th data-col="comments">Comments<span class="sort-ind"></span></th>
+                </tr>
+              </thead>
+              <tbody id="activity-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button class="fab" id="fab-new" type="button">+ New Activity</button>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" role="dialog" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <h2 class="modal-title" id="modal-title">New Activity</h2>
+      <button type="button" class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <form id="activity-form" onsubmit="saveActivity(event)">
+      <input type="hidden" id="form-id">
+
+      <label class="field-label" for="form-date">Activity Date</label>
+      <input class="input" type="date" id="form-date" required>
+
+      <label class="field-label" for="form-type">Activity Type</label>
+      <select class="select-input" id="form-type" required></select>
+
+      <label class="field-label" for="form-account-type">Account Type</label>
+      <select class="select-input" id="form-account-type" required>
+        <option value="Corporate">Corporate</option>
+        <option value="Travel Agency">Travel Agency</option>
+        <option value="Prospect">Prospect</option>
+        <option value="Other">Other</option>
+      </select>
+
+      <label class="field-label" for="form-account-name">Account Name</label>
+      <div id="account-name-field"></div>
+
+      <label class="field-label" for="form-contact-name">Contact Name</label>
+      <input class="input" type="text" id="form-contact-name">
+
+      <label class="field-label" for="form-contact-title">Contact Title</label>
+      <input class="input" type="text" id="form-contact-title">
+
+      <label class="field-label" for="form-outcome">Outcome</label>
+      <select class="select-input" id="form-outcome" required></select>
+
+      <label class="field-label" for="form-follow-up">Follow-up Date <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-600);">(optional)</span></label>
+      <input class="input" type="date" id="form-follow-up">
+
+      <label class="field-label" for="form-comments">Comments</label>
+      <textarea id="form-comments"></textarea>
+
+      <label class="field-label" for="form-entered-by">Entered by</label>
+      <input class="input readonly-field" type="text" id="form-entered-by" readonly>
+
+      <div class="modal-actions">
+        <button type="button" class="btn" id="modal-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="form-save-btn">Save Activity</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUserEmail = '';
+
+const ACTIVITY_TYPES = [
+  'Sales Call', 'Blitz', 'FAM Trip', 'Agency Visit', 'Trade Show',
+  'Site Inspection', 'Phone Call', 'Other'
+];
+const OUTCOMES = ['Very Promising', 'Promising', 'Neutral', 'Unlikely', 'Dead'];
+const OUTCOME_COLORS = {
+  'Very Promising': '#22c55e',
+  'Promising': '#3b82f6',
+  'Neutral': '#6b7280',
+  'Unlikely': '#f59e0b',
+  'Dead': '#ef4444'
+};
+const CORPORATE_ACCOUNTS = [
+  'Accor Hotels', 'Air France', 'Airbus', 'BNP Paribas',
+  'Capgemini', 'Danone', 'EDF', "L'Oréal",
+  'LVMH', 'Orange', 'PSA Group', 'Renault',
+  'Sanofi', 'Schneider Electric', 'Société Générale', 'TotalEnergies',
+  'Thales', 'Veolia', 'Vinci', 'Airbus Defence',
+  'Safran', 'Dassault Aviation'
+];
+const TA_GROUPS = {
+  'Group MOROCCO': [
+    'Atlas Voyages', 'Carlson Wagonlit Travel Maroc', 'American Express Travel Maroc',
+    'Selectour Afat Maroc', 'Fram Maroc', 'Kuoni Maroc', 'Nouvelles Frontières Maroc',
+    'TUI Maroc', 'Club Med Maroc', 'Jet tours Maroc', 'Marmara Maroc',
+    'Thomas Cook Maroc', 'Monarch Travel', 'Smits Travel', 'Wasteels Maroc'
+  ],
+  'Group FRANCE': [
+    'American Express Global Business Travel', 'BCD Travel France',
+    'CWT (Carlson Wagonlit Travel) France', 'Havas Voyages', 'Selectour',
+    'Ailleurs & Autrement', 'Kuoni France', 'Club Med Voyages',
+    'Nouvelles Frontières', 'TUI France', 'Marmara', 'Thomas Cook France',
+    'Jet tours', 'Fram', 'Air France Holidays', 'Vacances Transat', 'Héliades'
+  ],
+  'Group MIDDLE EAST': [
+    'Al Tayyar Travel Group', 'Kanoo Travel', 'Dnata Travel', 'Almosafer',
+    'Seera Group', 'Nesma Travel', 'Dnata Corporate Travel', 'Orient Travel',
+    'Travco Travel', 'National Travel Bahrain', 'Bahrain Travel',
+    'Emirates Holidays', 'Etihad Holidays', 'flydubai Holidays',
+    'Air Arabia Holidays', 'Oman Air Holidays', 'Saudi Airlines Travel'
+  ]
+};
+const OTHER_OPTION = 'Other (free text)';
+
+const STATE = {
+  activities: [],
+  expandedId: null,
+  editingId: null,
+  sortCol: 'activity_date',
+  sortDir: 'desc',
+  followFilter: 'all'
+};
+
+function escHtml(str) {
+  if (str == null) return '';
+  return str.toString()
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+function parseDateOnly(val) {
+  if (!val) return null;
+  const s = String(val).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length === 3) return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatDate(val) {
+  const d = parseDateOnly(val);
+  if (!d) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function truncate(str, len) {
+  const s = (str || '').toString();
+  if (s.length <= len) return s;
+  return s.slice(0, len) + '…';
+}
+
+function isCurrentMonth(dateVal) {
+  const d = parseDateOnly(dateVal);
+  if (!d) return false;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
+function isOverdue(row) {
+  if (row.follow_up_done) return false;
+  const fu = parseDateOnly(row.follow_up_date);
+  if (!fu) return false;
+  const today = parseDateOnly(todayStr());
+  return fu <= today;
+}
+
+function formatLastActivity(createdAt) {
+  if (!createdAt) return '—';
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return '—';
+  const now = new Date();
+  const diffMs = now - d;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 7) {
+    if (diffDays <= 0) return 'Today';
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  }
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function populateFilterDropdowns() {
+  const typeSel = document.getElementById('filter-type');
+  typeSel.innerHTML = '<option value="">All activity types</option>' +
+    ACTIVITY_TYPES.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+
+  const outSel = document.getElementById('filter-outcome');
+  outSel.innerHTML = '<option value="">All outcomes</option>' +
+    OUTCOMES.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+
+  const formType = document.getElementById('form-type');
+  formType.innerHTML = ACTIVITY_TYPES.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+
+  const formOutcome = document.getElementById('form-outcome');
+  formOutcome.innerHTML = OUTCOMES.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+}
+
+function getFilters() {
+  return {
+    type: document.getElementById('filter-type').value,
+    accountType: document.getElementById('filter-account-type').value,
+    outcome: document.getElementById('filter-outcome').value,
+    follow: STATE.followFilter,
+    dateFrom: document.getElementById('filter-date-from').value,
+    dateTo: document.getElementById('filter-date-to').value,
+    search: document.getElementById('filter-search').value.trim().toLowerCase()
+  };
+}
+
+function applyFilters(rows) {
+  const f = getFilters();
+  return rows.filter(row => {
+    if (f.type && row.activity_type !== f.type) return false;
+    if (f.accountType && row.account_type !== f.accountType) return false;
+    if (f.outcome && row.outcome !== f.outcome) return false;
+    if (f.follow === 'overdue' && !isOverdue(row)) return false;
+    if (f.follow === 'done' && !row.follow_up_done) return false;
+    if (f.dateFrom) {
+      const ad = parseDateOnly(row.activity_date);
+      const from = parseDateOnly(f.dateFrom);
+      if (!ad || ad < from) return false;
+    }
+    if (f.dateTo) {
+      const ad = parseDateOnly(row.activity_date);
+      const to = parseDateOnly(f.dateTo);
+      if (!ad || ad > to) return false;
+    }
+    if (f.search) {
+      const hay = `${row.account_name || ''} ${row.contact_name || ''}`.toLowerCase();
+      if (!hay.includes(f.search)) return false;
+    }
+    return true;
+  });
+}
+
+function sortRows(rows) {
+  const col = STATE.sortCol;
+  const dir = STATE.sortDir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    if (col === 'activity_date' || col === 'follow_up_date') {
+      const av = parseDateOnly(a[col])?.getTime() ?? 0;
+      const bv = parseDateOnly(b[col])?.getTime() ?? 0;
+      return (av - bv) * dir;
+    }
+    const av = (a[col] ?? '').toString().toLowerCase();
+    const bv = (b[col] ?? '').toString().toLowerCase();
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+}
+
+function renderKpis() {
+  const rows = STATE.activities;
+  const monthRows = rows.filter(r => isCurrentMonth(r.activity_date));
+  document.getElementById('kpi-month').textContent = monthRows.length;
+
+  const overdueCount = rows.filter(r => isOverdue(r)).length;
+  document.getElementById('kpi-overdue').textContent = overdueCount;
+
+  const accounts = new Set(monthRows.map(r => (r.account_name || '').trim()).filter(Boolean));
+  document.getElementById('kpi-accounts').textContent = accounts.size;
+
+  let latest = null;
+  rows.forEach(r => {
+    if (!r.created_at) return;
+    const t = new Date(r.created_at).getTime();
+    if (!latest || t > latest.t) latest = { t, created_at: r.created_at };
+  });
+  document.getElementById('kpi-last').textContent = latest ? formatLastActivity(latest.created_at) : '—';
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    const col = th.dataset.col;
+    const ind = th.querySelector('.sort-ind');
+    th.classList.toggle('sorted', col === STATE.sortCol);
+    if (col === STATE.sortCol) {
+      ind.textContent = STATE.sortDir === 'asc' ? '▲' : '▼';
+    } else {
+      ind.textContent = '';
+    }
+  });
+}
+
+function outcomePill(outcome) {
+  const color = OUTCOME_COLORS[outcome] || '#6b7280';
+  return `<span class="outcome-pill" style="background:${color}">${escHtml(outcome || '—')}</span>`;
+}
+
+function rowHtml(row) {
+  const expanded = STATE.expandedId === row.id;
+  const overdue = isOverdue(row);
+  const commentsShort = truncate(row.comments, 40);
+  const contactLine = escHtml(row.contact_name || '—');
+  const titleLine = row.contact_title
+    ? `<div class="contact-sub">${escHtml(row.contact_title)}</div>` : '';
+
+  const followDisplay = row.follow_up_date
+    ? `<span class="follow-date">${formatDate(row.follow_up_date)}</span>`
+    : '<span class="follow-date">—</span>';
+
+  const detailRow = expanded ? `
+    <tr class="expanded-row">
+      <td class="expanded-panel-cell" colspan="8">
+        <div class="expanded-panel">
+          <div><strong>Comments:</strong> ${escHtml(row.comments || '—')}</div>
+          <div class="expanded-actions">
+            <button type="button" class="btn btn-primary" data-edit-id="${row.id}">Edit</button>
+          </div>
+        </div>
+      </td>
+    </tr>` : '';
+
+  return `
+    <tr class="activity-row${overdue ? ' overdue' : ''}" data-id="${row.id}">
+      <td>${formatDate(row.activity_date)}</td>
+      <td>${escHtml(row.activity_type)}</td>
+      <td>
+        <div>${escHtml(row.account_name)}</div>
+        <div class="contact-sub">${escHtml(row.account_type)}</div>
+      </td>
+      <td><div>${contactLine}</div>${titleLine}</td>
+      <td>${outcomePill(row.outcome)}</td>
+      <td class="follow-cell" onclick="event.stopPropagation()">
+        ${followDisplay}
+        <input type="checkbox" data-follow-toggle="${row.id}" ${row.follow_up_done ? 'checked' : ''} title="Mark follow-up done">
+      </td>
+      <td>${escHtml(row.entered_by || '—')}</td>
+      <td class="comment-cell" title="${escHtml(row.comments)}">${escHtml(commentsShort || '—')}</td>
+    </tr>${detailRow}`;
+}
+
+function renderTable() {
+  const filtered = sortRows(applyFilters(STATE.activities));
+  const tbody = document.getElementById('activity-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;color:var(--gray-600);">No activities match the current filters.</td></tr>`;
+    updateSortIndicators();
+    return;
+  }
+  tbody.innerHTML = filtered.map(rowHtml).join('');
+  updateSortIndicators();
+
+  tbody.querySelectorAll('.activity-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const id = tr.dataset.id;
+      STATE.expandedId = STATE.expandedId === id ? null : id;
+      renderTable();
+    });
+  });
+
+  tbody.querySelectorAll('[data-follow-toggle]').forEach(cb => {
+    cb.addEventListener('change', async (e) => {
+      e.stopPropagation();
+      const id = cb.dataset.followToggle;
+      const done = cb.checked;
+      const { error } = await supabaseClient
+        .from('sales_activities')
+        .update({
+          follow_up_done: done,
+          last_updated_by: currentUserEmail,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      if (error) {
+        alert('Could not update follow-up: ' + error.message);
+        cb.checked = !done;
+        return;
+      }
+      const row = STATE.activities.find(r => r.id === id);
+      if (row) {
+        row.follow_up_done = done;
+        row.last_updated_by = currentUserEmail;
+      }
+      renderKpis();
+      renderTable();
+    });
+  });
+
+  tbody.querySelectorAll('[data-edit-id]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(btn.dataset.editId);
+    });
+  });
+}
+
+function setStateView(view) {
+  ['loading', 'error', 'empty'].forEach(k => {
+    document.getElementById(`${k}-state`).classList.remove('visible');
+  });
+  document.getElementById('dashboard').style.display = view === 'dashboard' ? 'block' : 'none';
+  document.getElementById('fab-new').style.display = (view === 'dashboard' || view === 'empty') ? 'block' : 'none';
+  if (view !== 'dashboard') document.getElementById(`${view}-state`).classList.add('visible');
+}
+
+async function loadActivities() {
+  setStateView('loading');
+  try {
+    const hotelCode = localStorage.getItem('hotelCode') || '';
+    const { data, error } = await supabaseClient
+      .from('sales_activities')
+      .select('*')
+      .eq('hotel_code', hotelCode)
+      .order('activity_date', { ascending: false });
+    if (error) throw error;
+
+    document.getElementById('sidebar-hotel').textContent = hotelCode || 'Hotel';
+
+    if (!data || !data.length) {
+      STATE.activities = [];
+      renderKpis();
+      renderTable();
+      setStateView('empty');
+      return;
+    }
+
+    STATE.activities = data;
+    renderKpis();
+    renderTable();
+    setStateView('dashboard');
+  } catch (err) {
+    console.error(err);
+    setStateView('error');
+    document.getElementById('error-state').textContent =
+      `Could not load sales activities: ${err.message || err}`;
+  }
+}
+
+/* ——— Account name combobox / plain input ——— */
+function allListOptions(accountType) {
+  if (accountType === 'Corporate') {
+    return CORPORATE_ACCOUNTS.map(name => ({ name, group: null }));
+  }
+  if (accountType === 'Travel Agency') {
+    const opts = [];
+    Object.entries(TA_GROUPS).forEach(([group, names]) => {
+      names.forEach(name => opts.push({ name, group }));
+    });
+    return opts;
+  }
+  return [];
+}
+
+function renderAccountNameField(accountType, presetValue) {
+  const wrap = document.getElementById('account-name-field');
+  const preset = (presetValue || '').trim();
+
+  if (accountType === 'Prospect' || accountType === 'Other') {
+    wrap.innerHTML = `<input class="input" type="text" id="form-account-name" required>`;
+    if (preset) document.getElementById('form-account-name').value = preset;
+    return;
+  }
+
+  const options = allListOptions(accountType);
+  const inList = options.some(o => o.name === preset);
+  const useOther = preset && !inList;
+
+  let listHtml = '';
+  if (accountType === 'Travel Agency') {
+    let lastGroup = null;
+    options.forEach(opt => {
+      if (opt.group !== lastGroup) {
+        listHtml += `<div class="combobox-group-label">${escHtml(opt.group)}</div>`;
+        lastGroup = opt.group;
+      }
+      listHtml += `<div class="combobox-option" data-value="${escHtml(opt.name)}">${escHtml(opt.name)}</div>`;
+    });
+  } else {
+    options.forEach(opt => {
+      listHtml += `<div class="combobox-option" data-value="${escHtml(opt.name)}">${escHtml(opt.name)}</div>`;
+    });
+  }
+  listHtml += `<div class="combobox-option special" data-value="__other__">${OTHER_OPTION}</div>`;
+
+  wrap.innerHTML = `
+    <div class="combobox-wrap" id="combobox-wrap">
+      <input class="input" type="text" id="form-account-name" autocomplete="off" placeholder="Search or select account" required>
+      <div class="combobox-list" id="combobox-list">${listHtml}</div>
+    </div>
+    <div class="other-input-wrap${useOther ? ' visible' : ''}" id="other-input-wrap">
+      <input class="input" type="text" id="form-account-other" placeholder="Enter account name">
+    </div>`;
+
+  const input = document.getElementById('form-account-name');
+  const list = document.getElementById('combobox-list');
+  const otherWrap = document.getElementById('other-input-wrap');
+  const otherInput = document.getElementById('form-account-other');
+
+  if (useOther) {
+    input.value = OTHER_OPTION;
+    otherInput.value = preset;
+    otherInput.required = true;
+  } else if (preset) {
+    input.value = preset;
+  }
+
+  function filterList(q) {
+    const lower = q.toLowerCase();
+    let visibleGroup = null;
+    list.querySelectorAll('.combobox-option').forEach(opt => {
+      if (opt.dataset.value === '__other__') {
+        opt.style.display = '';
+        return;
+      }
+      const match = !lower || opt.textContent.toLowerCase().includes(lower);
+      opt.style.display = match ? '' : 'none';
+      if (match && opt.previousElementSibling?.classList?.contains('combobox-group-label')) {
+        opt.previousElementSibling.style.display = '';
+      }
+    });
+    list.querySelectorAll('.combobox-group-label').forEach(label => {
+      let sib = label.nextElementSibling;
+      let anyVisible = false;
+      while (sib && !sib.classList.contains('combobox-group-label')) {
+        if (sib.classList.contains('combobox-option') && sib.style.display !== 'none') anyVisible = true;
+        sib = sib.nextElementSibling;
+      }
+      label.style.display = anyVisible ? '' : 'none';
+    });
+  }
+
+  function selectOption(opt) {
+    const val = opt.dataset.value;
+    if (val === '__other__') {
+      input.value = OTHER_OPTION;
+      otherWrap.classList.add('visible');
+      otherInput.required = true;
+      otherInput.focus();
+    } else {
+      input.value = opt.dataset.value;
+      otherWrap.classList.remove('visible');
+      otherInput.required = false;
+      otherInput.value = '';
+    }
+    list.classList.remove('open');
+  }
+
+  input.addEventListener('focus', () => {
+    filterList(input.value === OTHER_OPTION ? '' : input.value);
+    list.classList.add('open');
+  });
+  input.addEventListener('input', () => {
+    if (input.value !== OTHER_OPTION) {
+      otherWrap.classList.remove('visible');
+      otherInput.required = false;
+    }
+    filterList(input.value === OTHER_OPTION ? '' : input.value);
+    list.classList.add('open');
+  });
+  list.querySelectorAll('.combobox-option').forEach(opt => {
+    opt.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      selectOption(opt);
+    });
+  });
+}
+
+function getAccountNameFromForm() {
+  const accountType = document.getElementById('form-account-type').value;
+  if (accountType === 'Prospect' || accountType === 'Other') {
+    return document.getElementById('form-account-name').value.trim();
+  }
+  const main = document.getElementById('form-account-name').value.trim();
+  if (main === OTHER_OPTION) {
+    return (document.getElementById('form-account-other')?.value || '').trim();
+  }
+  return main;
+}
+
+function setAccountNameForEdit(row) {
+  renderAccountNameField(row.account_type, row.account_name);
+}
+
+function openNewModal() {
+  STATE.editingId = null;
+  document.getElementById('modal-title').textContent = 'New Activity';
+  document.getElementById('form-id').value = '';
+  document.getElementById('form-date').value = todayStr();
+  document.getElementById('form-type').value = ACTIVITY_TYPES[0];
+  document.getElementById('form-account-type').value = 'Corporate';
+  renderAccountNameField('Corporate', '');
+  document.getElementById('form-contact-name').value = '';
+  document.getElementById('form-contact-title').value = '';
+  document.getElementById('form-outcome').value = OUTCOMES[0];
+  document.getElementById('form-follow-up').value = '';
+  document.getElementById('form-comments').value = '';
+  document.getElementById('form-entered-by').value = currentUserEmail;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function openEditModal(id) {
+  const row = STATE.activities.find(r => String(r.id) === String(id));
+  if (!row) return;
+  STATE.editingId = row.id;
+  document.getElementById('modal-title').textContent = 'Edit Activity';
+  document.getElementById('form-id').value = row.id;
+  document.getElementById('form-date').value = (row.activity_date || '').toString().slice(0, 10);
+  document.getElementById('form-type').value = row.activity_type || ACTIVITY_TYPES[0];
+  document.getElementById('form-account-type').value = row.account_type || 'Corporate';
+  setAccountNameForEdit(row);
+  document.getElementById('form-contact-name').value = row.contact_name || '';
+  document.getElementById('form-contact-title').value = row.contact_title || '';
+  document.getElementById('form-outcome').value = row.outcome || OUTCOMES[0];
+  document.getElementById('form-follow-up').value = row.follow_up_date
+    ? String(row.follow_up_date).slice(0, 10) : '';
+  document.getElementById('form-comments').value = row.comments || '';
+  document.getElementById('form-entered-by').value = currentUserEmail;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  STATE.editingId = null;
+}
+
+async function saveActivity(e) {
+  e.preventDefault();
+  const accountName = getAccountNameFromForm();
+  if (!accountName) {
+    alert('Please enter an account name.');
+    return;
+  }
+
+  const payload = {
+    activity_date: document.getElementById('form-date').value,
+    activity_type: document.getElementById('form-type').value,
+    account_type: document.getElementById('form-account-type').value,
+    account_name: accountName,
+    contact_name: document.getElementById('form-contact-name').value.trim() || null,
+    contact_title: document.getElementById('form-contact-title').value.trim() || null,
+    outcome: document.getElementById('form-outcome').value,
+    follow_up_date: document.getElementById('form-follow-up').value || null,
+    comments: document.getElementById('form-comments').value.trim() || null,
+    last_updated_by: currentUserEmail
+  };
+
+  const btn = document.getElementById('form-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    if (STATE.editingId) {
+      const { error } = await supabaseClient
+        .from('sales_activities')
+        .update(payload)
+        .eq('id', STATE.editingId);
+      if (error) throw error;
+    } else {
+      const insertPayload = {
+        ...payload,
+        hotel_code: localStorage.getItem('hotelCode'),
+        follow_up_done: false,
+        entered_by: currentUserEmail
+      };
+      const { error } = await supabaseClient
+        .from('sales_activities')
+        .insert(insertPayload);
+      if (error) throw error;
+    }
+    closeModal();
+    await loadActivities();
+  } catch (err) {
+    alert('Could not save activity: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Activity';
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  errorEl.style.display = 'none';
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    errorEl.textContent = 'Incorrect email or password. Please try again.';
+    errorEl.style.display = 'block';
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+    return;
+  }
+  currentUserEmail = data.session.user.email;
+  showApp(currentUserEmail);
+  btn.textContent = 'Sign In';
+  btn.disabled = false;
+  loadActivities();
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('fab-new').style.display = 'none';
+}
+
+function showApp(email) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = email;
+  document.getElementById('form-entered-by').value = currentUserEmail;
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  currentUserEmail = '';
+  showLogin();
+}
+
+document.getElementById('fab-new').addEventListener('click', openNewModal);
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+document.getElementById('form-account-type').addEventListener('change', () => {
+  renderAccountNameField(document.getElementById('form-account-type').value, '');
+});
+
+document.getElementById('filter-type').addEventListener('change', renderTable);
+document.getElementById('filter-account-type').addEventListener('change', renderTable);
+document.getElementById('filter-outcome').addEventListener('change', renderTable);
+document.getElementById('filter-date-from').addEventListener('change', renderTable);
+document.getElementById('filter-date-to').addEventListener('change', renderTable);
+document.getElementById('filter-search').addEventListener('input', renderTable);
+
+document.getElementById('filter-follow').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('filter-follow').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.followFilter = btn.dataset.follow;
+    renderTable();
+  });
+});
+
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (STATE.sortCol === col) {
+      STATE.sortDir = STATE.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      STATE.sortCol = col;
+      STATE.sortDir = 'asc';
+    }
+    renderTable();
+  });
+});
+
+populateFilterDropdowns();
+document.getElementById('fab-new').style.display = 'none';
+
+document.addEventListener('click', (e) => {
+  const list = document.getElementById('combobox-list');
+  const wrap = document.getElementById('combobox-wrap');
+  if (list && wrap && !wrap.contains(e.target)) list.classList.remove('open');
+});
+
+(async () => {
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) {
+    showLogin();
+    return;
+  }
+  currentUserEmail = user.email;
+  showApp(user.email);
+  loadActivities();
+})();
+</script>
+</body>
+</html>
