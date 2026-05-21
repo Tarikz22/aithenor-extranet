@@ -1,3 +1,18 @@
+<!--
+Run in Supabase SQL editor before deploying:
+
+ALTER TABLE sales_activities
+  ADD COLUMN IF NOT EXISTS activity_type_other    TEXT,
+  ADD COLUMN IF NOT EXISTS account_type_other     TEXT,
+  ADD COLUMN IF NOT EXISTS activity_purpose       TEXT,
+  ADD COLUMN IF NOT EXISTS activity_purpose_other TEXT,
+  ADD COLUMN IF NOT EXISTS business_potential     BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS potential_room_nights  INTEGER,
+  ADD COLUMN IF NOT EXISTS potential_revenue      NUMERIC,
+  ADD COLUMN IF NOT EXISTS potential_date_from    DATE,
+  ADD COLUMN IF NOT EXISTS potential_date_to      DATE,
+  ADD COLUMN IF NOT EXISTS potential_business_type TEXT;
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -225,6 +240,13 @@ textarea { min-height: 100px; resize: vertical; }
 .combobox-option.special { font-style: italic; color: var(--gray-600); border-top: 1px solid var(--gray-200); }
 .other-input-wrap { margin-top: 8px; display: none; }
 .other-input-wrap.visible { display: block; }
+.form-section-title { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); margin: 18px 0 10px; padding-top: 4px; border-top: 1px solid var(--gray-200); }
+.radio-row { display: flex; gap: 20px; margin-top: 4px; }
+.radio-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--gray-900); cursor: pointer; }
+.business-fields { display: none; margin-top: 4px; }
+.business-fields.visible { display: block; }
+.date-range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.date-range-row .field-label { margin-top: 8px; }
 @media (max-width: 980px) {
   .sidebar { display: none; }
   .main { margin-left: 0; }
@@ -340,7 +362,10 @@ textarea { min-height: 100px; resize: vertical; }
             <option value="">All account types</option>
             <option>Corporate</option>
             <option>Travel Agency</option>
-            <option>Prospect</option>
+            <option>Ministry</option>
+            <option>Public Institution</option>
+            <option>Association</option>
+            <option>Event Management</option>
             <option>Other</option>
           </select>
           <select id="filter-outcome"><option value="">All outcomes</option></select>
@@ -394,14 +419,24 @@ textarea { min-height: 100px; resize: vertical; }
 
       <label class="field-label" for="form-type">Activity Type</label>
       <select class="select-input" id="form-type" required></select>
+      <div class="other-input-wrap" id="form-type-other-wrap">
+        <label class="field-label" for="form-type-other">Please specify</label>
+        <input class="input" type="text" id="form-type-other">
+      </div>
+
+      <label class="field-label" for="form-purpose">Purpose</label>
+      <select class="select-input" id="form-purpose" required></select>
+      <div class="other-input-wrap" id="form-purpose-other-wrap">
+        <label class="field-label" for="form-purpose-other">Please specify</label>
+        <input class="input" type="text" id="form-purpose-other">
+      </div>
 
       <label class="field-label" for="form-account-type">Account Type</label>
-      <select class="select-input" id="form-account-type" required>
-        <option value="Corporate">Corporate</option>
-        <option value="Travel Agency">Travel Agency</option>
-        <option value="Prospect">Prospect</option>
-        <option value="Other">Other</option>
-      </select>
+      <select class="select-input" id="form-account-type" required></select>
+      <div class="other-input-wrap" id="form-account-type-other-wrap">
+        <label class="field-label" for="form-account-type-other">Please specify</label>
+        <input class="input" type="text" id="form-account-type-other">
+      </div>
 
       <label class="field-label" for="form-account-name">Account Name</label>
       <div id="account-name-field"></div>
@@ -409,7 +444,7 @@ textarea { min-height: 100px; resize: vertical; }
       <label class="field-label" for="form-contact-name">Contact Name</label>
       <input class="input" type="text" id="form-contact-name">
 
-      <label class="field-label" for="form-contact-title">Contact Title</label>
+      <label class="field-label" for="form-contact-title">Position</label>
       <input class="input" type="text" id="form-contact-title">
 
       <label class="field-label" for="form-outcome">Outcome</label>
@@ -420,6 +455,34 @@ textarea { min-height: 100px; resize: vertical; }
 
       <label class="field-label" for="form-comments">Comments</label>
       <textarea id="form-comments"></textarea>
+
+      <div class="form-section-title">Business Potential</div>
+      <div class="radio-row">
+        <label><input type="radio" name="business-potential" value="no" checked> No</label>
+        <label><input type="radio" name="business-potential" value="yes"> Yes</label>
+      </div>
+      <div class="business-fields" id="business-fields">
+        <label class="field-label" for="form-potential-rn">Estimated Room Nights</label>
+        <input class="input" type="number" id="form-potential-rn" min="1" step="1">
+        <label class="field-label" for="form-potential-revenue">Estimated Revenue (€)</label>
+        <input class="input" type="number" id="form-potential-revenue" min="0" step="0.01">
+        <label class="field-label">Travel Dates</label>
+        <div class="date-range-row">
+          <div>
+            <label class="field-label" for="form-potential-from" style="margin-top:0;">From</label>
+            <input class="input" type="date" id="form-potential-from">
+          </div>
+          <div>
+            <label class="field-label" for="form-potential-to" style="margin-top:0;">To</label>
+            <input class="input" type="date" id="form-potential-to">
+          </div>
+        </div>
+        <label class="field-label" for="form-potential-biz-type">Business Type</label>
+        <select class="select-input" id="form-potential-biz-type">
+          <option value="Individual">Individual</option>
+          <option value="Group">Group</option>
+        </select>
+      </div>
 
       <label class="field-label" for="form-entered-by">Entered by</label>
       <input class="input readonly-field" type="text" id="form-entered-by" readonly>
@@ -441,7 +504,16 @@ let currentUserEmail = '';
 
 const ACTIVITY_TYPES = [
   'Sales Call', 'Blitz', 'FAM Trip', 'Agency Visit', 'Trade Show',
-  'Site Inspection', 'Phone Call', 'Other'
+  'Site Inspection', 'Phone Call', 'Cold Call', 'Other'
+];
+const ACCOUNT_TYPES = [
+  'Corporate', 'Travel Agency', 'Ministry', 'Public Institution',
+  'Association', 'Event Management', 'Other'
+];
+const PURPOSES = [
+  'First Visit', 'Follow-up', 'Proposal Presentation',
+  'Contract Renewal', 'Relationship Visit',
+  'Complaint Handling', 'Admin', 'Other'
 ];
 const OUTCOMES = ['Very Promising', 'Promising', 'Neutral', 'Unlikely', 'Dead'];
 const OUTCOME_COLORS = {
@@ -459,6 +531,66 @@ const CORPORATE_ACCOUNTS = [
   'Thales', 'Veolia', 'Vinci', 'Airbus Defence',
   'Safran', 'Dassault Aviation'
 ];
+const MINISTRY_GROUPS = {
+  'Group MOROCCO': [
+    "Ministère de l'Intérieur", "Ministère de l'Économie et des Finances",
+    "Ministère des Affaires Étrangères", "Ministère de la Justice",
+    "Ministère de la Santé et de la Protection Sociale",
+    "Ministère de l'Éducation Nationale", "Ministère de l'Enseignement Supérieur",
+    "Ministère du Tourisme et de l'Artisanat",
+    "Ministère de l'Industrie et du Commerce",
+    "Ministère de l'Équipement et de l'Eau",
+    "Ministère de la Transition Numérique",
+    "Ministère de l'Agriculture et de la Pêche Maritime",
+    "Ministère de l'Énergie et des Mines",
+    "Ministère de la Solidarité et de l'Intégration Sociale"
+  ],
+  'Group FRANCE': [
+    "Ministère de l'Économie et des Finances",
+    "Ministère des Affaires Étrangères",
+    "Ministère de l'Intérieur", "Ministère de la Défense",
+    "Ministère de la Santé", "Ministère de l'Éducation Nationale",
+    "Ministère de la Culture", "Ministère de la Justice",
+    "Ministère de la Transition Écologique",
+    "Ministère du Travail"
+  ],
+  'Group MIDDLE EAST': [
+    'Ministère des Finances (UAE)', 'Ministère du Tourisme (UAE)',
+    "Ministère de l'Économie (Saudi Arabia)",
+    'Ministère du Tourisme (Saudi Arabia)',
+    'Ministère des Finances (Qatar)',
+    "Ministère des Affaires Étrangères (Kuwait)",
+    'Ministère du Tourisme (Bahrain)',
+    'Ministère du Tourisme (Oman)'
+  ]
+};
+const PUBLIC_INSTITUTION_GROUPS = {
+  'Group MOROCCO': [
+    'OCP Group', 'ONCF', 'ONEE', 'Royal Air Maroc (RAM)',
+    'Office National des Aéroports (ONDA)',
+    'MASEN', 'CDG (Caisse de Dépôt et de Gestion)',
+    'Bank Al-Maghrib', 'Maroc Telecom', 'ADM (Autoroutes du Maroc)',
+    'ONMT (Office National Marocain du Tourisme)',
+    'TMSA (Tanger Med Special Agency)',
+    'Hassan II Fund', 'ANAPEC', 'CNSS', 'RAMED',
+    'Université Mohammed V', 'Université Hassan II',
+    'Université Cadi Ayyad', 'Al Akhawayn University'
+  ],
+  'Group FRANCE': [
+    'BPI France', 'Caisse des Dépôts', 'SNCF', 'EDF',
+    'Air France', 'La Poste', 'RATP', 'Pôle Emploi',
+    'INRIA', 'CEA', 'CNRS', 'Université Paris-Sorbonne',
+    'HEC Paris', 'Sciences Po', 'École Polytechnique'
+  ],
+  'Group MIDDLE EAST': [
+    'ADNOC', 'Saudi Aramco', 'Emirates Group',
+    'Abu Dhabi Investment Authority (ADIA)',
+    'Public Investment Fund (PIF) Saudi Arabia',
+    'Qatar Investment Authority (QIA)',
+    'Dubai Airports', 'Dubai Tourism', 'DEWA',
+    'King Abdulaziz University', 'American University of Beirut'
+  ]
+};
 const TA_GROUPS = {
   'Group MOROCCO': [
     'Atlas Voyages', 'Carlson Wagonlit Travel Maroc', 'American Express Travel Maroc',
@@ -482,6 +614,8 @@ const TA_GROUPS = {
   ]
 };
 const OTHER_OPTION = 'Other (free text)';
+const GROUPED_ACCOUNT_TYPES = ['Travel Agency', 'Ministry', 'Public Institution'];
+const PLAIN_ACCOUNT_NAME_TYPES = ['Association', 'Event Management', 'Other'];
 
 const STATE = {
   activities: [],
@@ -563,11 +697,62 @@ function populateFilterDropdowns() {
   outSel.innerHTML = '<option value="">All outcomes</option>' +
     OUTCOMES.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
 
-  const formType = document.getElementById('form-type');
-  formType.innerHTML = ACTIVITY_TYPES.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+  document.getElementById('form-type').innerHTML =
+    ACTIVITY_TYPES.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
 
-  const formOutcome = document.getElementById('form-outcome');
-  formOutcome.innerHTML = OUTCOMES.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+  document.getElementById('form-purpose').innerHTML =
+    PURPOSES.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+
+  document.getElementById('form-account-type').innerHTML =
+    ACCOUNT_TYPES.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+
+  document.getElementById('form-outcome').innerHTML =
+    OUTCOMES.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+}
+
+function syncOtherField(selectId, wrapId, inputId) {
+  const select = document.getElementById(selectId);
+  const wrap = document.getElementById(wrapId);
+  const input = document.getElementById(inputId);
+  const isOther = select.value === 'Other';
+  wrap.classList.toggle('visible', isOther);
+  if (!isOther) {
+    input.value = '';
+    input.required = false;
+  } else {
+    input.required = true;
+  }
+}
+
+function syncAllOtherFields() {
+  syncOtherField('form-type', 'form-type-other-wrap', 'form-type-other');
+  syncOtherField('form-purpose', 'form-purpose-other-wrap', 'form-purpose-other');
+  syncOtherField('form-account-type', 'form-account-type-other-wrap', 'form-account-type-other');
+}
+
+function syncBusinessPotentialFields() {
+  const yes = document.querySelector('input[name="business-potential"]:checked')?.value === 'yes';
+  const block = document.getElementById('business-fields');
+  block.classList.toggle('visible', yes);
+  const fields = ['form-potential-rn', 'form-potential-revenue', 'form-potential-from', 'form-potential-to', 'form-potential-biz-type'];
+  if (!yes) {
+    document.getElementById('form-potential-rn').value = '';
+    document.getElementById('form-potential-revenue').value = '';
+    document.getElementById('form-potential-from').value = '';
+    document.getElementById('form-potential-to').value = '';
+    document.getElementById('form-potential-biz-type').value = 'Individual';
+    fields.forEach(id => { document.getElementById(id).required = false; });
+  } else {
+    document.getElementById('form-potential-rn').required = true;
+  }
+}
+
+function groupedOptionsFrom(map) {
+  const opts = [];
+  Object.entries(map).forEach(([group, names]) => {
+    names.forEach(name => opts.push({ name, group }));
+  });
+  return opts;
 }
 
 function getFilters() {
@@ -808,13 +993,9 @@ function allListOptions(accountType) {
   if (accountType === 'Corporate') {
     return CORPORATE_ACCOUNTS.map(name => ({ name, group: null }));
   }
-  if (accountType === 'Travel Agency') {
-    const opts = [];
-    Object.entries(TA_GROUPS).forEach(([group, names]) => {
-      names.forEach(name => opts.push({ name, group }));
-    });
-    return opts;
-  }
+  if (accountType === 'Travel Agency') return groupedOptionsFrom(TA_GROUPS);
+  if (accountType === 'Ministry') return groupedOptionsFrom(MINISTRY_GROUPS);
+  if (accountType === 'Public Institution') return groupedOptionsFrom(PUBLIC_INSTITUTION_GROUPS);
   return [];
 }
 
@@ -822,7 +1003,7 @@ function renderAccountNameField(accountType, presetValue) {
   const wrap = document.getElementById('account-name-field');
   const preset = (presetValue || '').trim();
 
-  if (accountType === 'Prospect' || accountType === 'Other') {
+  if (PLAIN_ACCOUNT_NAME_TYPES.includes(accountType)) {
     wrap.innerHTML = `<input class="input" type="text" id="form-account-name" required>`;
     if (preset) document.getElementById('form-account-name').value = preset;
     return;
@@ -833,10 +1014,10 @@ function renderAccountNameField(accountType, presetValue) {
   const useOther = preset && !inList;
 
   let listHtml = '';
-  if (accountType === 'Travel Agency') {
+  if (GROUPED_ACCOUNT_TYPES.includes(accountType)) {
     let lastGroup = null;
     options.forEach(opt => {
-      if (opt.group !== lastGroup) {
+      if (opt.group && opt.group !== lastGroup) {
         listHtml += `<div class="combobox-group-label">${escHtml(opt.group)}</div>`;
         lastGroup = opt.group;
       }
@@ -934,7 +1115,7 @@ function renderAccountNameField(accountType, presetValue) {
 
 function getAccountNameFromForm() {
   const accountType = document.getElementById('form-account-type').value;
-  if (accountType === 'Prospect' || accountType === 'Other') {
+  if (PLAIN_ACCOUNT_NAME_TYPES.includes(accountType)) {
     return document.getElementById('form-account-name').value.trim();
   }
   const main = document.getElementById('form-account-name').value.trim();
@@ -948,13 +1129,105 @@ function setAccountNameForEdit(row) {
   renderAccountNameField(row.account_type, row.account_name);
 }
 
+function buildFormPayload() {
+  const activityType = document.getElementById('form-type').value;
+  const purpose = document.getElementById('form-purpose').value;
+  const accountType = document.getElementById('form-account-type').value;
+  const bizYes = document.querySelector('input[name="business-potential"]:checked')?.value === 'yes';
+
+  if (activityType === 'Other' && !document.getElementById('form-type-other').value.trim()) {
+    alert('Please specify the activity type.');
+    return null;
+  }
+  if (purpose === 'Other' && !document.getElementById('form-purpose-other').value.trim()) {
+    alert('Please specify the purpose.');
+    return null;
+  }
+  if (accountType === 'Other' && !document.getElementById('form-account-type-other').value.trim()) {
+    alert('Please specify the account type.');
+    return null;
+  }
+
+  return {
+    activity_date: document.getElementById('form-date').value,
+    activity_type: activityType,
+    activity_type_other: activityType === 'Other'
+      ? document.getElementById('form-type-other').value.trim() : null,
+    activity_purpose: purpose,
+    activity_purpose_other: purpose === 'Other'
+      ? document.getElementById('form-purpose-other').value.trim() : null,
+    account_type: accountType,
+    account_type_other: accountType === 'Other'
+      ? document.getElementById('form-account-type-other').value.trim() : null,
+    contact_name: document.getElementById('form-contact-name').value.trim() || null,
+    contact_title: document.getElementById('form-contact-title').value.trim() || null,
+    outcome: document.getElementById('form-outcome').value,
+    follow_up_date: document.getElementById('form-follow-up').value || null,
+    comments: document.getElementById('form-comments').value.trim() || null,
+    business_potential: bizYes,
+    potential_room_nights: bizYes
+      ? (parseInt(document.getElementById('form-potential-rn').value, 10) || null) : null,
+    potential_revenue: bizYes
+      ? (parseFloat(document.getElementById('form-potential-revenue').value) || null) : null,
+    potential_date_from: bizYes
+      ? (document.getElementById('form-potential-from').value || null) : null,
+    potential_date_to: bizYes
+      ? (document.getElementById('form-potential-to').value || null) : null,
+    potential_business_type: bizYes
+      ? document.getElementById('form-potential-biz-type').value : null,
+    last_updated_by: currentUserEmail
+  };
+}
+
+function populateExtendedFields(row) {
+  const activityType = row.activity_type || ACTIVITY_TYPES[0];
+  document.getElementById('form-type').value = activityType;
+  document.getElementById('form-type-other').value = row.activity_type_other || '';
+  syncOtherField('form-type', 'form-type-other-wrap', 'form-type-other');
+
+  document.getElementById('form-purpose').value = row.activity_purpose || PURPOSES[0];
+  document.getElementById('form-purpose-other').value = row.activity_purpose_other || '';
+  syncOtherField('form-purpose', 'form-purpose-other-wrap', 'form-purpose-other');
+
+  document.getElementById('form-account-type').value = row.account_type || 'Corporate';
+  document.getElementById('form-account-type-other').value = row.account_type_other || '';
+  syncOtherField('form-account-type', 'form-account-type-other-wrap', 'form-account-type-other');
+
+  const bizYes = !!row.business_potential;
+  document.querySelector(`input[name="business-potential"][value="${bizYes ? 'yes' : 'no'}"]`).checked = true;
+  document.getElementById('form-potential-rn').value = row.potential_room_nights ?? '';
+  document.getElementById('form-potential-revenue').value = row.potential_revenue ?? '';
+  document.getElementById('form-potential-from').value = row.potential_date_from
+    ? String(row.potential_date_from).slice(0, 10) : '';
+  document.getElementById('form-potential-to').value = row.potential_date_to
+    ? String(row.potential_date_to).slice(0, 10) : '';
+  document.getElementById('form-potential-biz-type').value = row.potential_business_type || 'Individual';
+  syncBusinessPotentialFields();
+}
+
+function resetExtendedFields() {
+  document.getElementById('form-type').value = ACTIVITY_TYPES[0];
+  document.getElementById('form-type-other').value = '';
+  document.getElementById('form-purpose').value = PURPOSES[0];
+  document.getElementById('form-purpose-other').value = '';
+  document.getElementById('form-account-type').value = 'Corporate';
+  document.getElementById('form-account-type-other').value = '';
+  document.querySelector('input[name="business-potential"][value="no"]').checked = true;
+  document.getElementById('form-potential-rn').value = '';
+  document.getElementById('form-potential-revenue').value = '';
+  document.getElementById('form-potential-from').value = '';
+  document.getElementById('form-potential-to').value = '';
+  document.getElementById('form-potential-biz-type').value = 'Individual';
+  syncAllOtherFields();
+  syncBusinessPotentialFields();
+}
+
 function openNewModal() {
   STATE.editingId = null;
   document.getElementById('modal-title').textContent = 'New Activity';
   document.getElementById('form-id').value = '';
   document.getElementById('form-date').value = todayStr();
-  document.getElementById('form-type').value = ACTIVITY_TYPES[0];
-  document.getElementById('form-account-type').value = 'Corporate';
+  resetExtendedFields();
   renderAccountNameField('Corporate', '');
   document.getElementById('form-contact-name').value = '';
   document.getElementById('form-contact-title').value = '';
@@ -972,8 +1245,7 @@ function openEditModal(id) {
   document.getElementById('modal-title').textContent = 'Edit Activity';
   document.getElementById('form-id').value = row.id;
   document.getElementById('form-date').value = (row.activity_date || '').toString().slice(0, 10);
-  document.getElementById('form-type').value = row.activity_type || ACTIVITY_TYPES[0];
-  document.getElementById('form-account-type').value = row.account_type || 'Corporate';
+  populateExtendedFields(row);
   setAccountNameForEdit(row);
   document.getElementById('form-contact-name').value = row.contact_name || '';
   document.getElementById('form-contact-title').value = row.contact_title || '';
@@ -998,18 +1270,10 @@ async function saveActivity(e) {
     return;
   }
 
-  const payload = {
-    activity_date: document.getElementById('form-date').value,
-    activity_type: document.getElementById('form-type').value,
-    account_type: document.getElementById('form-account-type').value,
-    account_name: accountName,
-    contact_name: document.getElementById('form-contact-name').value.trim() || null,
-    contact_title: document.getElementById('form-contact-title').value.trim() || null,
-    outcome: document.getElementById('form-outcome').value,
-    follow_up_date: document.getElementById('form-follow-up').value || null,
-    comments: document.getElementById('form-comments').value.trim() || null,
-    last_updated_by: currentUserEmail
-  };
+  const base = buildFormPayload();
+  if (!base) return;
+
+  const payload = { ...base, account_name: accountName };
 
   const btn = document.getElementById('form-save-btn');
   btn.disabled = true;
@@ -1094,8 +1358,18 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
 
+document.getElementById('form-type').addEventListener('change', () => {
+  syncOtherField('form-type', 'form-type-other-wrap', 'form-type-other');
+});
+document.getElementById('form-purpose').addEventListener('change', () => {
+  syncOtherField('form-purpose', 'form-purpose-other-wrap', 'form-purpose-other');
+});
 document.getElementById('form-account-type').addEventListener('change', () => {
+  syncOtherField('form-account-type', 'form-account-type-other-wrap', 'form-account-type-other');
   renderAccountNameField(document.getElementById('form-account-type').value, '');
+});
+document.querySelectorAll('input[name="business-potential"]').forEach(radio => {
+  radio.addEventListener('change', syncBusinessPotentialFields);
 });
 
 document.getElementById('filter-type').addEventListener('change', renderTable);
@@ -1128,6 +1402,8 @@ document.querySelectorAll('thead th[data-col]').forEach(th => {
 });
 
 populateFilterDropdowns();
+syncAllOtherFields();
+syncBusinessPotentialFields();
 document.getElementById('fab-new').style.display = 'none';
 
 document.addEventListener('click', (e) => {
