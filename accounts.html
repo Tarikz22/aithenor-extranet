@@ -110,6 +110,26 @@ tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 1
   line-height: 1.6;
 }
 .expanded-panel strong { color: var(--navy); }
+.pipeline-bridge {
+  display: none;
+  background: #f5f5f5;
+  color: var(--gray-900);
+  font-size: 13px;
+  padding: 10px 16px;
+  border-left: 3px solid #1a2332;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.unvisited-alert {
+  display: none;
+  background: #4A1B0C;
+  color: #fff;
+  font-size: 13px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+  width: 100%;
+}
 .state { display: none; align-items: center; justify-content: center; min-height: 280px; color: var(--gray-600); }
 .state.visible { display: flex; }
 .login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
@@ -212,6 +232,9 @@ tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 1
           <div class="summary-tile"><div class="summary-label">Estimated Revenue At Risk</div><div class="summary-value" id="s-rev-risk">€0</div><div class="summary-sub">Directional estimate</div></div>
         </div>
 
+        <div id="pipeline-bridge" class="pipeline-bridge"></div>
+        <div id="unvisited-alert" class="unvisited-alert"></div>
+
         <div class="controls">
           <div class="tabs" id="tabs"></div>
           <div class="control-right">
@@ -236,8 +259,39 @@ const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const STATE = { accounts: [], activeTab: 'all', expandedAccountKey: null };
+async function fetchCorporateAccountData() {
+  const hotelCode = localStorage.getItem('hotelCode') || '';
+  const { data, error } = await supabaseClient
+    .from('engine_outputs')
+    .select('engine_json')
+    .eq('hotel_code', hotelCode)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error || !data) return [];
+  try {
+    const engineJson = typeof data.engine_json === 'string'
+      ? JSON.parse(data.engine_json) : data.engine_json;
+    const corpIssues = engineJson.corporate_account_pace_issues || [];
+    return corpIssues[0]?.all_accounts || [];
+  } catch (e) { return []; }
+}
+
+const STATE = {
+  accounts: [],
+  activeTab: 'all',
+  expandedAccountKey: null,
+  salesActivitySummary: {},
+  salesActivities: []
+};
 const TABS = ['all', 'risk', 'ahead', 'track'];
+const OUTCOME_COLORS = {
+  'Very Promising': '#22c55e',
+  'Promising': '#3b82f6',
+  'Neutral': '#6b7280',
+  'Unlikely': '#f59e0b',
+  'Dead': '#ef4444'
+};
 
 function escHtml(str) {
   if (str == null) return '';
@@ -248,6 +302,151 @@ function money(v) { return new Intl.NumberFormat('en-GB', { style: 'currency', c
 function int(v) { return new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 }).format(Math.round(n(v))); }
 function pct(v) { return (n(v) * 100).toFixed(1) + '%'; }
 function shortText(v) { return (v || '').toString().trim(); }
+
+function parseDateOnly(val) {
+  if (!val) return null;
+  const s = String(val).slice(0, 10);
+  const parts = s.split('-');
+  if (parts.length === 3) return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatVisitDate(val) {
+  const d = parseDateOnly(val);
+  if (!d) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatEnteredByName(email) {
+  if (!email) return '—';
+  const prefix = String(email).split('@')[0] || '';
+  if (!prefix) return '—';
+  const parts = prefix.split(/[._-]+/).filter(Boolean);
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  if (parts.length >= 2) return `${cap(parts[0])} ${parts[1].charAt(0).toUpperCase()}.`;
+  return cap(parts[0]);
+}
+
+function buildLastVisitedHtml(companyName) {
+  const key = shortText(companyName).toLowerCase();
+  const visit = STATE.salesActivitySummary[key];
+  if (!visit) {
+    return `<div style="color:#9ca3af; font-size:12px;">No sales activity recorded for this account. <a href="sales.html" style="color:#1a2332;">Log a visit →</a></div>`;
+  }
+  const color = OUTCOME_COLORS[visit.outcome] || '#6b7280';
+  return `<div><strong>Last visited:</strong> ${escHtml(formatVisitDate(visit.activity_date))} by ${escHtml(formatEnteredByName(visit.entered_by))} — <span style="color:${color}">${escHtml(visit.outcome || '—')}</span> — <a href="sales.html" style="font-size:12px; color:#1a2332;">View all activity →</a></div>`;
+}
+
+function daysSinceActivity(dateVal) {
+  const d = parseDateOnly(dateVal);
+  if (!d) return Infinity;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.floor((today - d) / 86400000);
+}
+
+function buildSalesActivitySummary(rows) {
+  const map = {};
+  (rows || []).forEach(row => {
+    const key = shortText(row.account_name).toLowerCase();
+    if (!key) return;
+    const existing = map[key];
+    if (!existing || String(row.activity_date) > String(existing.activity_date)) {
+      map[key] = {
+        activity_date: row.activity_date,
+        outcome: row.outcome,
+        entered_by: row.entered_by
+      };
+    }
+  });
+  return map;
+}
+
+function renderUnvisitedAlert() {
+  const bar = document.getElementById('unvisited-alert');
+  if (!bar) return;
+  const flagged = STATE.accounts.filter(acc => {
+    if (n(acc.variance_rn) >= 0) return false;
+    const key = shortText(acc.company_name).toLowerCase();
+    const visit = STATE.salesActivitySummary[key];
+    if (!visit) return true;
+    return daysSinceActivity(visit.activity_date) > 60;
+  });
+  if (!flagged.length) {
+    bar.style.display = 'none';
+    return;
+  }
+  const names = flagged.map(a => a.company_name);
+  let nameList;
+  if (names.length > 4) {
+    nameList = names.slice(0, 3).join(', ') + `, + ${names.length - 3} more`;
+  } else {
+    nameList = names.join(', ');
+  }
+  const nLabel = flagged.length === 1 ? 'account' : 'accounts';
+  bar.textContent = `${flagged.length} ${nLabel} behind pace with no visit in 60+ days: ${nameList}`;
+  bar.style.display = 'block';
+}
+
+function renderPipelineBridge(engineJson, salesRows) {
+  const bar = document.getElementById('pipeline-bridge');
+  if (!bar) return;
+  const fgIssues = engineJson?.forecast_gap_issues || [];
+  const window3160 = fgIssues.find(c =>
+    (c.window_label && (c.window_label.includes('31') || c.window_label.includes('60'))) ||
+    (c.window && (String(c.window).includes('31') || String(c.window).includes('60'))) ||
+    (c.title && (String(c.title).includes('31') || String(c.title).includes('60')))
+  );
+  const revenueGap = window3160?.revenue_gap ?? window3160?.gap_revenue ?? window3160?.financial_gap ?? null;
+  if (revenueGap == null || !Number.isFinite(Number(revenueGap))) {
+    bar.style.display = 'none';
+    return;
+  }
+  const gap = Number(revenueGap);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const from31 = new Date(today);
+  from31.setDate(from31.getDate() + 31);
+  const to60 = new Date(today);
+  to60.setDate(to60.getDate() + 60);
+  const pipelineSum = (salesRows || []).filter(r => {
+    if (r.business_potential !== true) return false;
+    const from = parseDateOnly(r.potential_date_from);
+    if (!from) return false;
+    return from >= from31 && from <= to60;
+  }).reduce((s, r) => s + (Number(r.potential_revenue) || 0), 0);
+  const coverage = gap > 0 ? Math.round((pipelineSum / gap) * 100) : 0;
+  if (pipelineSum > 0) {
+    bar.textContent = `Days 31–60 revenue gap: ${money(gap)}. Sales pipeline covers ${money(pipelineSum)} (${coverage}% of gap).`;
+  } else {
+    bar.textContent = `Days 31–60 revenue gap: ${money(gap)}. No sales pipeline logged for this window.`;
+  }
+  bar.style.display = 'block';
+}
+
+async function loadSalesActivitySummary(engineJson) {
+  try {
+    const hotelCode = localStorage.getItem('hotelCode') || '';
+    const { data, error } = await supabaseClient
+      .from('sales_activities')
+      .select('*')
+      .eq('hotel_code', hotelCode);
+    if (error) throw error;
+    STATE.salesActivities = data || [];
+    STATE.salesActivitySummary = buildSalesActivitySummary(STATE.salesActivities);
+    renderPipelineBridge(engineJson || {}, STATE.salesActivities);
+    renderUnvisitedAlert();
+    renderTable();
+  } catch (err) {
+    console.error('Sales activity summary:', err);
+    STATE.salesActivitySummary = {};
+    STATE.salesActivities = [];
+    renderUnvisitedAlert();
+    renderTable();
+  }
+}
+
 function statusOf(acc) {
   if (n(acc.variance_vs_ly) < -0.10) return 'risk';
   if (n(acc.variance_vs_ly) > 0.10) return 'ahead';
@@ -344,6 +543,7 @@ function rowHtml(acc, maxAbsVarianceRn, sectionKey) {
         <div class="expanded-panel">
           <div><strong>Comments:</strong> ${escHtml(acc.comments || '—')}</div>
           <div><strong>Account type:</strong> ${escHtml(acc.account_type || '—')}</div>
+          ${buildLastVisitedHtml(acc.company_name)}
           ${nextActionLine}
         </div>
       </td>
@@ -455,6 +655,7 @@ async function loadAccounts() {
     renderTabs();
     renderTable();
     setStateView('dashboard');
+    loadSalesActivitySummary(engineJson);
   } catch (err) {
     console.error(err);
     setStateView('error');

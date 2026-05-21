@@ -492,6 +492,7 @@ textarea { min-height: 100px; resize: vertical; }
 
       <label class="field-label" for="form-account-name">Account Name</label>
       <div id="account-name-field"></div>
+      <div id="account-intel-block" style="display:none; background:#f0f4ff; border-left:3px solid #1a2332; border-radius:6px; padding:10px 14px; margin-top:8px; font-size:13px;"></div>
 
       <label class="field-label" for="form-contact-name">Contact Name</label>
       <input class="input" type="text" id="form-contact-name">
@@ -552,7 +553,26 @@ const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+async function fetchCorporateAccountData() {
+  const hotelCode = localStorage.getItem('hotelCode') || '';
+  const { data, error } = await supabaseClient
+    .from('engine_outputs')
+    .select('engine_json')
+    .eq('hotel_code', hotelCode)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error || !data) return [];
+  try {
+    const engineJson = typeof data.engine_json === 'string'
+      ? JSON.parse(data.engine_json) : data.engine_json;
+    const corpIssues = engineJson.corporate_account_pace_issues || [];
+    return corpIssues[0]?.all_accounts || [];
+  } catch (e) { return []; }
+}
+
 let currentUserEmail = '';
+let cachedCorpAccounts = null;
 
 const ACTIVITY_TYPES = [
   'Sales Call', 'Blitz', 'FAM Trip', 'Agency Visit', 'Trade Show',
@@ -1432,6 +1452,96 @@ async function loadActivities() {
   }
 }
 
+/* ——— Corporate account intelligence (modal) ——— */
+function hideAccountIntelBlock() {
+  const block = document.getElementById('account-intel-block');
+  if (block) {
+    block.style.display = 'none';
+    block.innerHTML = '';
+  }
+}
+
+async function ensureCorpAccountsCache() {
+  if (cachedCorpAccounts === null) {
+    cachedCorpAccounts = await fetchCorporateAccountData();
+  }
+  return cachedCorpAccounts;
+}
+
+function getSelectedCorporateAccountName() {
+  const accountType = document.getElementById('form-account-type')?.value;
+  if (accountType !== 'Corporate') return '';
+  const input = document.getElementById('form-account-name');
+  if (!input) return '';
+  const val = input.value.trim();
+  if (!val || val === OTHER_OPTION) return '';
+  return val;
+}
+
+async function updateAccountIntelBlock() {
+  const block = document.getElementById('account-intel-block');
+  if (!block) return;
+  const accountType = document.getElementById('form-account-type').value;
+  if (accountType !== 'Corporate') {
+    hideAccountIntelBlock();
+    return;
+  }
+  const name = getSelectedCorporateAccountName();
+  if (!name) {
+    hideAccountIntelBlock();
+    return;
+  }
+  const accounts = await ensureCorpAccountsCache();
+  const match = accounts.find(a =>
+    shortText(a.company_name).toLowerCase() === name.toLowerCase()
+  );
+  if (!match) {
+    hideAccountIntelBlock();
+    return;
+  }
+  const fyLy = n(match.fy_ly_rn);
+  const ytdRn = n(match.actual_ytd_rn);
+  const varianceRn = Number.isFinite(Number(match.variance_rn))
+    ? Number(match.variance_rn)
+    : n(match.full_year_projected_rn) - fyLy;
+  const variancePct = Number.isFinite(Number(match.variance_pct))
+    ? Number(match.variance_pct)
+    : (fyLy ? (varianceRn / fyLy) * 100 : 0);
+  const sign = varianceRn >= 0 ? '+' : '';
+  const varColor = varianceRn >= 0 ? '#22c55e' : '#ef4444';
+  const pctDisplay = (variancePct >= 0 ? '+' : '') + Number(variancePct).toFixed(1) + '%';
+  const adr = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+    .format(n(match.actual_ytd_adr));
+  block.style.display = 'block';
+  block.innerHTML = `
+    <div style="font-weight:600; color:#1a2332; margin-bottom:4px;">Account Intelligence</div>
+    <div>
+      YTD Production:
+      <strong>${Math.round(ytdRn)} RN</strong>
+      vs ${Math.round(fyLy)} RN last year
+      — <strong style="color:${varColor}">${sign}${Math.round(varianceRn)} RN (${pctDisplay})</strong>
+    </div>
+    <div style="color:#6b7280; font-size:12px; margin-top:2px;">
+      ADR: ${escHtml(adr)} · Account Manager: ${escHtml(match.account_manager || 'Unassigned')}
+    </div>`;
+}
+
+function shortText(v) { return (v || '').toString().trim(); }
+function n(v) { const num = Number(v); return Number.isFinite(num) ? num : 0; }
+
+function bindCorporateAccountIntelHandlers() {
+  const input = document.getElementById('form-account-name');
+  if (!input || input.dataset.intelBound === '1') return;
+  input.dataset.intelBound = '1';
+  input.addEventListener('input', () => { updateAccountIntelBlock(); });
+  input.addEventListener('change', () => { updateAccountIntelBlock(); });
+}
+
+function resetAccountIntelHandlers() {
+  const input = document.getElementById('form-account-name');
+  if (input) delete input.dataset.intelBound;
+}
+
 /* ——— Account name combobox / plain input ——— */
 function allListOptions(accountType) {
   if (accountType === 'Corporate') {
@@ -1450,6 +1560,7 @@ function renderAccountNameField(accountType, presetValue) {
   if (PLAIN_ACCOUNT_NAME_TYPES.includes(accountType)) {
     wrap.innerHTML = `<input class="input" type="text" id="form-account-name" required>`;
     if (preset) document.getElementById('form-account-name').value = preset;
+    hideAccountIntelBlock();
     return;
   }
 
@@ -1535,6 +1646,7 @@ function renderAccountNameField(accountType, presetValue) {
       otherInput.value = '';
     }
     list.classList.remove('open');
+    if (accountType === 'Corporate') updateAccountIntelBlock();
   }
 
   input.addEventListener('focus', () => {
@@ -1555,6 +1667,13 @@ function renderAccountNameField(accountType, presetValue) {
       selectOption(opt);
     });
   });
+
+  if (accountType === 'Corporate') {
+    bindCorporateAccountIntelHandlers();
+    updateAccountIntelBlock();
+  } else {
+    hideAccountIntelBlock();
+  }
 }
 
 function getAccountNameFromForm() {
@@ -1668,11 +1787,14 @@ function resetExtendedFields() {
 
 function openNewModal() {
   STATE.editingId = null;
+  cachedCorpAccounts = null;
+  hideAccountIntelBlock();
   document.getElementById('modal-title').textContent = 'New Activity';
   document.getElementById('form-id').value = '';
   document.getElementById('form-date').value = todayStr();
   resetExtendedFields();
   renderAccountNameField('Corporate', '');
+  ensureCorpAccountsCache().then(() => updateAccountIntelBlock());
   document.getElementById('form-contact-name').value = '';
   document.getElementById('form-contact-title').value = '';
   document.getElementById('form-outcome').value = OUTCOMES[0];
@@ -1686,11 +1808,14 @@ function openEditModal(id) {
   const row = STATE.activities.find(r => String(r.id) === String(id));
   if (!row) return;
   STATE.editingId = row.id;
+  cachedCorpAccounts = null;
+  hideAccountIntelBlock();
   document.getElementById('modal-title').textContent = 'Edit Activity';
   document.getElementById('form-id').value = row.id;
   document.getElementById('form-date').value = (row.activity_date || '').toString().slice(0, 10);
   populateExtendedFields(row);
   setAccountNameForEdit(row);
+  ensureCorpAccountsCache().then(() => updateAccountIntelBlock());
   document.getElementById('form-contact-name').value = row.contact_name || '';
   document.getElementById('form-contact-title').value = row.contact_title || '';
   document.getElementById('form-outcome').value = row.outcome || OUTCOMES[0];
@@ -1704,6 +1829,9 @@ function openEditModal(id) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   STATE.editingId = null;
+  cachedCorpAccounts = null;
+  resetAccountIntelHandlers();
+  hideAccountIntelBlock();
 }
 
 async function saveActivity(e) {
@@ -1813,7 +1941,11 @@ document.getElementById('form-purpose').addEventListener('change', () => {
 });
 document.getElementById('form-account-type').addEventListener('change', () => {
   syncOtherField('form-account-type', 'form-account-type-other-wrap', 'form-account-type-other');
+  resetAccountIntelHandlers();
   renderAccountNameField(document.getElementById('form-account-type').value, '');
+  if (document.getElementById('form-account-type').value !== 'Corporate') {
+    hideAccountIntelBlock();
+  }
 });
 document.querySelectorAll('input[name="business-potential"]').forEach(radio => {
   radio.addEventListener('change', syncBusinessPotentialFields);
