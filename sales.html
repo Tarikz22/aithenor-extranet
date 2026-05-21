@@ -569,7 +569,7 @@ async function fetchCorporateAccountData() {
     .from('engine_outputs')
     .select('engine_json')
     .eq('hotel_code', hotelCode)
-    .order('created_at', { ascending: false })
+    .order('generated_at', { ascending: false })
     .limit(1)
     .single();
   if (error || !data) return [];
