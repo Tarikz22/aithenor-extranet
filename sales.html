@@ -143,10 +143,25 @@ tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 1
 .activity-row:hover { background: #fcfcfa; }
 .activity-row.overdue { background: var(--overdue-bg); }
 .activity-row.overdue:hover { background: #fde8e8; }
-.comment-cell { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comment-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .outcome-pill { border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; display: inline-block; white-space: nowrap; }
-.follow-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.follow-cell input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--navy); }
+.follow-cell {
+  vertical-align: middle;
+  text-align: center;
+  width: 1%;
+  white-space: nowrap;
+}
+.follow-cell-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+}
+.follow-cell input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--navy); margin: 0; flex-shrink: 0; }
+.col-comments { min-width: 220px; }
+th.col-comments, td.col-comments { min-width: 220px; }
 .follow-date { font-size: 12px; color: var(--gray-600); }
 .contact-sub { font-size: 11px; color: var(--gray-600); margin-top: 2px; }
 .expanded-panel-cell { padding: 0; background: #fff; }
@@ -395,6 +410,10 @@ textarea { min-height: 100px; resize: vertical; }
             <button type="button" data-potential="yes">Yes</button>
             <button type="button" data-potential="no">No</button>
           </div>
+          <label class="filter-toggle-label" for="filter-manager">Sales Manager</label>
+          <select id="filter-manager" title="Sales Manager">
+            <option value="">All managers</option>
+          </select>
           <input type="date" id="filter-date-from" title="From date">
           <input type="date" id="filter-date-to" title="To date">
           <input class="search" type="text" id="filter-search" placeholder="Search account or contact">
@@ -412,9 +431,9 @@ textarea { min-height: 100px; resize: vertical; }
                   <th data-col="outcome">Outcome<span class="sort-ind"></span></th>
                   <th data-col="potential_room_nights">Potential RN<span class="sort-ind"></span></th>
                   <th data-col="potential_revenue">Potential Rev (€)<span class="sort-ind"></span></th>
+                  <th data-col="comments" class="col-comments">Comments<span class="sort-ind"></span></th>
                   <th data-col="follow_up_date">Follow-up<span class="sort-ind"></span></th>
                   <th data-col="entered_by">Entered By<span class="sort-ind"></span></th>
-                  <th data-col="comments">Comments<span class="sort-ind"></span></th>
                 </tr>
               </thead>
               <tbody id="activity-tbody"></tbody>
@@ -657,6 +676,18 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function formatEnteredByName(email) {
+  if (!email) return '—';
+  const prefix = String(email).split('@')[0] || '';
+  if (!prefix) return '—';
+  const parts = prefix.split(/[._-]+/).filter(Boolean);
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  if (parts.length >= 2) {
+    return `${cap(parts[0])} ${parts[1].charAt(0).toUpperCase()}.`;
+  }
+  return cap(parts[0]);
+}
+
 function todayStr() {
   const d = new Date();
   return d.toISOString().slice(0, 10);
@@ -788,7 +819,8 @@ function getFilters() {
     potential: STATE.potentialFilter,
     dateFrom: document.getElementById('filter-date-from').value,
     dateTo: document.getElementById('filter-date-to').value,
-    search: document.getElementById('filter-search').value.trim().toLowerCase()
+    search: document.getElementById('filter-search').value.trim().toLowerCase(),
+    manager: document.getElementById('filter-manager').value
   };
 }
 
@@ -816,8 +848,18 @@ function applyFilters(rows) {
       const hay = `${row.account_name || ''} ${row.contact_name || ''}`.toLowerCase();
       if (!hay.includes(f.search)) return false;
     }
+    if (f.manager && row.entered_by !== f.manager) return false;
     return true;
   });
+}
+
+function populateManagerDropdown() {
+  const sel = document.getElementById('filter-manager');
+  const prev = sel.value;
+  const emails = [...new Set(STATE.activities.map(r => r.entered_by).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All managers</option>' +
+    emails.map(e => `<option value="${escHtml(e)}">${escHtml(formatEnteredByName(e))}</option>`).join('');
+  if (prev && emails.includes(prev)) sel.value = prev;
 }
 
 function sortRows(rows) {
@@ -842,8 +884,7 @@ function sortRows(rows) {
   });
 }
 
-function renderKpis() {
-  const rows = STATE.activities;
+function renderKpis(rows) {
   const monthRows = rows.filter(r => isCurrentMonth(r.activity_date));
   document.getElementById('kpi-month').textContent = monthRows.length;
 
@@ -952,24 +993,28 @@ function rowHtml(row) {
       <td>${outcomePill(row.outcome)}</td>
       <td class="num">${potentialRn}</td>
       <td class="num">${escHtml(potentialRev)}</td>
+      <td class="comment-cell col-comments" title="${escHtml(row.comments)}">${escHtml(commentsShort || '—')}</td>
       <td class="follow-cell" onclick="event.stopPropagation()">
-        ${followDisplay}
-        <input type="checkbox" data-follow-toggle="${row.id}" ${row.follow_up_done ? 'checked' : ''} title="Mark follow-up done">
+        <div class="follow-cell-inner">
+          ${followDisplay}
+          <input type="checkbox" data-follow-toggle="${row.id}" ${row.follow_up_done ? 'checked' : ''} title="Mark follow-up done">
+        </div>
       </td>
-      <td>${escHtml(row.entered_by || '—')}</td>
-      <td class="comment-cell" title="${escHtml(row.comments)}">${escHtml(commentsShort || '—')}</td>
+      <td>${escHtml(formatEnteredByName(row.entered_by))}</td>
     </tr>${detailRow}`;
 }
 
 function renderTable() {
-  const filtered = sortRows(applyFilters(STATE.activities));
+  const filtered = applyFilters(STATE.activities);
+  renderKpis(filtered);
+  const sorted = sortRows(filtered);
   const tbody = document.getElementById('activity-tbody');
-  if (!filtered.length) {
+  if (!sorted.length) {
     tbody.innerHTML = `<tr><td colspan="10" style="padding:24px;color:var(--gray-600);">No activities match the current filters.</td></tr>`;
     updateSortIndicators();
     return;
   }
-  tbody.innerHTML = filtered.map(rowHtml).join('');
+  tbody.innerHTML = sorted.map(rowHtml).join('');
   updateSortIndicators();
 
   tbody.querySelectorAll('.activity-row').forEach(tr => {
@@ -1003,7 +1048,6 @@ function renderTable() {
         row.follow_up_done = done;
         row.last_updated_by = currentUserEmail;
       }
-      renderKpis();
       renderTable();
     });
   });
@@ -1040,14 +1084,14 @@ async function loadActivities() {
 
     if (!data || !data.length) {
       STATE.activities = [];
-      renderKpis();
+      populateManagerDropdown();
       renderTable();
       setStateView('empty');
       return;
     }
 
     STATE.activities = data;
-    renderKpis();
+    populateManagerDropdown();
     renderTable();
     setStateView('dashboard');
   } catch (err) {
@@ -1448,6 +1492,7 @@ document.getElementById('filter-outcome').addEventListener('change', renderTable
 document.getElementById('filter-date-from').addEventListener('change', renderTable);
 document.getElementById('filter-date-to').addEventListener('change', renderTable);
 document.getElementById('filter-search').addEventListener('input', renderTable);
+document.getElementById('filter-manager').addEventListener('change', renderTable);
 
 document.getElementById('filter-follow').querySelectorAll('button').forEach(btn => {
   btn.addEventListener('click', () => {
