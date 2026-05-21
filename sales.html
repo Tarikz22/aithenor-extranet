@@ -21,6 +21,9 @@ ALTER TABLE sales_activities
 <title>Aithenor — Sales Activity Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --navy: #0F1F3D;
@@ -81,6 +84,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .summary-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-600); margin-bottom: 8px; }
 .summary-value { font-size: 24px; color: var(--navy); font-weight: 600; }
 .summary-sub { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+.export-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+.export-toolbar .btn { font-size: 12px; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
 .filter-bar select,
 .filter-bar input[type="date"],
@@ -384,6 +389,11 @@ textarea { min-height: 100px; resize: vertical; }
             <div class="summary-value" id="kpi-last" style="font-size:20px;">—</div>
             <div class="summary-sub" id="kpi-last-sub">Most recent record</div>
           </div>
+        </div>
+
+        <div class="export-toolbar">
+          <button type="button" class="btn" id="export-pdf-btn">⬇ Export PDF</button>
+          <button type="button" class="btn" id="export-excel-btn">⬇ Export Excel</button>
         </div>
 
         <div class="filter-bar">
@@ -860,6 +870,326 @@ function populateManagerDropdown() {
   sel.innerHTML = '<option value="">All managers</option>' +
     emails.map(e => `<option value="${escHtml(e)}">${escHtml(formatEnteredByName(e))}</option>`).join('');
   if (prev && emails.includes(prev)) sel.value = prev;
+}
+
+function getExportRows() {
+  return sortRows(applyFilters(STATE.activities));
+}
+
+function computeKpiStats(rows) {
+  const monthRows = rows.filter(r => isCurrentMonth(r.activity_date));
+  let latest = null;
+  rows.forEach(r => {
+    if (!r.created_at) return;
+    const t = new Date(r.created_at).getTime();
+    if (!latest || t > latest.t) latest = { created_at: r.created_at };
+  });
+  return {
+    monthCount: monthRows.length,
+    overdueCount: rows.filter(r => isOverdue(r)).length,
+    accountsCount: new Set(monthRows.map(r => (r.account_name || '').trim()).filter(Boolean)).size,
+    lastActivity: latest ? formatLastActivity(latest.created_at) : '—'
+  };
+}
+
+function getFilterSummaryText() {
+  const f = getFilters();
+  const hasActive = !!(f.type || f.accountType || f.outcome || f.follow !== 'all' ||
+    f.potential !== 'all' || f.manager || f.dateFrom || f.dateTo || f.search);
+  if (!hasActive) return 'Filters applied: None — showing all activities';
+
+  const parts = [];
+  parts.push(f.type || 'All activities');
+  parts.push(f.accountType || 'All account types');
+  parts.push(f.outcome || 'All outcomes');
+  const followLabels = { all: 'All follow-ups', overdue: 'Overdue follow-ups', done: 'Done follow-ups' };
+  parts.push(followLabels[f.follow] || 'All follow-ups');
+  const potLabels = { all: 'All potential', yes: 'Potential: Yes', no: 'Potential: No' };
+  parts.push(potLabels[f.potential] || 'All potential');
+  parts.push(f.manager ? formatEnteredByName(f.manager) : 'All managers');
+  if (f.dateFrom || f.dateTo) {
+    const from = f.dateFrom ? formatDate(f.dateFrom) : '…';
+    const to = f.dateTo ? formatDate(f.dateTo) : '…';
+    parts.push(`${from} – ${to}`);
+  }
+  if (f.search) parts.push(`Search: "${f.search}"`);
+  return 'Filters applied: ' + parts.join(' · ');
+}
+
+function formatReportDate(d = new Date()) {
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatFileDate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+function formatDateExcel(val) {
+  const d = parseDateOnly(val);
+  if (!d) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${d.getFullYear()}`;
+}
+
+function getPurposeDisplay(row) {
+  if (row.activity_purpose === 'Other' && row.activity_purpose_other) {
+    return row.activity_purpose_other;
+  }
+  return row.activity_purpose || '—';
+}
+
+function getAccountExportName(row) {
+  const name = row.account_name || '—';
+  return hasBusinessPotential(row) ? `€ ${name}` : name;
+}
+
+function formatFollowUpExport(row) {
+  if (row.follow_up_done) return 'Done';
+  if (row.follow_up_date) {
+    if (!row.follow_up_done && isOverdue(row)) return 'Pending';
+    return formatDate(row.follow_up_date);
+  }
+  return '—';
+}
+
+function drawPdfFooter(doc, pageNum, pageTotal, hotelCode) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const footerY = pageH - 12;
+  doc.setDrawColor(180, 180, 180);
+  doc.line(15, footerY - 3, pageW - 15, footerY - 3);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Aithenor — Confidential', 15, footerY);
+  doc.text(hotelCode, pageW / 2, footerY, { align: 'center' });
+  doc.text(`Page ${pageNum} of ${pageTotal}`, pageW - 15, footerY, { align: 'right' });
+}
+
+function exportToPdf() {
+  if (!window.jspdf?.jsPDF) {
+    alert('PDF library not loaded. Please refresh the page.');
+    return;
+  }
+  const rows = getExportRows();
+  const kpis = computeKpiStats(rows);
+  const hotelCode = localStorage.getItem('hotelCode') || 'Hotel';
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 15;
+
+  doc.setFillColor(26, 35, 50);
+  doc.rect(0, 0, pageW, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('AITHENOR', margin, 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('Commercial Intelligence Platform', margin, 18);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('SALES ACTIVITY REPORT', pageW - margin, 11, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(hotelCode, pageW - margin, 17, { align: 'right' });
+  doc.setFontSize(8);
+  doc.text('Generated on: ' + formatReportDate(), pageW - margin, 23, { align: 'right' });
+
+  let y = 28;
+  doc.setFillColor(245, 245, 245);
+  doc.rect(0, y, pageW, 8, 'F');
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  const filterLines = doc.splitTextToSize(getFilterSummaryText(), pageW - margin * 2);
+  doc.text(filterLines, margin, y + 5);
+  y += 8;
+
+  const kpiItems = [
+    { title: 'ACTIVITIES THIS MONTH', value: String(kpis.monthCount), sub: 'Current calendar month' },
+    { title: 'OPEN FOLLOW-UPS OVERDUE', value: String(kpis.overdueCount), sub: 'Not done and past due date' },
+    { title: 'ACCOUNTS VISITED THIS MONTH', value: String(kpis.accountsCount), sub: 'Distinct account names' },
+    { title: 'LAST ACTIVITY ENTERED', value: String(kpis.lastActivity), sub: 'Most recent record' }
+  ];
+  const gap = 3;
+  const boxW = (pageW - margin * 2 - gap * 3) / 4;
+  const boxH = 22;
+  kpiItems.forEach((kpi, i) => {
+    const x = margin + i * (boxW + gap);
+    doc.setDrawColor(229, 231, 235);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(x, y, boxW, boxH, 'FD');
+    doc.setTextColor(107, 114, 128);
+    doc.setFontSize(6);
+    doc.text(kpi.title, x + 3, y + 6);
+    doc.setTextColor(26, 35, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(kpi.value, x + 3, y + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(107, 114, 128);
+    doc.setFontSize(6);
+    doc.text(kpi.sub, x + 3, y + 18);
+  });
+  y += boxH + 6;
+
+  doc.setTextColor(26, 35, 50);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('ACTIVITY LOG', margin, y);
+  y += 3;
+  doc.setDrawColor(26, 35, 50);
+  doc.line(margin, y, pageW - margin, y);
+  y += 5;
+
+  const tableHead = [['Date', 'Type', 'Purpose', 'Account', 'Contact', 'Position', 'Outcome', 'Potential RN', 'Potential Rev (€)', 'Follow-up', 'Comments']];
+  const tableBody = rows.map(row => [
+    formatDate(row.activity_date),
+    row.activity_type || '—',
+    getPurposeDisplay(row),
+    getAccountExportName(row),
+    row.contact_name || '—',
+    row.contact_title || '—',
+    row.outcome || '—',
+    hasBusinessPotential(row) ? String(row.potential_room_nights ?? '—') : '—',
+    hasBusinessPotential(row) ? formatPotentialRevenue(row.potential_revenue) : '—',
+    formatFollowUpExport(row),
+    row.comments || '—'
+  ]);
+
+  const fixedWidths = { 0: 18, 1: 22, 2: 22, 3: 30, 4: 28, 5: 25, 6: 22, 7: 16, 8: 20, 9: 18 };
+  const colStyles = { 10: { cellWidth: 'auto' } };
+  Object.entries(fixedWidths).forEach(([k, v]) => { colStyles[k] = { cellWidth: v }; });
+
+  doc.autoTable({
+    head: tableHead,
+    body: tableBody.length ? tableBody : [['—', '—', '—', '—', '—', '—', '—', '—', '—', '—', 'No activities match current filters']],
+    startY: y,
+    margin: { left: margin, right: margin, top: margin, bottom: 18 },
+    styles: { fontSize: 7.5, textColor: [26, 26, 26], overflow: 'linebreak' },
+    headStyles: { fillColor: [26, 35, 50], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    alternateRowStyles: { fillColor: [249, 250, 251] },
+    columnStyles: colStyles
+  });
+
+  const pipelineRows = rows.filter(hasBusinessPotential);
+  if (pipelineRows.length) {
+    let py = doc.lastAutoTable.finalY + 10;
+    const pageH = doc.internal.pageSize.getHeight();
+    if (py > pageH - 50) {
+      doc.addPage();
+      py = margin + 10;
+    }
+    doc.setTextColor(26, 35, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('PIPELINE SUMMARY', margin, py);
+    py += 3;
+    doc.setDrawColor(26, 35, 50);
+    doc.line(margin, py, pageW - margin, py);
+    py += 6;
+    const totalRn = pipelineRows.reduce((s, r) => s + (Number(r.potential_room_nights) || 0), 0);
+    const totalRev = pipelineRows.reduce((s, r) => s + (Number(r.potential_revenue) || 0), 0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(26, 26, 26);
+    doc.text(`Total Potential Room Nights: ${totalRn}`, margin, py);
+    py += 5;
+    doc.text(`Total Potential Revenue: ${formatPotentialRevenue(totalRev)}`, margin, py);
+    py += 8;
+    doc.autoTable({
+      head: [['Account', 'Type', 'Potential RN', 'Potential Rev (€)', 'Travel Dates', 'Business Type']],
+      body: pipelineRows.map(row => [
+        row.account_name || '—',
+        row.activity_type || '—',
+        String(row.potential_room_nights ?? '—'),
+        formatPotentialRevenue(row.potential_revenue),
+        `${row.potential_date_from ? formatDate(row.potential_date_from) : '—'} → ${row.potential_date_to ? formatDate(row.potential_date_to) : '—'}`,
+        row.potential_business_type || '—'
+      ]),
+      startY: py,
+      margin: { left: margin, right: margin, bottom: 18 },
+      styles: { fontSize: 7.5, textColor: [26, 26, 26] },
+      headStyles: { fillColor: [26, 35, 50], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [249, 250, 251] }
+    });
+  }
+
+  const pageTotal = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageTotal; p++) {
+    doc.setPage(p);
+    drawPdfFooter(doc, p, pageTotal, hotelCode);
+  }
+
+  doc.save(`Aithenor_Sales_Report_${hotelCode}_${formatFileDate()}.pdf`);
+}
+
+const EXCEL_HEADERS = [
+  'Date', 'Type', 'Purpose', 'Account', 'Account Type', 'Contact', 'Position', 'Outcome',
+  'Business Potential', 'Potential RN', 'Potential Revenue (€)', 'Travel Date From',
+  'Travel Date To', 'Business Type', 'Follow-up Date', 'Follow-up Done', 'Comments', 'Entered By'
+];
+
+function rowToExcelArray(row) {
+  const bp = hasBusinessPotential(row);
+  return [
+    formatDateExcel(row.activity_date),
+    row.activity_type || '',
+    getPurposeDisplay(row) === '—' ? '' : getPurposeDisplay(row),
+    row.account_name || '',
+    row.account_type || '',
+    row.contact_name || '',
+    row.contact_title || '',
+    row.outcome || '',
+    bp ? 'Yes' : 'No',
+    bp ? (row.potential_room_nights ?? '') : '',
+    bp ? (row.potential_revenue ?? '') : '',
+    formatDateExcel(row.potential_date_from),
+    formatDateExcel(row.potential_date_to),
+    row.potential_business_type || '',
+    formatDateExcel(row.follow_up_date),
+    row.follow_up_done ? 'Yes' : 'No',
+    row.comments || '',
+    formatEnteredByName(row.entered_by) === '—' ? '' : formatEnteredByName(row.entered_by)
+  ];
+}
+
+function exportToExcel() {
+  if (!window.XLSX) {
+    alert('Excel library not loaded. Please refresh the page.');
+    return;
+  }
+  const rows = getExportRows();
+  const hotelCode = localStorage.getItem('hotelCode') || 'Hotel';
+  const wb = XLSX.utils.book_new();
+
+  const sheet1Data = [EXCEL_HEADERS, ...rows.map(rowToExcelArray)];
+  const ws1 = XLSX.utils.aoa_to_sheet(sheet1Data);
+  ws1['!cols'] = EXCEL_HEADERS.map(() => ({ wch: 16 }));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Activity Log');
+
+  const pipelineRows = rows.filter(hasBusinessPotential);
+  const sheet2Data = [EXCEL_HEADERS, ...pipelineRows.map(rowToExcelArray)];
+  if (pipelineRows.length) {
+    const totalRn = pipelineRows.reduce((s, r) => s + (Number(r.potential_room_nights) || 0), 0);
+    const totalRev = pipelineRows.reduce((s, r) => s + (Number(r.potential_revenue) || 0), 0);
+    const totalsRow = new Array(EXCEL_HEADERS.length).fill('');
+    totalsRow[3] = 'TOTAL';
+    totalsRow[9] = totalRn;
+    totalsRow[10] = totalRev;
+    sheet2Data.push(totalsRow);
+  }
+  const ws2 = XLSX.utils.aoa_to_sheet(sheet2Data.length > 1 ? sheet2Data : [EXCEL_HEADERS]);
+  ws2['!cols'] = EXCEL_HEADERS.map(() => ({ wch: 16 }));
+  XLSX.utils.book_append_sheet(wb, ws2, 'Pipeline Summary');
+
+  XLSX.writeFile(wb, `Aithenor_Sales_${hotelCode}_${formatFileDate()}.xlsx`);
 }
 
 function sortRows(rows) {
@@ -1464,6 +1794,9 @@ async function logout() {
   currentUserEmail = '';
   showLogin();
 }
+
+document.getElementById('export-pdf-btn').addEventListener('click', exportToPdf);
+document.getElementById('export-excel-btn').addEventListener('click', exportToExcel);
 
 document.getElementById('fab-new').addEventListener('click', openNewModal);
 document.getElementById('modal-close').addEventListener('click', closeModal);
