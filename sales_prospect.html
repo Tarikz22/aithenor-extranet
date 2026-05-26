@@ -356,9 +356,13 @@ textarea { min-height: 100px; resize: vertical; }
           <option>Travel Agency</option><option>Event Company</option><option>DMC</option><option>Corporate</option><option>Association</option><option>Government</option><option>Other</option>
         </select>
         <label class="field-label">Country</label>
-        <input class="input" type="text" id="pf-country">
+        <select class="select-input" id="pf-country">
+          <option value="">Select country...</option>
+        </select>
         <label class="field-label">City</label>
-        <input class="input" type="text" id="pf-city">
+        <select class="select-input" id="pf-city" disabled>
+          <option value="">Select country first</option>
+        </select>
         <label class="field-label">Website</label>
         <input class="input" type="text" id="pf-website">
         <label class="field-label">Estimated Size</label>
@@ -490,7 +494,7 @@ textarea { min-height: 100px; resize: vertical; }
     <form id="template-form" onsubmit="return false;">
       <label class="field-label">Category</label>
       <select class="select-input" id="tpl-category">
-        <option>First Contact</option><option>Follow-up</option><option>Seasonal</option><option>Commercial</option><option>Re-engagement</option><option>Administrative</option>
+        <option value="first_contact">First Contact</option><option value="follow_up">Follow-up</option><option value="seasonal">Seasonal</option><option value="commercial">Commercial</option><option value="re_engagement">Re-engagement</option><option value="administrative">Administrative</option>
       </select>
       <label class="field-label">Name</label>
       <input class="input" type="text" id="tpl-name" required>
@@ -536,7 +540,65 @@ let outreachContactId = null;
 let editingTemplateId = null;
 let currentStep = 1;
 let activeTab = 'prospects';
-let activeTemplateCategory = 'First Contact';
+let activeTemplateCategory = 'first_contact';
+
+const COUNTRY_CITY_DATA = {
+  'Morocco': ['Casablanca','Rabat','Marrakech','Fes','Tangier','Agadir','Meknes','Oujda','Kenitra','Tetouan','Other'],
+  'France': ['Paris','Lyon','Marseille','Toulouse','Nice','Nantes','Strasbourg','Montpellier','Bordeaux','Lille','Other'],
+  'United Arab Emirates': ['Dubai','Abu Dhabi','Sharjah','Ajman','Ras Al Khaimah','Other'],
+  'Saudi Arabia': ['Riyadh','Jeddah','Mecca','Medina','Dammam','Other'],
+  'Qatar': ['Doha','Al Rayyan','Other'],
+  'Kuwait': ['Kuwait City','Other'],
+  'Bahrain': ['Manama','Other'],
+  'United Kingdom': ['London','Manchester','Birmingham','Edinburgh','Glasgow','Other'],
+  'Germany': ['Berlin','Munich','Frankfurt','Hamburg','Cologne','Other'],
+  'Spain': ['Madrid','Barcelona','Seville','Valencia','Malaga','Other'],
+  'Italy': ['Rome','Milan','Florence','Venice','Naples','Other'],
+  'Belgium': ['Brussels','Antwerp','Bruges','Other'],
+  'Netherlands': ['Amsterdam','Rotterdam','The Hague','Other'],
+  'Switzerland': ['Geneva','Zurich','Basel','Other'],
+  'United States': ['New York','Los Angeles','Chicago','Miami','San Francisco','Other'],
+  'China': ['Beijing','Shanghai','Guangzhou','Shenzhen','Other'],
+  'Japan': ['Tokyo','Osaka','Kyoto','Other'],
+  'India': ['Mumbai','Delhi','Bangalore','Chennai','Other'],
+  'Brazil': ['São Paulo','Rio de Janeiro','Other'],
+  'South Africa': ['Cape Town','Johannesburg','Durban','Other'],
+  'Egypt': ['Cairo','Alexandria','Hurghada','Other'],
+  'Tunisia': ['Tunis','Sousse','Other'],
+  'Algeria': ['Algiers','Oran','Other'],
+  'Senegal': ['Dakar','Other'],
+  'Ivory Coast': ['Abidjan','Other'],
+  'Other': ['Other']
+};
+
+const COUNTRY_PHONE_CODES = {
+  'Morocco': '+212',
+  'France': '+33',
+  'United Arab Emirates': '+971',
+  'Saudi Arabia': '+966',
+  'Qatar': '+974',
+  'Kuwait': '+965',
+  'Bahrain': '+973',
+  'United Kingdom': '+44',
+  'Germany': '+49',
+  'Spain': '+34',
+  'Italy': '+39',
+  'Belgium': '+32',
+  'Netherlands': '+31',
+  'Switzerland': '+41',
+  'United States': '+1',
+  'China': '+86',
+  'Japan': '+81',
+  'India': '+91',
+  'Brazil': '+55',
+  'South Africa': '+27',
+  'Egypt': '+20',
+  'Tunisia': '+216',
+  'Algeria': '+213',
+  'Senegal': '+221',
+  'Ivory Coast': '+225',
+  'Other': ''
+};
 
 function escHtml(str) {
   if (str == null) return '';
@@ -748,6 +810,31 @@ function buildExpandedPanel(p) {
   </div>`;
 }
 
+function populateCountryDropdown() {
+  const sel = document.getElementById('pf-country');
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">Select country...</option>' +
+    Object.keys(COUNTRY_CITY_DATA).sort().map(c =>
+      `<option value="${escHtml(c)}" ${c === currentVal ? 'selected' : ''}>${escHtml(c)}</option>`
+    ).join('');
+  populateCityDropdown(currentVal);
+}
+
+function populateCityDropdown(country) {
+  const sel = document.getElementById('pf-city');
+  const cities = COUNTRY_CITY_DATA[country] || [];
+  if (!cities.length) {
+    sel.innerHTML = '<option value="">Select country first</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">Select city...</option>' +
+    cities.map(c =>
+      `<option value="${escHtml(c)}">${escHtml(c)}</option>`
+    ).join('');
+}
+
 /* ── Prospect Modal (New/Edit) ── */
 function openNewProspectModal() {
   editingProspectId = null;
@@ -756,6 +843,7 @@ function openNewProspectModal() {
   document.getElementById('prospect-form').reset();
   document.getElementById('pf-size-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === 'Mid'));
   document.querySelectorAll('input[name="pf-direction"]').forEach(r => r.checked = r.value === 'Outbound');
+  populateCountryDropdown();
   document.getElementById('contacts-container').innerHTML = '';
   addContactBlock(true);
   updateStepUI();
@@ -770,7 +858,9 @@ function openEditProspect(id) {
   document.getElementById('prospect-modal-title').textContent = 'Edit Prospect';
   document.getElementById('pf-company').value = p.company_name || '';
   document.getElementById('pf-type').value = p.company_type || '';
+  populateCountryDropdown();
   document.getElementById('pf-country').value = p.country || '';
+  populateCityDropdown(p.country || '');
   document.getElementById('pf-city').value = p.city || '';
   document.getElementById('pf-website').value = p.website || '';
   document.getElementById('pf-size-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === (p.estimated_size || 'Mid')));
@@ -835,7 +925,38 @@ function addContactBlock(isPrimary, data) {
     </div>
     <label class="field-label">Title</label><input class="input cf-title" type="text" value="${escHtml(data?.title||'')}">
     <label class="field-label">Email</label><input class="input cf-email" type="email" value="${escHtml(data?.email||'')}">
-    <label class="field-label">Phone</label><input class="input cf-phone" type="text" value="${escHtml(data?.phone||'')}">
+    <label class="field-label">Phone</label>
+    <div style="display:flex;gap:6px;">
+      <select class="select-input cf-phone-ext" style="width:90px;flex-shrink:0;">
+        <option value="">—</option>
+        <option value="+212">🇲🇦 +212</option>
+        <option value="+33">🇫🇷 +33</option>
+        <option value="+971">🇦🇪 +971</option>
+        <option value="+966">🇸🇦 +966</option>
+        <option value="+974">🇶🇦 +974</option>
+        <option value="+965">🇰🇼 +965</option>
+        <option value="+973">🇧🇭 +973</option>
+        <option value="+44">🇬🇧 +44</option>
+        <option value="+49">🇩🇪 +49</option>
+        <option value="+34">🇪🇸 +34</option>
+        <option value="+39">🇮🇹 +39</option>
+        <option value="+32">🇧🇪 +32</option>
+        <option value="+31">🇳🇱 +31</option>
+        <option value="+41">🇨🇭 +41</option>
+        <option value="+1">🇺🇸 +1</option>
+        <option value="+86">🇨🇳 +86</option>
+        <option value="+81">🇯🇵 +81</option>
+        <option value="+91">🇮🇳 +91</option>
+        <option value="+55">🇧🇷 +55</option>
+        <option value="+27">🇿🇦 +27</option>
+        <option value="+20">🇪🇬 +20</option>
+        <option value="+216">🇹🇳 +216</option>
+        <option value="+213">🇩🇿 +213</option>
+        <option value="+221">🇸🇳 +221</option>
+        <option value="+225">🇨🇮 +225</option>
+      </select>
+      <input class="input cf-phone" type="text" placeholder="Phone number" value="${escHtml(data?.phone ? data.phone.replace(/^\+\d+\s*/,'') : '')}" style="flex:1;">
+    </div>
     <label class="field-label">LinkedIn</label><input class="input cf-linkedin" type="text" value="${escHtml(data?.linkedin||'')}">
     <label class="field-label">Preferred Language</label>
     <select class="select-input cf-lang"><option value="FR" ${(data?.preferred_language||'FR')==='FR'?'selected':''}>FR</option><option value="EN" ${data?.preferred_language==='EN'?'selected':''}>EN</option><option value="AR" ${data?.preferred_language==='AR'?'selected':''}>AR</option></select>
@@ -843,6 +964,26 @@ function addContactBlock(isPrimary, data) {
       <label style="font-size:12px;cursor:pointer;"><input type="radio" name="primary-contact" class="cf-primary" ${(data?.is_primary || isPrimary) ? 'checked' : ''}> Set as primary</label>
     </div>`;
   container.appendChild(div);
+
+  if (data?.phone) {
+    const extSel = div.querySelector('.cf-phone-ext');
+    const phoneInput = div.querySelector('.cf-phone');
+    const knownCodes = Object.values(COUNTRY_PHONE_CODES)
+      .filter(Boolean)
+      .sort((a,b) => b.length - a.length);
+    let matched = false;
+    for (const code of knownCodes) {
+      if (data.phone.startsWith(code)) {
+        extSel.value = code;
+        phoneInput.value = data.phone.slice(code.length).trim();
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      phoneInput.value = data.phone;
+    }
+  }
 }
 
 function removeContactBlock(btn) {
@@ -874,13 +1015,18 @@ function getContactsFromForm() {
   const blocks = document.querySelectorAll('.contact-form-block');
   const contacts = [];
   blocks.forEach(block => {
+    const extSel = block.querySelector('.cf-phone-ext');
+    const phoneNum = block.querySelector('.cf-phone').value.trim();
+    const phoneExt = extSel ? extSel.value : '';
+    const phone = phoneExt && phoneNum ? phoneExt + ' ' + phoneNum
+      : (phoneNum || phoneExt || null);
     contacts.push({
       id: block.dataset.contactId || null,
       first_name: block.querySelector('.cf-first').value.trim(),
       last_name: block.querySelector('.cf-last').value.trim(),
       title: block.querySelector('.cf-title').value.trim(),
       email: block.querySelector('.cf-email').value.trim(),
-      phone: block.querySelector('.cf-phone').value.trim(),
+      phone: phone,
       linkedin: block.querySelector('.cf-linkedin').value.trim(),
       preferred_language: block.querySelector('.cf-lang').value,
       is_primary: block.querySelector('.cf-primary').checked
@@ -910,8 +1056,8 @@ async function saveProspect() {
     hotel_code: hotelCode,
     company_name: company,
     company_type: companyType,
-    country: document.getElementById('pf-country').value.trim() || null,
-    city: document.getElementById('pf-city').value.trim() || null,
+    country: document.getElementById('pf-country').value || null,
+    city: document.getElementById('pf-city').value || null,
     website: document.getElementById('pf-website').value.trim() || null,
     estimated_size: sizeBtn ? sizeBtn.dataset.val : 'Mid',
     source: document.getElementById('pf-source').value || null,
@@ -944,6 +1090,7 @@ async function saveProspect() {
     for (const c of contacts) {
       const contactPayload = {
         prospect_id: prospectId,
+        hotel_code: hotelCode,
         first_name: c.first_name || null,
         last_name: c.last_name || null,
         title: c.title || null,
@@ -1021,12 +1168,19 @@ function populateTemplateDropdown() {
   const lang = document.querySelector('#or-language button.active')?.dataset.lang || 'FR';
   const sel = document.getElementById('or-template');
   const filtered = allTemplates.filter(t => t.language === lang);
-  const categories = ['First Contact','Follow-up','Seasonal','Commercial','Re-engagement','Administrative'];
+  const categories = [
+    { key: 'first_contact',  label: 'First Contact' },
+    { key: 'follow_up',      label: 'Follow-up' },
+    { key: 'seasonal',       label: 'Seasonal' },
+    { key: 'commercial',     label: 'Commercial' },
+    { key: 're_engagement',  label: 'Re-engagement' },
+    { key: 'administrative', label: 'Administrative' }
+  ];
   let opts = '<option value="">— Select template —</option>';
   categories.forEach(cat => {
-    const catTemplates = filtered.filter(t => t.category === cat);
+    const catTemplates = filtered.filter(t => t.category === cat.key);
     if (catTemplates.length) {
-      opts += `<optgroup label="${escHtml(cat)}">`;
+      opts += `<optgroup label="${escHtml(cat.label)}">`;
       catTemplates.forEach(t => { opts += `<option value="${t.id}">${escHtml(t.name)}</option>`; });
       opts += '</optgroup>';
     }
@@ -1157,12 +1311,19 @@ async function logOutreach(status) {
 
 /* ── Templates Tab ── */
 function renderTemplatesTab() {
-  const categories = ['First Contact','Follow-up','Seasonal','Commercial','Re-engagement','Administrative'];
+  const categories = [
+    { key: 'first_contact',  label: 'First Contact' },
+    { key: 'follow_up',      label: 'Follow-up' },
+    { key: 'seasonal',       label: 'Seasonal' },
+    { key: 'commercial',     label: 'Commercial' },
+    { key: 're_engagement',  label: 'Re-engagement' },
+    { key: 'administrative', label: 'Administrative' }
+  ];
   const catEl = document.getElementById('template-categories');
   catEl.innerHTML = categories.map(cat => {
-    const count = allTemplates.filter(t => t.category === cat).length;
-    return `<div class="cat-item ${cat === activeTemplateCategory ? 'active' : ''}" data-cat="${escHtml(cat)}">
-      <span>${escHtml(cat)}</span><span class="cat-badge">${count}</span>
+    const count = allTemplates.filter(t => t.category === cat.key).length;
+    return `<div class="cat-item ${cat.key === activeTemplateCategory ? 'active' : ''}" data-cat="${escHtml(cat.key)}">
+      <span>${escHtml(cat.label)}</span><span class="cat-badge">${count}</span>
     </div>`;
   }).join('');
   catEl.querySelectorAll('.cat-item').forEach(el => {
@@ -1481,6 +1642,18 @@ document.querySelectorAll('.merge-chip').forEach(chip => {
     bodyEl.selectionStart = bodyEl.selectionEnd = start + field.length;
     bodyEl.focus();
   });
+});
+
+document.getElementById('pf-country').addEventListener('change', function() {
+  populateCityDropdown(this.value);
+  const firstBlock = document.querySelector('.contact-form-block');
+  if (firstBlock) {
+    const extSel = firstBlock.querySelector('.cf-phone-ext');
+    if (extSel) {
+      const code = COUNTRY_PHONE_CODES[this.value] || '';
+      extSel.value = code;
+    }
+  }
 });
 
 ['filter-type','filter-focus','filter-market','filter-status','filter-language'].forEach(id => {
