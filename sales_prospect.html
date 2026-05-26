@@ -1167,7 +1167,7 @@ function closeOutreachModal() {
 function populateTemplateDropdown() {
   const lang = document.querySelector('#or-language button.active')?.dataset.lang || 'FR';
   const sel = document.getElementById('or-template');
-  const filtered = allTemplates.filter(t => t.language === lang);
+  const filtered = allTemplates.filter(t => (t.language || '').toUpperCase() === (lang || '').toUpperCase());
   const categories = [
     { key: 'first_contact',  label: 'First Contact' },
     { key: 'follow_up',      label: 'Follow-up' },
@@ -1415,7 +1415,7 @@ async function deleteTemplate(id) {
   const t = allTemplates.find(x => x.id === id);
   if (!t) return;
   if (!t.hotel_code) { alert('Cannot delete global templates.'); return; }
-  const sameCatLang = allTemplates.filter(x => x.category === t.category && x.language === t.language);
+  const sameCatLang = allTemplates.filter(x => x.category === t.category && (x.language || '').toUpperCase() === (t.language || '').toUpperCase());
   if (sameCatLang.length <= 1) { alert('Cannot delete the only template in this language/category.'); return; }
   if (!confirm('Delete this template?')) return;
   try {
