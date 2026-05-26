@@ -492,8 +492,10 @@ textarea { min-height: 100px; resize: vertical; }
         <div>
           <button type="button" class="btn" id="or-copy">Copy to Clipboard</button>
           <span class="copied-msg" id="or-copied">Copied ✓</span>
+          <div id="or-outlook-hint" style="display:none; font-size:11px; color:var(--gray-400); margin-top:4px;">Tip: use "Open in Outlook" to send directly.</div>
         </div>
         <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-primary" id="or-open-outlook" onclick="openInOutlook()">✉ Open in Outlook</button>
           <button type="button" class="btn" id="or-draft">Save as Draft</button>
           <button type="button" class="btn btn-primary" id="or-send">Log as Sent</button>
         </div>
@@ -2257,7 +2259,31 @@ document.getElementById('or-copy').addEventListener('click', () => {
   const msg = document.getElementById('or-copied');
   msg.style.display = 'inline';
   setTimeout(() => { msg.style.display = 'none'; }, 2000);
+  const outlookHint = document.getElementById('or-outlook-hint');
+  if (outlookHint) outlookHint.style.display = 'block';
 });
+
+function openInOutlook() {
+  const contactId = document.getElementById('or-contact').value;
+  const contact = allContacts.find(c => c.id === contactId);
+  const toEmail = contact?.email || '';
+  const subject = document.getElementById('or-subject').value.trim();
+  const body = document.getElementById('or-body').value.trim();
+
+  if (!subject && !body) {
+    showError('Please select a template before opening Outlook.');
+    return;
+  }
+
+  const mailtoLink = `mailto:${encodeURIComponent(toEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  if (mailtoLink.length > 2000) {
+    const proceed = confirm('This message is long and may be truncated by your mail client. Continue?');
+    if (!proceed) return;
+  }
+
+  window.location.href = mailtoLink;
+}
 
 document.getElementById('or-send').addEventListener('click', () => logOutreach('sent'));
 document.getElementById('or-draft').addEventListener('click', () => logOutreach('draft'));
