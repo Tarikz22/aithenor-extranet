@@ -496,6 +496,7 @@ textarea { min-height: 100px; resize: vertical; }
         </div>
         <div style="display:flex;gap:8px;">
           <button type="button" class="btn btn-primary" id="or-open-outlook" onclick="openInOutlook()">✉ Open in Outlook</button>
+          <button type="button" class="btn" id="or-save-as-template" onclick="openSaveAsTemplateModal()">Save as Template</button>
           <button type="button" class="btn" id="or-draft">Save as Draft</button>
           <button type="button" class="btn btn-primary" id="or-send">Log as Sent</button>
         </div>
@@ -633,6 +634,51 @@ textarea { min-height: 100px; resize: vertical; }
         <button type="button" class="btn" onclick="closeEditContactModal()">Cancel</button>
         <button type="button" class="btn btn-primary" id="btn-ec-save" onclick="saveEditContact()">Save Contact</button>
       </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="save-template-overlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head">
+      <h2 class="modal-title">Save as Template</h2>
+      <button type="button" class="modal-close" onclick="closeSaveAsTemplateModal()">&times;</button>
+    </div>
+    <form id="save-template-form" onsubmit="return false;">
+
+      <label class="field-label">Template Name *</label>
+      <input class="input" type="text" id="st-name" placeholder="e.g. My Arabic intro" autocomplete="off">
+
+      <label class="field-label">Category *</label>
+      <select class="select-input" id="st-category">
+        <option value="first_contact">First Contact</option>
+        <option value="follow_up">Follow-up</option>
+        <option value="seasonal">Seasonal</option>
+        <option value="commercial">Commercial</option>
+        <option value="re_engagement">Re-engagement</option>
+        <option value="administrative">Administrative</option>
+      </select>
+
+      <label class="field-label">Language</label>
+      <input class="input" type="text" id="st-language" readonly style="background:var(--gray-50); color:var(--gray-500); cursor:not-allowed;">
+
+      <label class="field-label">Subject</label>
+      <input class="input" type="text" id="st-subject" readonly style="background:var(--gray-50); color:var(--gray-500);">
+
+      <label class="field-label">Body preview</label>
+      <textarea class="input" id="st-body-preview" rows="5" readonly style="background:var(--gray-50); color:var(--gray-500); resize:none; font-size:12px; line-height:1.5;"></textarea>
+
+      <div style="font-size:11px; color:var(--gray-500); margin-top:4px;">
+        Subject and body are saved exactly as currently drafted — including any edits you made. Merge fields are preserved so they resolve correctly on next use.
+      </div>
+
+      <div id="st-error" style="display:none; color:var(--red); font-size:12px; margin-top:6px;"></div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeSaveAsTemplateModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-st-save" onclick="saveAsTemplate()">Save Template</button>
+      </div>
+
     </form>
   </div>
 </div>
@@ -1522,7 +1568,7 @@ function resolveMergeFields(text) {
   result = result.replace(/\{\{hotel_name\}\}/g, hotelName);
   result = result.replace(/\{\{sender_name\}\}/g, senderName);
   result = result.replace(/\{\{year\}\}/g, year);
-  result = result.replace(/\n?\{\{ai_context\}\}/g, '');
+  result = result.replace(/\n{0,2}\{\{ai_context\}\}\n?/g, '');
   return result;
 }
 
@@ -1987,6 +2033,116 @@ function closeEditContactModal() {
   document.getElementById('edit-contact-overlay').classList.remove('open');
   editingContactId = null;
   editingContactProspectId = null;
+}
+
+function openSaveAsTemplateModal() {
+  const subject = document.getElementById('or-subject').value.trim();
+  const body = document.getElementById('or-body').value.trim();
+  const lang = document.querySelector('#or-lang-tabs .lang-tab.active')?.dataset.lang || 'FR';
+
+  if (!body) {
+    showError('Select a template and make your edits before saving.');
+    return;
+  }
+
+  document.getElementById('st-name').value = '';
+  document.getElementById('st-language').value = lang.toUpperCase();
+  document.getElementById('st-subject').value = subject;
+  document.getElementById('st-body-preview').value = body;
+  document.getElementById('st-error').style.display = 'none';
+
+  document.getElementById('save-template-overlay').classList.add('open');
+
+  setTimeout(() => {
+    document.getElementById('st-name').focus();
+  }, 100);
+}
+
+function closeSaveAsTemplateModal() {
+  document.getElementById('save-template-overlay').classList.remove('open');
+}
+
+async function saveAsTemplate() {
+  const errorEl = document.getElementById('st-error');
+  errorEl.style.display = 'none';
+
+  const name = document.getElementById('st-name').value.trim();
+  const category = document.getElementById('st-category').value;
+  const language = document.getElementById('st-language').value.toLowerCase();
+  const subject = document.getElementById('st-subject').value.trim();
+  const body = document.getElementById('st-body-preview').value.trim();
+
+  if (!name) {
+    errorEl.textContent = 'Template name is required.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  if (!body) {
+    errorEl.textContent = 'Body cannot be empty.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const duplicate = allTemplates.find(t =>
+    t.name.toLowerCase() === name.toLowerCase() &&
+    (t.language||'').toLowerCase() === language &&
+    t.category === category &&
+    t.hotel_code === hotelCode
+  );
+  if (duplicate) {
+    errorEl.textContent = 'A template with this name already exists for this category and language. Use a different name.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const saveBtn = document.getElementById('btn-st-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('prospect_templates')
+      .insert({
+        hotel_code: hotelCode,
+        category: category,
+        name: name,
+        language: language,
+        subject: subject || null,
+        body: body,
+        is_active: true,
+        created_by: currentUserEmail
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+
+    allTemplates.push(data);
+
+    closeSaveAsTemplateModal();
+
+    const hint = document.getElementById('or-outlook-hint');
+    if (hint) {
+      hint.textContent = `Template "${name}" saved and ready to use.`;
+      hint.style.display = 'block';
+      hint.style.color = 'var(--green)';
+      setTimeout(() => {
+        hint.style.display = 'none';
+        hint.style.color = '';
+      }, 3000);
+    }
+
+    if (activeTab === 'templates') renderTemplatesTab();
+
+  } catch (err) {
+    errorEl.textContent = 'Could not save template. Please try again.';
+    errorEl.style.display = 'block';
+    console.error(err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Template';
+  }
 }
 
 async function saveEditContact() {
