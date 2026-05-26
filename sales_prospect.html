@@ -275,6 +275,7 @@ textarea { min-height: 100px; resize: vertical; }
       </div>
       <div class="topbar-actions">
         <button class="btn" onclick="refreshData()">Refresh</button>
+        <button class="btn" onclick="openQuickEntry()">⚡ Quick Entry</button>
         <button class="btn" onclick="exportPDF()">Export PDF</button>
         <button class="btn" onclick="exportExcel()">Export Excel</button>
         <button class="btn btn-primary" id="btn-add-prospect">+ Add Prospect</button>
@@ -534,6 +535,59 @@ textarea { min-height: 100px; resize: vertical; }
       <div class="modal-actions">
         <button type="button" class="btn" onclick="closeTemplateModal()">Cancel</button>
         <button type="button" class="btn btn-primary" id="btn-tpl-save">Save Template</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Quick Entry Modal -->
+<div class="modal-overlay" id="quick-entry-overlay">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <div>
+        <h2 class="modal-title">Quick Entry</h2>
+        <div style="font-size:12px; color:var(--gray-600); margin-top:2px;">Fast business card input — save and continue</div>
+      </div>
+      <button type="button" class="modal-close" onclick="closeQuickEntry()">&times;</button>
+    </div>
+    <div id="qe-counter" style="display:flex; align-items:center; gap:10px; background:var(--gold-pale); border:1px solid var(--gold); border-radius:8px; padding:8px 12px; margin-bottom:14px; font-size:13px; color:var(--navy);">
+      <span>Cards entered this session:</span>
+      <strong id="qe-count">0</strong>
+      <span style="margin-left:auto; font-size:11px; color:var(--gray-600);" id="qe-last-saved"></span>
+    </div>
+    <form id="quick-entry-form" onsubmit="return false;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div><label class="field-label">Company Name *</label><input class="input" type="text" id="qe-company" placeholder="Company name" required autocomplete="off"></div>
+        <div><label class="field-label">Type *</label><select class="select-input" id="qe-type" required><option value="">Select...</option><option>Travel Agency</option><option>Event Company</option><option>DMC</option><option>Corporate</option><option>Association</option><option>Government</option><option>Other</option></select></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+        <div><label class="field-label">Country *</label><select class="select-input" id="qe-country" required><option value="">Select country...</option></select></div>
+        <div><label class="field-label">City</label><select class="select-input" id="qe-city" disabled><option value="">Select country first</option></select></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+        <div><label class="field-label">First Name *</label><input class="input" type="text" id="qe-first" placeholder="First name" required autocomplete="off"></div>
+        <div><label class="field-label">Last Name *</label><input class="input" type="text" id="qe-last" placeholder="Last name" required autocomplete="off"></div>
+      </div>
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-top:8px;">
+        <div><label class="field-label">Title / Position</label><input class="input" type="text" id="qe-title" placeholder="e.g. Sales Manager" autocomplete="off"></div>
+        <div><label class="field-label">Language</label><select class="select-input" id="qe-lang"><option value="FR">FR</option><option value="EN">EN</option><option value="AR">AR</option></select></div>
+      </div>
+      <div style="display:grid; grid-template-columns:90px 1fr 1fr; gap:10px; margin-top:8px;">
+        <div><label class="field-label">Ext</label><select class="select-input" id="qe-phone-ext"><option value="">—</option><option value="+212">🇲🇦 +212</option><option value="+33">🇫🇷 +33</option><option value="+971">🇦🇪 +971</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+973">🇧🇭 +973</option><option value="+44">🇬🇧 +44</option><option value="+49">🇩🇪 +49</option><option value="+34">🇪🇸 +34</option><option value="+39">🇮🇹 +39</option><option value="+32">🇧🇪 +32</option><option value="+31">🇳🇱 +31</option><option value="+41">🇨🇭 +41</option><option value="+1">🇺🇸 +1</option><option value="+86">🇨🇳 +86</option><option value="+81">🇯🇵 +81</option><option value="+91">🇮🇳 +91</option><option value="+55">🇧🇷 +55</option><option value="+27">🇿🇦 +27</option><option value="+20">🇪🇬 +20</option><option value="+216">🇹🇳 +216</option><option value="+213">🇩🇿 +213</option><option value="+221">🇸🇳 +221</option><option value="+225">🇨🇮 +225</option></select></div>
+        <div><label class="field-label">Phone *</label><input class="input" type="text" id="qe-phone" placeholder="Phone number" required autocomplete="off"></div>
+        <div><label class="field-label">Email *</label><input class="input" type="email" id="qe-email" placeholder="email@company.com" required autocomplete="off"></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:8px;">
+        <div><label class="field-label">Source</label><select class="select-input" id="qe-source"><option value="Business Card" selected>Business Card</option><option value="Referral">Referral</option><option value="Event">Event</option><option value="Other">Other</option></select></div>
+        <div><label class="field-label">Notes</label><input class="input" type="text" id="qe-notes" placeholder="Optional note (e.g. Met at ATM 2025)" autocomplete="off"></div>
+      </div>
+      <div id="qe-error" style="display:none; color:var(--red); font-size:12px; margin-top:8px;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn" onclick="closeQuickEntry()">Done</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn" id="qe-save-close" onclick="saveQuickEntry(true)">Save &amp; Close</button>
+          <button type="button" class="btn btn-primary" id="qe-save-next" onclick="saveQuickEntry(false)">Save &amp; Next →</button>
+        </div>
       </div>
     </form>
   </div>
@@ -1582,6 +1636,162 @@ function closeTemplateModal() {
   editingTemplateId = null;
 }
 
+/* ── Quick Entry ── */
+let quickEntryCount = 0;
+
+function openQuickEntry() {
+  quickEntryCount = 0;
+  document.getElementById('qe-count').textContent = '0';
+  document.getElementById('qe-last-saved').textContent = '';
+  resetQuickEntryForm();
+  populateQuickEntryCountries();
+  document.getElementById('quick-entry-overlay').classList.add('open');
+  setTimeout(() => { document.getElementById('qe-company').focus(); }, 100);
+}
+
+function closeQuickEntry() {
+  document.getElementById('quick-entry-overlay').classList.remove('open');
+  if (quickEntryCount > 0) refreshData();
+}
+
+function resetQuickEntryForm() {
+  document.getElementById('qe-company').value = '';
+  document.getElementById('qe-type').value = '';
+  document.getElementById('qe-country').value = '';
+  document.getElementById('qe-city').innerHTML = '<option value="">Select country first</option>';
+  document.getElementById('qe-city').disabled = true;
+  document.getElementById('qe-first').value = '';
+  document.getElementById('qe-last').value = '';
+  document.getElementById('qe-title').value = '';
+  document.getElementById('qe-lang').value = 'FR';
+  document.getElementById('qe-phone-ext').value = '';
+  document.getElementById('qe-phone').value = '';
+  document.getElementById('qe-email').value = '';
+  document.getElementById('qe-source').value = 'Business Card';
+  document.getElementById('qe-notes').value = '';
+  document.getElementById('qe-error').style.display = 'none';
+  document.getElementById('qe-error').textContent = '';
+}
+
+function populateQuickEntryCountries() {
+  const sel = document.getElementById('qe-country');
+  sel.innerHTML = '<option value="">Select country...</option>' +
+    Object.keys(COUNTRY_CITY_DATA).sort().map(c =>
+      `<option value="${escHtml(c)}">${escHtml(c)}</option>`
+    ).join('');
+}
+
+function populateQuickEntryCities(country) {
+  const sel = document.getElementById('qe-city');
+  const cities = COUNTRY_CITY_DATA[country] || [];
+  if (!cities.length) {
+    sel.innerHTML = '<option value="">Select country first</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">Select city...</option>' +
+    cities.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+}
+
+async function saveQuickEntry(closeAfter) {
+  const errorEl = document.getElementById('qe-error');
+  errorEl.style.display = 'none';
+
+  const company  = document.getElementById('qe-company').value.trim();
+  const type     = document.getElementById('qe-type').value;
+  const country  = document.getElementById('qe-country').value;
+  const city     = document.getElementById('qe-city').value;
+  const first    = document.getElementById('qe-first').value.trim();
+  const last     = document.getElementById('qe-last').value.trim();
+  const title    = document.getElementById('qe-title').value.trim();
+  const lang     = document.getElementById('qe-lang').value;
+  const phoneExt = document.getElementById('qe-phone-ext').value;
+  const phoneNum = document.getElementById('qe-phone').value.trim();
+  const email    = document.getElementById('qe-email').value.trim();
+  const source   = document.getElementById('qe-source').value;
+  const notes    = document.getElementById('qe-notes').value.trim();
+
+  const missing = [];
+  if (!company) missing.push('Company Name');
+  if (!type)    missing.push('Type');
+  if (!country) missing.push('Country');
+  if (!first)   missing.push('First Name');
+  if (!last)    missing.push('Last Name');
+  if (!phoneNum) missing.push('Phone');
+  if (!email)   missing.push('Email');
+
+  if (missing.length) {
+    errorEl.textContent = 'Required fields missing: ' + missing.join(', ');
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const phone = phoneExt && phoneNum ? phoneExt + ' ' + phoneNum : phoneNum;
+
+  const saveBtn = document.getElementById('qe-save-next');
+  const saveBtnClose = document.getElementById('qe-save-close');
+  saveBtn.disabled = true;
+  saveBtnClose.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  try {
+    const prospectPayload = {
+      hotel_code: hotelCode,
+      company_name: company,
+      company_type: type,
+      country: country || null,
+      city: city || null,
+      source: source,
+      notes: notes || null,
+      status: 'new',
+      created_by: currentUserEmail,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: pData, error: pErr } = await supabaseClient
+      .from('prospects').insert(prospectPayload).select('id').single();
+    if (pErr) throw pErr;
+
+    const contactPayload = {
+      prospect_id: pData.id,
+      hotel_code: hotelCode,
+      first_name: first,
+      last_name: last,
+      title: title || null,
+      email: email,
+      phone: phone,
+      preferred_language: lang,
+      is_primary: true
+    };
+
+    const { error: cErr } = await supabaseClient
+      .from('prospect_contacts').insert(contactPayload);
+    if (cErr) throw cErr;
+
+    quickEntryCount++;
+    document.getElementById('qe-count').textContent = quickEntryCount;
+    const now = new Date();
+    document.getElementById('qe-last-saved').textContent =
+      `Last saved: ${first} ${last} @ ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+
+    if (closeAfter) {
+      closeQuickEntry();
+    } else {
+      resetQuickEntryForm();
+      setTimeout(() => { document.getElementById('qe-company').focus(); }, 80);
+    }
+  } catch (err) {
+    errorEl.textContent = 'Could not save. Please try again.';
+    errorEl.style.display = 'block';
+    console.error(err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtnClose.disabled = false;
+    saveBtn.textContent = 'Save & Next \u2192';
+  }
+}
+
 async function saveTemplate() {
   const name = document.getElementById('tpl-name').value.trim();
   if (!name) { alert('Template name is required.'); return; }
@@ -1860,6 +2070,19 @@ document.getElementById('pf-country').addEventListener('change', function() {
       const code = COUNTRY_PHONE_CODES[this.value] || '';
       extSel.value = code;
     }
+  }
+});
+
+document.getElementById('qe-country').addEventListener('change', function() {
+  populateQuickEntryCities(this.value);
+  const code = COUNTRY_PHONE_CODES[this.value] || '';
+  document.getElementById('qe-phone-ext').value = code;
+});
+
+document.getElementById('quick-entry-form').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    saveQuickEntry(false);
   }
 });
 
