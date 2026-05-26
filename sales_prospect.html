@@ -475,6 +475,18 @@ textarea { min-height: 100px; resize: vertical; }
       </div>
       <div class="ai-warning" id="or-ai-warning" style="display:none;"></div>
 
+      <label class="field-label">Update Prospect Status</label>
+      <select class="select-input" id="or-status-update">
+        <option value="">— Keep current status —</option>
+        <option value="contacted">Contacted</option>
+        <option value="meeting">Meeting Booked</option>
+        <option value="proposal">Proposal Sent</option>
+        <option value="contracted">Contracted</option>
+        <option value="lost">Lost</option>
+      </select>
+      <div id="or-status-hint" style="font-size:11px; color:var(--gray-600); margin-top:4px;"></div>
+      <div id="or-draft-hint" style="font-size:11px; color:var(--amber); margin-top:2px; display:none;">Status update is ignored when saving as draft.</div>
+
       <div class="modal-actions" style="justify-content:space-between;">
         <div>
           <button type="button" class="btn" id="or-copy">Copy to Clipboard</button>
@@ -1323,6 +1335,13 @@ function openOutreachModal(prospectId, contactId) {
   document.getElementById('or-body').removeAttribute('dir');
   document.getElementById('or-ai-toggle').checked = false;
   document.getElementById('or-ai-warning').style.display = 'none';
+  document.getElementById('or-status-update').value = '';
+  document.getElementById('or-status-hint').textContent = '';
+  document.getElementById('or-draft-hint').style.display = 'none';
+  const currentProspect = allProspects.find(x => x.id === prospectId);
+  if (currentProspect) {
+    document.getElementById('or-status-hint').textContent = `Current status: ${currentProspect.status || 'new'}`;
+  }
   document.getElementById('or-template').value = '';
   populateTemplateDropdown();
   document.getElementById('outreach-modal-overlay').classList.add('open');
@@ -1466,8 +1485,20 @@ async function logOutreach(status) {
 
     if (status === 'sent') {
       const prospect = allProspects.find(p => p.id === outreachProspectId);
-      if (prospect && prospect.status === 'new') {
-        await supabaseClient.from('prospects').update({ status: 'contacted', updated_at: new Date().toISOString() }).eq('id', outreachProspectId);
+      const selectedStatus = document.getElementById('or-status-update').value;
+
+      let newStatus = null;
+
+      if (selectedStatus) {
+        newStatus = selectedStatus;
+      } else if (prospect && prospect.status === 'new') {
+        newStatus = 'contacted';
+      }
+
+      if (newStatus) {
+        await supabaseClient.from('prospects')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', outreachProspectId);
       }
     }
 
@@ -1797,6 +1828,12 @@ document.getElementById('or-copy').addEventListener('click', () => {
 
 document.getElementById('or-send').addEventListener('click', () => logOutreach('sent'));
 document.getElementById('or-draft').addEventListener('click', () => logOutreach('draft'));
+document.getElementById('or-draft').addEventListener('mouseenter', () => {
+  document.getElementById('or-draft-hint').style.display = 'block';
+});
+document.getElementById('or-draft').addEventListener('mouseleave', () => {
+  document.getElementById('or-draft-hint').style.display = 'none';
+});
 
 document.getElementById('btn-add-template').addEventListener('click', openNewTemplateModal);
 document.getElementById('btn-tpl-save').addEventListener('click', saveTemplate);
