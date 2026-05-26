@@ -361,8 +361,8 @@ textarea { min-height: 100px; resize: vertical; }
           <option value="">Select...</option>
           <option>Travel Agency</option><option>Event Company</option><option>DMC</option><option>Corporate</option><option>Association</option><option>Government</option><option>Other</option>
         </select>
-        <label class="field-label">Country</label>
-        <select class="select-input" id="pf-country">
+        <label class="field-label">Country *</label>
+        <select class="select-input" id="pf-country" required>
           <option value="">Select country...</option>
         </select>
         <label class="field-label">City</label>
@@ -588,6 +588,48 @@ textarea { min-height: 100px; resize: vertical; }
           <button type="button" class="btn" id="qe-save-close" onclick="saveQuickEntry(true)">Save &amp; Close</button>
           <button type="button" class="btn btn-primary" id="qe-save-next" onclick="saveQuickEntry(false)">Save &amp; Next →</button>
         </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Contact Modal -->
+<div class="modal-overlay" id="edit-contact-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 class="modal-title">Edit Contact</h2>
+      <button type="button" class="modal-close" onclick="closeEditContactModal()">&times;</button>
+    </div>
+    <form id="edit-contact-form" onsubmit="return false;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label class="field-label">First Name *</label><input class="input" type="text" id="ec-first"></div>
+        <div><label class="field-label">Last Name *</label><input class="input" type="text" id="ec-last"></div>
+      </div>
+      <label class="field-label">Title</label>
+      <input class="input" type="text" id="ec-title">
+      <label class="field-label">Email *</label>
+      <input class="input" type="email" id="ec-email">
+      <label class="field-label">Phone *</label>
+      <div style="display:flex;gap:6px;">
+        <select class="select-input" id="ec-phone-ext" style="width:90px;flex-shrink:0;">
+          <option value="">—</option>
+          <option value="+212">🇲🇦 +212</option><option value="+33">🇫🇷 +33</option><option value="+971">🇦🇪 +971</option><option value="+966">🇸🇦 +966</option><option value="+974">🇶🇦 +974</option><option value="+965">🇰🇼 +965</option><option value="+973">🇧🇭 +973</option><option value="+44">🇬🇧 +44</option><option value="+49">🇩🇪 +49</option><option value="+34">🇪🇸 +34</option><option value="+39">🇮🇹 +39</option><option value="+32">🇧🇪 +32</option><option value="+31">🇳🇱 +31</option><option value="+41">🇨🇭 +41</option><option value="+1">🇺🇸 +1</option><option value="+86">🇨🇳 +86</option><option value="+81">🇯🇵 +81</option><option value="+91">🇮🇳 +91</option><option value="+55">🇧🇷 +55</option><option value="+27">🇿🇦 +27</option><option value="+20">🇪🇬 +20</option><option value="+216">🇹🇳 +216</option><option value="+213">🇩🇿 +213</option><option value="+221">🇸🇳 +221</option><option value="+225">🇨🇮 +225</option>
+        </select>
+        <input class="input" type="text" id="ec-phone" placeholder="Phone number" style="flex:1;">
+      </div>
+      <label class="field-label">LinkedIn</label>
+      <input class="input" type="text" id="ec-linkedin">
+      <label class="field-label">Preferred Language</label>
+      <select class="select-input" id="ec-lang">
+        <option value="FR">FR</option><option value="EN">EN</option><option value="AR">AR</option>
+      </select>
+      <div style="margin-top:8px;">
+        <label style="font-size:12px;cursor:pointer;"><input type="checkbox" id="ec-primary"> Set as primary contact</label>
+      </div>
+      <div id="ec-error" style="display:none;color:var(--red);font-size:12px;margin-top:6px;"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeEditContactModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-ec-save" onclick="saveEditContact()">Save Contact</button>
       </div>
     </form>
   </div>
@@ -1020,16 +1062,26 @@ function buildExpandedPanel(p) {
       <div class="contact-detail">${escHtml(c.title || '')}</div>
       <div class="contact-detail">${escHtml(c.email || '')} ${c.phone ? '· ' + escHtml(c.phone) : ''}</div>
       ${c.linkedin ? '<div class="contact-detail"><a href="'+escHtml(c.linkedin)+'" target="_blank">LinkedIn</a></div>' : ''}
-      <button class="btn" style="margin-top:6px;font-size:11px;" onclick="event.stopPropagation();openOutreachModal('${p.id}','${c.id}')">Reach Out</button>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="btn" style="font-size:11px;" onclick="event.stopPropagation();openEditContactModal('${c.id}','${p.id}')">Edit Contact</button>
+        <button class="btn" style="font-size:11px;" onclick="event.stopPropagation();openOutreachModal('${p.id}','${c.id}')">Reach Out</button>
+      </div>
     </div>`).join('');
 
   const outreachHtml = outreaches.length ? outreaches.map(o => `
     <div class="outreach-item">
-      <span>${escHtml(formatDate(o.sent_at || o.created_at))}</span>
-      ${channelIconHtml(o.channel)}
-      <span class="lang-badge">${escHtml(o.language || '')}</span>
-      ${statusPillHtml(o.status)}
-      <span style="color:var(--gray-600);margin-left:4px;">${escHtml((o.body||'').slice(0,80))}</span>
+      <div style="display:flex;align-items:center;gap:6px;cursor:pointer;" onclick="toggleOutreachExpand(this)">
+        <span>${escHtml(formatDate(o.sent_at || o.created_at))}</span>
+        ${channelIconHtml(o.channel)}
+        <span class="lang-badge">${escHtml(o.language || '')}</span>
+        ${statusPillHtml(o.status)}
+        <span style="color:var(--gray-600);margin-left:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${escHtml((o.body||'').slice(0,80))}</span>
+        <span style="font-size:11px;color:var(--gray-400);flex-shrink:0;">&#9660;</span>
+      </div>
+      <div class="outreach-full" style="display:none;margin-top:8px;padding:10px;background:var(--gray-100);border-radius:8px;font-size:12px;line-height:1.6;">
+        ${o.subject ? `<div style="font-weight:600;color:var(--navy);margin-bottom:6px;">Subject: ${escHtml(o.subject)}</div>` : ''}
+        <div style="white-space:pre-wrap;color:var(--gray-900);">${escHtml(o.body || '')}</div>
+      </div>
     </div>`).join('') : '<div style="color:var(--gray-400);font-size:12px;">No outreach yet.</div>';
 
   return `<div class="expanded-panel">
@@ -1039,8 +1091,8 @@ function buildExpandedPanel(p) {
       <div class="expanded-section"><h4>Outreach History</h4>${outreachHtml}</div>
     </div>
     <div class="expanded-actions">
-      <button class="btn" onclick="event.stopPropagation();openEditProspect('${p.id}')">Edit Prospect</button>
-      <button class="btn" onclick="event.stopPropagation();openAddContactToProspect('${p.id}')">Add Contact</button>
+      <button class="btn" onclick="event.stopPropagation();openEditCompanyOnly('${p.id}')">Edit Company</button>
+      <button class="btn" onclick="event.stopPropagation();openAddContactToProspect('${p.id}')">+ Add Contact</button>
       <button class="btn btn-danger" onclick="event.stopPropagation();archiveProspect('${p.id}')">Archive</button>
     </div>
   </div>`;
@@ -1133,6 +1185,9 @@ function openAddContactToProspect(prospectId) {
 function closeProspectModal() {
   document.getElementById('prospect-modal-overlay').classList.remove('open');
   editingProspectId = null;
+  document.querySelector('.step-dot[data-step="3"]').style.display = '';
+  document.getElementById('btn-step-next').dataset.maxStep = '3';
+  document.getElementById('btn-prospect-save').dataset.companyOnly = '';
 }
 
 function updateStepUI() {
@@ -1156,12 +1211,12 @@ function addContactBlock(isPrimary, data) {
   div.innerHTML = `
     <button type="button" class="remove-contact" onclick="removeContactBlock(this)" title="Remove contact">&times;</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div><label class="field-label">First Name</label><input class="input cf-first" type="text" value="${escHtml(data?.first_name||'')}"></div>
-      <div><label class="field-label">Last Name</label><input class="input cf-last" type="text" value="${escHtml(data?.last_name||'')}"></div>
+      <div><label class="field-label">First Name *</label><input class="input cf-first" type="text" value="${escHtml(data?.first_name||'')}"></div>
+      <div><label class="field-label">Last Name *</label><input class="input cf-last" type="text" value="${escHtml(data?.last_name||'')}"></div>
     </div>
     <label class="field-label">Title</label><input class="input cf-title" type="text" value="${escHtml(data?.title||'')}">
-    <label class="field-label">Email</label><input class="input cf-email" type="email" value="${escHtml(data?.email||'')}">
-    <label class="field-label">Phone</label>
+    <label class="field-label">Email *</label><input class="input cf-email" type="email" value="${escHtml(data?.email||'')}">
+    <label class="field-label">Phone *</label>
     <div style="display:flex;gap:6px;">
       <select class="select-input cf-phone-ext" style="width:90px;flex-shrink:0;">
         <option value="">—</option>
@@ -1272,14 +1327,22 @@ function getContactsFromForm() {
 }
 
 async function saveProspect() {
+  const companyOnly = document.getElementById('btn-prospect-save').dataset.companyOnly === 'true';
   const company = document.getElementById('pf-company').value.trim();
   const companyType = document.getElementById('pf-type').value;
   if (!company || !companyType) { alert('Company name and type are required.'); currentStep = 1; updateStepUI(); return; }
 
-  const contacts = getContactsFromForm();
-  if (!contacts.length || !contacts.some(c => c.first_name || c.last_name)) {
-    alert('At least one contact with a name is required.');
-    return;
+  if (!companyOnly) {
+    const contacts = getContactsFromForm();
+    if (!contacts.length || !contacts.some(c => c.first_name || c.last_name)) {
+      alert('At least one contact with a name is required.');
+      return;
+    }
+    const invalidContact = contacts.find(c => !c.first_name || !c.last_name || !c.email || !c.phone);
+    if (invalidContact) {
+      alert('Each contact requires first name, last name, email and phone.');
+      return;
+    }
   }
 
   const sizeBtn = document.querySelector('#pf-size-seg button.active');
@@ -1323,26 +1386,30 @@ async function saveProspect() {
       prospectId = data.id;
     }
 
-    for (const c of contacts) {
-      const contactPayload = {
-        prospect_id: prospectId,
-        hotel_code: hotelCode,
-        first_name: c.first_name || null,
-        last_name: c.last_name || null,
-        title: c.title || null,
-        email: c.email || null,
-        phone: c.phone || null,
-        linkedin: c.linkedin || null,
-        preferred_language: c.preferred_language || 'FR',
-        is_primary: c.is_primary
-      };
-      if (c.id) {
-        await supabaseClient.from('prospect_contacts').update(contactPayload).eq('id', c.id);
-      } else {
-        await supabaseClient.from('prospect_contacts').insert(contactPayload);
+    if (!companyOnly) {
+      const contacts = getContactsFromForm();
+      for (const c of contacts) {
+        const contactPayload = {
+          prospect_id: prospectId,
+          hotel_code: hotelCode,
+          first_name: c.first_name || null,
+          last_name: c.last_name || null,
+          title: c.title || null,
+          email: c.email || null,
+          phone: c.phone || null,
+          linkedin: c.linkedin || null,
+          preferred_language: c.preferred_language || 'FR',
+          is_primary: c.is_primary
+        };
+        if (c.id) {
+          await supabaseClient.from('prospect_contacts').update(contactPayload).eq('id', c.id);
+        } else {
+          await supabaseClient.from('prospect_contacts').insert(contactPayload);
+        }
       }
     }
 
+    document.getElementById('btn-prospect-save').dataset.companyOnly = '';
     closeProspectModal();
     await refreshData();
   } catch (err) {
@@ -1839,6 +1906,155 @@ async function deleteTemplate(id) {
   }
 }
 
+/* ── Edit Company Only ── */
+function openEditCompanyOnly(id) {
+  const p = allProspects.find(x => x.id === id);
+  if (!p) return;
+  editingProspectId = id;
+  currentStep = 1;
+  document.getElementById('prospect-modal-title').textContent = 'Edit Company';
+  document.getElementById('pf-company').value = p.company_name || '';
+  document.getElementById('pf-type').value = p.company_type || '';
+  populateCountryDropdown();
+  document.getElementById('pf-country').value = p.country || '';
+  populateCityDropdown(p.country || '');
+  setTimeout(() => { document.getElementById('pf-city').value = p.city || ''; }, 50);
+  document.getElementById('pf-website').value = p.website || '';
+  document.getElementById('pf-size-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === (p.estimated_size || 'Mid')));
+  document.getElementById('pf-source').value = p.source || '';
+  document.getElementById('pf-source-detail').value = p.source_detail || '';
+  document.getElementById('pf-notes').value = p.notes || '';
+
+  const focuses = Array.isArray(p.business_focus) ? p.business_focus : [];
+  document.querySelectorAll('#pf-focus input').forEach(cb => cb.checked = focuses.includes(cb.value));
+  const dir = p.direction || 'Outbound';
+  document.querySelectorAll('input[name="pf-direction"]').forEach(r => r.checked = r.value === dir);
+  const markets = Array.isArray(p.primary_markets) ? p.primary_markets : [];
+  document.querySelectorAll('#pf-markets input').forEach(cb => cb.checked = markets.includes(cb.value));
+  const langs = Array.isArray(p.languages) ? p.languages : [];
+  document.querySelectorAll('#pf-languages input').forEach(cb => cb.checked = langs.includes(cb.value));
+
+  document.querySelector('.step-dot[data-step="3"]').style.display = 'none';
+  document.getElementById('contacts-container').innerHTML = '';
+  document.getElementById('btn-prospect-save').dataset.companyOnly = 'true';
+  document.getElementById('btn-step-next').dataset.maxStep = '2';
+
+  updateStepUI();
+  document.getElementById('prospect-modal-overlay').classList.add('open');
+}
+
+/* ── Edit Contact Modal ── */
+let editingContactId = null;
+let editingContactProspectId = null;
+
+function openEditContactModal(contactId, prospectId) {
+  const c = allContacts.find(x => x.id === contactId);
+  if (!c) return;
+  editingContactId = contactId;
+  editingContactProspectId = prospectId;
+
+  document.getElementById('ec-first').value = c.first_name || '';
+  document.getElementById('ec-last').value = c.last_name || '';
+  document.getElementById('ec-title').value = c.title || '';
+  document.getElementById('ec-email').value = c.email || '';
+  document.getElementById('ec-linkedin').value = c.linkedin || '';
+  document.getElementById('ec-lang').value = c.preferred_language || 'FR';
+  document.getElementById('ec-primary').checked = c.is_primary || false;
+  document.getElementById('ec-error').style.display = 'none';
+
+  const extSel = document.getElementById('ec-phone-ext');
+  const phoneInput = document.getElementById('ec-phone');
+  if (c.phone) {
+    const knownCodes = Object.values(COUNTRY_PHONE_CODES).filter(Boolean).sort((a,b) => b.length - a.length);
+    let matched = false;
+    for (const code of knownCodes) {
+      if (c.phone.startsWith(code)) {
+        extSel.value = code;
+        phoneInput.value = c.phone.slice(code.length).trim();
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) { extSel.value = ''; phoneInput.value = c.phone; }
+  } else { extSel.value = ''; phoneInput.value = ''; }
+
+  document.getElementById('edit-contact-overlay').classList.add('open');
+}
+
+function closeEditContactModal() {
+  document.getElementById('edit-contact-overlay').classList.remove('open');
+  editingContactId = null;
+  editingContactProspectId = null;
+}
+
+async function saveEditContact() {
+  const errorEl = document.getElementById('ec-error');
+  errorEl.style.display = 'none';
+
+  const first = document.getElementById('ec-first').value.trim();
+  const last = document.getElementById('ec-last').value.trim();
+  const email = document.getElementById('ec-email').value.trim();
+  const phoneNum = document.getElementById('ec-phone').value.trim();
+  const phoneExt = document.getElementById('ec-phone-ext').value;
+
+  const missing = [];
+  if (!first) missing.push('First Name');
+  if (!last) missing.push('Last Name');
+  if (!email) missing.push('Email');
+  if (!phoneNum) missing.push('Phone');
+
+  if (missing.length) {
+    errorEl.textContent = 'Required: ' + missing.join(', ');
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const phone = phoneExt && phoneNum ? phoneExt + ' ' + phoneNum : phoneNum;
+  const isPrimary = document.getElementById('ec-primary').checked;
+
+  const saveBtn = document.getElementById('btn-ec-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  try {
+    if (isPrimary && editingContactProspectId) {
+      await supabaseClient.from('prospect_contacts').update({ is_primary: false }).eq('prospect_id', editingContactProspectId);
+    }
+
+    const { error } = await supabaseClient.from('prospect_contacts').update({
+      first_name: first,
+      last_name: last,
+      title: document.getElementById('ec-title').value.trim() || null,
+      email: email,
+      phone: phone,
+      linkedin: document.getElementById('ec-linkedin').value.trim() || null,
+      preferred_language: document.getElementById('ec-lang').value,
+      is_primary: isPrimary
+    }).eq('id', editingContactId);
+
+    if (error) throw error;
+    closeEditContactModal();
+    await refreshData();
+  } catch (err) {
+    errorEl.textContent = 'Could not save. Please try again.';
+    errorEl.style.display = 'block';
+    console.error(err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Contact';
+  }
+}
+
+/* ── Outreach Expand ── */
+function toggleOutreachExpand(headerEl) {
+  const item = headerEl.closest('.outreach-item');
+  const full = item.querySelector('.outreach-full');
+  const arrow = headerEl.querySelector('span:last-child');
+  const isOpen = full.style.display !== 'none';
+  full.style.display = isOpen ? 'none' : 'block';
+  arrow.innerHTML = isOpen ? '&#9660;' : '&#9650;';
+}
+
 /* ── Data Loading ── */
 async function loadProspects() {
   const { data, error } = await supabaseClient
@@ -1960,13 +2176,20 @@ async function logout() {
 document.getElementById('btn-add-prospect').addEventListener('click', openNewProspectModal);
 document.getElementById('btn-add-contact').addEventListener('click', () => addContactBlock(false));
 document.getElementById('btn-step-next').addEventListener('click', () => {
+  const maxStep = parseInt(document.getElementById('btn-step-next').dataset.maxStep || '3');
   if (currentStep === 1) {
-    if (!document.getElementById('pf-company').value.trim() || !document.getElementById('pf-type').value) {
-      alert('Company name and type are required.'); return;
+    if (!document.getElementById('pf-company').value.trim() || !document.getElementById('pf-type').value || !document.getElementById('pf-country').value) {
+      alert('Company name, type and country are required.'); return;
     }
   }
-  currentStep = Math.min(3, currentStep + 1);
-  updateStepUI();
+  if (currentStep < maxStep) {
+    currentStep = Math.min(maxStep, currentStep + 1);
+    updateStepUI();
+  }
+  if (currentStep === maxStep && maxStep === 2) {
+    document.getElementById('btn-step-next').style.display = 'none';
+    document.getElementById('btn-prospect-save').style.display = '';
+  }
 });
 document.getElementById('btn-step-prev').addEventListener('click', () => {
   currentStep = Math.max(1, currentStep - 1);
