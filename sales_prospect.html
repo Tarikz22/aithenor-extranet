@@ -6,6 +6,9 @@
 <title>Aithenor — Sales Prospects</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --navy: #0F1F3D;
@@ -272,6 +275,8 @@ textarea { min-height: 100px; resize: vertical; }
       </div>
       <div class="topbar-actions">
         <button class="btn" onclick="refreshData()">Refresh</button>
+        <button class="btn" onclick="exportPDF()">Export PDF</button>
+        <button class="btn" onclick="exportExcel()">Export Excel</button>
         <button class="btn btn-primary" id="btn-add-prospect">+ Add Prospect</button>
       </div>
     </div>
@@ -763,6 +768,171 @@ function renderTable() {
   });
 }
 
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const filtered = applyFilters();
+  const hotelName = localStorage.getItem('hotelName') || hotelCode;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const fileDate = now.toISOString().slice(0,10).replace(/-/g,'');
+
+  doc.setFillColor(15, 31, 61);
+  doc.rect(0, 0, 297, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('AITHENOR', 14, 10);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sales Prospects Report', 14, 17);
+  doc.text(`${hotelName}   \u00b7   ${dateStr}`, 200, 17);
+
+  const f = getFilters();
+  const filterParts = [];
+  if (f.type) filterParts.push(`Type: ${f.type}`);
+  if (f.focus) filterParts.push(`Focus: ${f.focus}`);
+  if (f.market) filterParts.push(`Market: ${f.market}`);
+  if (f.status) filterParts.push(`Status: ${f.status}`);
+  if (f.search) filterParts.push(`Search: "${f.search}"`);
+  const filterStr = filterParts.length ? 'Filters: ' + filterParts.join('   |   ') : 'Filters: None';
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text(filterStr, 14, 28);
+
+  const nonArchived = allProspects.filter(p => p.status !== 'archived');
+  const contracted = nonArchived.filter(p => p.status === 'contracted').length;
+  const convRate = nonArchived.length > 0 ? ((contracted / nonArchived.length) * 100).toFixed(1) + '%' : '0%';
+  doc.setFontSize(9);
+  doc.setTextColor(15, 31, 61);
+  doc.text(`Total Prospects: ${filtered.length}`, 14, 35);
+  doc.text(`Contracted: ${contracted}`, 80, 35);
+  doc.text(`Conversion Rate: ${convRate}`, 146, 35);
+
+  const tableRows = filtered.map(p => {
+    const primary = getPrimaryContact(p.id);
+    const primaryName = primary ? `${primary.first_name || ''} ${primary.last_name || ''}`.trim() : '\u2014';
+    const outreaches = getProspectOutreach(p.id);
+    const lastOut = outreaches.length ? outreaches.sort((a,b) => (b.sent_at||b.created_at||'').localeCompare(a.sent_at||a.created_at||''))[0] : null;
+    const focuses = Array.isArray(p.business_focus) ? p.business_focus.join(', ') : '\u2014';
+    return [
+      p.company_name || '\u2014',
+      p.company_type || '\u2014',
+      focuses,
+      p.country || '\u2014',
+      primaryName,
+      primary?.email || '\u2014',
+      lastOut?.sent_at ? formatDate(lastOut.sent_at) : '\u2014',
+      p.status || 'new'
+    ];
+  });
+
+  doc.autoTable({
+    startY: 40,
+    head: [['Company', 'Type', 'Focus', 'Country', 'Primary Contact', 'Email', 'Last Outreach', 'Status']],
+    body: tableRows,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [15, 31, 61], textColor: [255, 255, 255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [250, 250, 247] },
+    margin: { left: 14, right: 14 }
+  });
+
+  const pipeline = filtered.filter(p => p.status === 'proposal' || p.status === 'contracted');
+  if (pipeline.length) {
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 31, 61);
+    doc.text('Pipeline Summary', 14, finalY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${pipeline.length} prospect(s) at proposal or contracted stage.`, 14, finalY + 6);
+  }
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 8);
+  }
+
+  doc.save(`Aithenor_Prospects_${hotelCode}_${fileDate}.pdf`);
+}
+
+function exportExcel() {
+  const filtered = applyFilters();
+  const now = new Date();
+  const fileDate = now.toISOString().slice(0,10).replace(/-/g,'');
+
+  const prospectRows = filtered.map(p => {
+    const primary = getPrimaryContact(p.id);
+    const allContactsForP = getProspectContacts(p.id);
+    const outreaches = getProspectOutreach(p.id);
+    const lastOut = outreaches.length ? outreaches.sort((a,b) => (b.sent_at||b.created_at||'').localeCompare(a.sent_at||a.created_at||''))[0] : null;
+    return {
+      'Company': p.company_name || '',
+      'Type': p.company_type || '',
+      'Focus': Array.isArray(p.business_focus) ? p.business_focus.join(', ') : '',
+      'Direction': p.direction || '',
+      'Markets': Array.isArray(p.primary_markets) ? p.primary_markets.join(', ') : '',
+      'Country': p.country || '',
+      'City': p.city || '',
+      'Website': p.website || '',
+      'Size': p.estimated_size || '',
+      'Source': p.source || '',
+      'Status': p.status || 'new',
+      'Primary Contact': primary ? `${primary.first_name||''} ${primary.last_name||''}`.trim() : '',
+      'Primary Email': primary?.email || '',
+      'Primary Phone': primary?.phone || '',
+      'Total Contacts': allContactsForP.length,
+      'Total Outreach': outreaches.length,
+      'Last Outreach': lastOut?.sent_at ? formatDate(lastOut.sent_at) : '',
+      'Notes': p.notes || ''
+    };
+  });
+
+  const pipelineRows = filtered
+    .filter(p => p.status === 'proposal' || p.status === 'contracted')
+    .map(p => {
+      const primary = getPrimaryContact(p.id);
+      return {
+        'Company': p.company_name || '',
+        'Type': p.company_type || '',
+        'Status': p.status || '',
+        'Country': p.country || '',
+        'Primary Contact': primary ? `${primary.first_name||''} ${primary.last_name||''}`.trim() : '',
+        'Primary Email': primary?.email || '',
+        'Primary Phone': primary?.phone || '',
+        'Focus': Array.isArray(p.business_focus) ? p.business_focus.join(', ') : '',
+        'Notes': p.notes || ''
+      };
+    });
+
+  const wb = XLSX.utils.book_new();
+
+  const ws1 = XLSX.utils.json_to_sheet(prospectRows);
+  ws1['!cols'] = [
+    {wch:30},{wch:18},{wch:30},{wch:12},{wch:20},
+    {wch:16},{wch:16},{wch:25},{wch:8},{wch:14},
+    {wch:12},{wch:25},{wch:28},{wch:18},{wch:6},
+    {wch:6},{wch:14},{wch:35}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Prospect Log');
+
+  if (pipelineRows.length) {
+    const ws2 = XLSX.utils.json_to_sheet(pipelineRows);
+    ws2['!cols'] = [
+      {wch:30},{wch:18},{wch:12},{wch:16},
+      {wch:25},{wch:28},{wch:18},{wch:30},{wch:35}
+    ];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Pipeline');
+  }
+
+  XLSX.writeFile(wb, `Aithenor_Prospects_${hotelCode}_${fileDate}.xlsx`);
+}
+
 function buildExpandedPanel(p) {
   const contacts = getProspectContacts(p.id);
   const outreaches = getProspectOutreach(p.id).sort((a,b) => (a.sent_at||a.created_at||'').localeCompare(b.sent_at||b.created_at||''));
@@ -1210,7 +1380,7 @@ function resolveMergeFields(text) {
   result = result.replace(/\{\{hotel_name\}\}/g, hotelName);
   result = result.replace(/\{\{sender_name\}\}/g, senderName);
   result = result.replace(/\{\{year\}\}/g, year);
-  result = result.replace(/\{\{ai_context\}\}/g, '');
+  result = result.replace(/\n?\{\{ai_context\}\}/g, '');
   return result;
 }
 
