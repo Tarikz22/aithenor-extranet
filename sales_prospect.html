@@ -1,1 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Sales Prospects</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --navy-light: #243F72;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --gold-pale: #FBF6EA;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --red: #C0392B;
+  --red-light: #FDECEA;
+  --orange: #D35400;
+  --orange-light: #FEF0E7;
+  --amber: #B8860B;
+  --amber-light: #FEF9E7;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--gray-900); min-height: 100vh; }
+.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; z-index: 100; border-right: 1px solid rgba(201,168,76,0.15); }
+.sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.logo-text { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--white); letter-spacing: 4px; text-transform: uppercase; }
+.logo-sub { font-size: 9px; color: var(--gold); letter-spacing: 2.5px; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
+.hotel-card { margin: 16px 14px; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); border-radius: 8px; padding: 12px 14px; }
+.hotel-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 600; color: var(--white); }
+.hotel-meta { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.3px; }
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+.nav-section { padding: 12px 20px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
+.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; min-width: 18px; text-align: center; }
+.sidebar-bottom { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+.sync-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.35); }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.main { margin-left: var(--sidebar-w); min-height: 100vh; }
+.topbar { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--navy); }
+.topbar-sub { color: var(--gray-600); font-size: 12px; letter-spacing: .04em; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.btn { border: 1px solid var(--gray-300); border-radius: 999px; font-size: 12px; padding: 8px 12px; background: #fff; cursor: pointer; font-family: inherit; transition: all .15s; }
+.btn:hover { border-color: var(--navy); }
+.btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn-primary:hover { background: var(--navy-mid); }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red-light); }
+.content { padding: 24px 32px 80px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.summary-tile { background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; }
+.summary-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-600); margin-bottom: 8px; }
+.summary-value { font-size: 24px; color: var(--navy); font-weight: 600; }
+.summary-sub { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+.error-banner { display: none; background: var(--red-light); color: var(--red); border: 1px solid var(--red); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; position: relative; }
+.error-banner .dismiss { position: absolute; right: 10px; top: 8px; background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--gray-200); margin-bottom: 18px; }
+.tab-btn { padding: 10px 18px; font-size: 13px; font-weight: 500; color: var(--gray-600); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; }
+.tab-btn.active { color: var(--navy); border-bottom-color: var(--gold); font-weight: 600; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.filter-bar select, .filter-bar input[type="text"] { border: 1px solid var(--gray-300); border-radius: 10px; padding: 9px 10px; font-family: inherit; font-size: 12px; background: #fff; }
+.filter-bar .search { min-width: 200px; flex: 1; }
+.panel { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+thead th { background: var(--gray-100); color: var(--gray-600); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 10px; text-align: left; border-bottom: 1px solid var(--gray-200); white-space: nowrap; }
+tbody td { padding: 10px; border-bottom: 1px solid var(--gray-200); font-size: 13px; vertical-align: middle; }
+.prospect-row { cursor: pointer; }
+.prospect-row:hover { background: #fcfcfa; }
+.status-pill { border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; display: inline-block; white-space: nowrap; }
+.status-new { background: var(--gray-100); color: var(--gray-600); }
+.status-contacted { background: #EBF5FF; color: #1D4ED8; }
+.status-meeting { background: var(--amber-light); color: var(--amber); }
+.status-proposal { background: var(--orange-light); color: var(--orange); }
+.status-contracted { background: var(--green-light); color: var(--green); }
+.status-lost { background: var(--red-light); color: var(--red); }
+.status-archived { background: var(--gray-100); color: var(--gray-400); font-style: italic; }
+.focus-pill { display: inline-block; background: var(--gold-pale); color: var(--navy); border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 500; margin-right: 3px; margin-bottom: 2px; }
+.focus-more { font-size: 10px; color: var(--gray-400); }
+.lang-badge { display: inline-block; background: var(--gray-100); border: 1px solid var(--gray-200); color: var(--gray-600); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600; }
+.primary-badge { display: inline-block; background: var(--gold-pale); border: 1px solid var(--gold); color: var(--navy); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600; }
+.expanded-panel-cell { padding: 0; background: #fff; }
+.expanded-panel { padding: 16px; border-top: 1px dashed var(--gray-300); background: #fff; }
+.expanded-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.expanded-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-600); margin-bottom: 8px; }
+.expanded-section .detail-line { font-size: 13px; margin-bottom: 4px; }
+.expanded-section .detail-line strong { color: var(--navy); }
+.contact-card { border: 1px solid var(--gray-200); border-radius: 10px; padding: 10px; margin-bottom: 8px; background: var(--gray-100); }
+.contact-card .contact-name { font-weight: 600; color: var(--navy); font-size: 13px; }
+.contact-card .contact-detail { font-size: 12px; color: var(--gray-600); margin-top: 2px; }
+.outreach-item { border-bottom: 1px solid var(--gray-200); padding: 8px 0; font-size: 12px; }
+.outreach-item:last-child { border-bottom: none; }
+.expanded-actions { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--gray-200); display: flex; gap: 8px; }
+.channel-icon { display: inline-block; width: 20px; text-align: center; }
+.state { display: none; align-items: center; justify-content: center; min-height: 280px; color: var(--gray-600); }
+.state.visible { display: flex; }
+.login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
+.login-card { width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 1px solid rgba(15,31,61,0.1); border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(15,31,61,0.12); }
+.brand-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.brand-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; margin-bottom: 8px; color: var(--navy); }
+.brand-copy { color: var(--gray-600); line-height: 1.6; margin-bottom: 18px; }
+.field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); margin: 12px 0 6px; }
+.input, .select-input, textarea { width: 100%; border: 1px solid var(--gray-300); border-radius: 10px; padding: 12px; font-family: inherit; font-size: 13px; }
+textarea { min-height: 100px; resize: vertical; }
+.login-btn { width: 100%; margin-top: 16px; border: none; border-radius: 10px; padding: 12px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
+.login-error { display: none; margin-top: 10px; color: var(--red); font-size: 12px; }
+.app-screen { display: none; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,31,61,0.45); z-index: 300; align-items: center; justify-content: center; padding: 24px; }
+.modal-overlay.open { display: flex; }
+.modal { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+.modal-wide { max-width: 680px; }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.modal-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--navy); }
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--gray-400); line-height: 1; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.step-indicator { display: flex; gap: 8px; margin-bottom: 16px; }
+.step-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--gray-300); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--gray-400); }
+.step-dot.active { border-color: var(--gold); background: var(--gold-pale); color: var(--navy); }
+.step-dot.done { border-color: var(--green); background: var(--green-light); color: var(--green); }
+.step-content { display: none; }
+.step-content.active { display: block; }
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.checkbox-group label { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.radio-row { display: flex; gap: 16px; margin-top: 4px; }
+.radio-row label { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.segmented { display: flex; gap: 0; border: 1px solid var(--gray-300); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+.segmented button { border: none; background: #fff; padding: 8px 14px; font-size: 12px; cursor: pointer; font-family: inherit; color: var(--gray-600); border-right: 1px solid var(--gray-300); }
+.segmented button:last-child { border-right: none; }
+.segmented button.active { background: var(--gold-pale); color: var(--navy); font-weight: 600; }
+.contact-form-block { border: 1px solid var(--gray-200); border-radius: 10px; padding: 12px; margin-bottom: 10px; position: relative; }
+.contact-form-block .remove-contact { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; }
+.channel-selector { display: flex; gap: 6px; margin-top: 4px; }
+.channel-selector button { border: 1px solid var(--gray-300); background: #fff; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.channel-selector button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+.lang-selector { display: flex; gap: 0; border: 1px solid var(--gray-300); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+.lang-selector button { border: none; background: #fff; padding: 8px 14px; font-size: 12px; cursor: pointer; font-family: inherit; color: var(--gray-600); border-right: 1px solid var(--gray-300); }
+.lang-selector button:last-child { border-right: none; }
+.lang-selector button.active { background: var(--gold-pale); color: var(--navy); font-weight: 600; }
+.ai-toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+.ai-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--navy); }
+.ai-warning { font-size: 11px; color: var(--amber); margin-top: 4px; }
+.merge-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding: 8px; background: var(--gray-100); border-radius: 8px; }
+.merge-chip { display: inline-block; background: var(--gold-pale); border: 1px solid var(--gold); border-radius: 999px; padding: 3px 8px; font-size: 11px; color: var(--navy); cursor: pointer; }
+.merge-chip:hover { background: var(--gold-light); }
+.template-card { border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: #fff; }
+.template-card .tpl-name { font-weight: 600; color: var(--navy); font-size: 14px; }
+.template-card .tpl-preview { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+.template-sidebar { display: flex; gap: 16px; }
+.template-categories { width: 200px; min-width: 200px; }
+.template-categories .cat-item { padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 8px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+.template-categories .cat-item:hover { background: var(--gray-100); }
+.template-categories .cat-item.active { background: var(--gold-pale); color: var(--navy); font-weight: 600; }
+.template-categories .cat-badge { background: var(--gray-200); border-radius: 999px; padding: 1px 7px; font-size: 10px; color: var(--gray-600); }
+.template-content { flex: 1; }
+.global-badge { display: inline-block; background: #EBF5FF; color: #1D4ED8; border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600; }
+.custom-badge { display: inline-block; background: var(--gold-pale); color: var(--navy); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600; }
+.copied-msg { display: none; font-size: 12px; color: var(--green); font-weight: 600; }
+@media (max-width: 980px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 18px 18px 80px; }
+  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .expanded-grid { grid-template-columns: 1fr; }
+  .template-sidebar { flex-direction: column; }
+  .template-categories { width: 100%; min-width: 0; }
+}
+@media (max-width: 680px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="brand-kicker">Aithenor</div>
+    <h1 class="brand-title">Sales Prospects</h1>
+    <div class="brand-copy">Manage outbound prospects and outreach for your hotel.</div>
+    <form onsubmit="handleLogin(event)">
+      <label class="field-label">Email</label>
+      <input class="input" type="email" id="login-email" required>
+      <label class="field-label">Password</label>
+      <input class="input" type="password" id="login-password" required>
+      <button class="login-btn" id="login-btn" type="submit">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
 
+<div class="app-screen" id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Aithenor</div>
+      <div class="logo-sub">Strategic Intelligence</div>
+    </div>
+    <div class="hotel-card">
+      <div class="hotel-name" id="sidebar-hotel">Hotel</div>
+      <div class="hotel-meta" id="sidebar-period">Sales Prospects</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Executive</div>
+      <a class="nav-item" href="gm.html">
+        <span class="nav-icon">✦</span>
+        GM Briefing
+      </a>
+
+      <div class="nav-section">Intelligence</div>
+      <a class="nav-item" href="index.html">
+        <span class="nav-icon">◈</span>
+        Insights
+        <span class="nav-badge" id="badge-count">—</span>
+      </a>
+      <a class="nav-item" href="costs.html">
+        <span class="nav-icon">◇</span>
+        Cost Modules
+      </a>
+
+      <div class="nav-section">Execution</div>
+      <a class="nav-item" href="accounts.html">
+        <span class="nav-icon">◉</span>
+        Accounts
+      </a>
+      <a class="nav-item" href="sales.html">
+        <span class="nav-icon">◎</span>
+        Sales Activity
+      </a>
+      <a class="nav-item active" href="sales_prospect.html">
+        <span class="nav-icon">◈</span>
+        Prospects
+      </a>
+      <a class="nav-item" href="weekly.html">
+        <span class="nav-icon">◎</span>
+        Weekly Intel
+      </a>
+
+      <div class="nav-section">Settings</div>
+      <a class="nav-item" href="config.html">
+        <span class="nav-icon">◇</span>
+        Configuration
+      </a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sync-status"><div class="sync-dot"></div><span>Connected to Supabase</span></div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
+        <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
+        <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Sales Prospects</div>
+        <div class="topbar-sub">Manage prospects, outreach, and conversion pipeline.</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" onclick="refreshData()">Refresh</button>
+        <button class="btn btn-primary" id="btn-add-prospect">+ Add Prospect</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="state visible" id="loading-state">Loading prospects...</div>
+      <div class="state" id="error-state">Could not load prospects.</div>
+
+      <div id="dashboard" style="display:none;">
+        <div class="error-banner" id="error-banner">
+          <span id="error-banner-msg"></span>
+          <button class="dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-tile"><div class="summary-label">Total Prospects</div><div class="summary-value" id="kpi-total">0</div><div class="summary-sub">Non-archived prospects</div></div>
+          <div class="summary-tile"><div class="summary-label">Contacted This Month</div><div class="summary-value" id="kpi-contacted">0</div><div class="summary-sub">At least one outreach sent</div></div>
+          <div class="summary-tile"><div class="summary-label">Open Follow-ups</div><div class="summary-value" id="kpi-followups">0</div><div class="summary-sub">Sent &gt; 5 days, no reply</div></div>
+          <div class="summary-tile"><div class="summary-label">Conversion Rate</div><div class="summary-value" id="kpi-conversion">0%</div><div class="summary-sub">Contracted / total</div></div>
+        </div>
+
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="prospects">Prospects</button>
+          <button class="tab-btn" data-tab="templates">Templates</button>
+        </div>
+
+        <div id="tab-prospects">
+          <div class="filter-bar">
+            <select id="filter-type"><option value="">All Types</option><option>Travel Agency</option><option>Event Company</option><option>DMC</option><option>Corporate</option><option>Association</option><option>Government</option><option>Other</option></select>
+            <select id="filter-focus"><option value="">All Focus</option><option>MICE</option><option>Leisure FIT</option><option>Corporate FIT</option><option>Groups</option><option>Government</option></select>
+            <select id="filter-market"><option value="">All Markets</option><option>Morocco</option><option>France</option><option>Gulf</option><option>Europe</option><option>Other</option></select>
+            <select id="filter-status"><option value="">All Status</option><option value="new">New</option><option value="contacted">Contacted</option><option value="meeting">Meeting</option><option value="proposal">Proposal</option><option value="contracted">Contracted</option><option value="lost">Lost</option><option value="archived">Archived</option></select>
+            <select id="filter-language"><option value="">All Languages</option><option value="FR">FR</option><option value="EN">EN</option><option value="AR">AR</option></select>
+            <input class="search" type="text" id="filter-search" placeholder="Search company or contact name">
+          </div>
+
+          <div class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Company</th><th>Type</th><th>Focus</th><th>Country</th><th>Primary Contact</th><th>Last Outreach</th><th>Status</th><th>Action</th>
+                </tr></thead>
+                <tbody id="prospect-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-templates" style="display:none;">
+          <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+            <button class="btn btn-primary" id="btn-add-template">+ Add Template</button>
+          </div>
+          <div class="template-sidebar">
+            <div class="template-categories" id="template-categories"></div>
+            <div class="template-content" id="template-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prospect Modal (New / Edit) -->
+<div class="modal-overlay" id="prospect-modal-overlay">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2 class="modal-title" id="prospect-modal-title">New Prospect</h2>
+      <button type="button" class="modal-close" onclick="closeProspectModal()">&times;</button>
+    </div>
+    <div class="step-indicator" id="step-indicator">
+      <div class="step-dot active" data-step="1">1</div>
+      <div class="step-dot" data-step="2">2</div>
+      <div class="step-dot" data-step="3">3</div>
+    </div>
+    <form id="prospect-form" onsubmit="return false;">
+      <div class="step-content active" id="step-1">
+        <label class="field-label">Company Name *</label>
+        <input class="input" type="text" id="pf-company" required>
+        <label class="field-label">Company Type *</label>
+        <select class="select-input" id="pf-type" required>
+          <option value="">Select...</option>
+          <option>Travel Agency</option><option>Event Company</option><option>DMC</option><option>Corporate</option><option>Association</option><option>Government</option><option>Other</option>
+        </select>
+        <label class="field-label">Country</label>
+        <input class="input" type="text" id="pf-country">
+        <label class="field-label">City</label>
+        <input class="input" type="text" id="pf-city">
+        <label class="field-label">Website</label>
+        <input class="input" type="text" id="pf-website">
+        <label class="field-label">Estimated Size</label>
+        <div class="segmented" id="pf-size-seg">
+          <button type="button" data-val="Small">Small</button>
+          <button type="button" data-val="Mid" class="active">Mid</button>
+          <button type="button" data-val="Large">Large</button>
+        </div>
+        <label class="field-label">Source</label>
+        <select class="select-input" id="pf-source">
+          <option value="">Select...</option>
+          <option>Business Card</option><option>Referral</option><option>Event</option><option>Other</option>
+        </select>
+        <label class="field-label">Source Detail</label>
+        <input class="input" type="text" id="pf-source-detail">
+        <label class="field-label">Notes</label>
+        <textarea id="pf-notes"></textarea>
+      </div>
+      <div class="step-content" id="step-2">
+        <label class="field-label">Business Focus</label>
+        <div class="checkbox-group" id="pf-focus">
+          <label><input type="checkbox" value="MICE"> MICE</label>
+          <label><input type="checkbox" value="Leisure FIT"> Leisure FIT</label>
+          <label><input type="checkbox" value="Corporate FIT"> Corporate FIT</label>
+          <label><input type="checkbox" value="Groups"> Groups</label>
+          <label><input type="checkbox" value="Government"> Government</label>
+        </div>
+        <label class="field-label">Direction</label>
+        <div class="radio-row">
+          <label><input type="radio" name="pf-direction" value="Inbound"> Inbound</label>
+          <label><input type="radio" name="pf-direction" value="Outbound" checked> Outbound</label>
+          <label><input type="radio" name="pf-direction" value="Both"> Both</label>
+        </div>
+        <label class="field-label">Primary Markets</label>
+        <div class="checkbox-group" id="pf-markets">
+          <label><input type="checkbox" value="Morocco"> Morocco</label>
+          <label><input type="checkbox" value="France"> France</label>
+          <label><input type="checkbox" value="Gulf"> Gulf</label>
+          <label><input type="checkbox" value="Europe"> Europe</label>
+          <label><input type="checkbox" value="Other"> Other</label>
+        </div>
+        <label class="field-label">Languages Spoken</label>
+        <div class="checkbox-group" id="pf-languages">
+          <label><input type="checkbox" value="FR"> FR</label>
+          <label><input type="checkbox" value="EN"> EN</label>
+          <label><input type="checkbox" value="AR"> AR</label>
+          <label><input type="checkbox" value="Other"> Other</label>
+        </div>
+      </div>
+      <div class="step-content" id="step-3">
+        <label class="field-label">Contacts (at least one required)</label>
+        <div id="contacts-container"></div>
+        <button type="button" class="btn" id="btn-add-contact" style="margin-top:8px;">+ Add another contact</button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btn-step-prev" style="display:none;">Back</button>
+        <button type="button" class="btn btn-primary" id="btn-step-next">Next</button>
+        <button type="button" class="btn btn-primary" id="btn-prospect-save" style="display:none;">Save Prospect</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Outreach Modal -->
+<div class="modal-overlay" id="outreach-modal-overlay">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2 class="modal-title">Outreach</h2>
+      <button type="button" class="modal-close" onclick="closeOutreachModal()">&times;</button>
+    </div>
+    <form id="outreach-form" onsubmit="return false;">
+      <label class="field-label">Company</label>
+      <input class="input" type="text" id="or-company" readonly style="background:var(--gray-100);color:var(--gray-600);cursor:not-allowed;">
+
+      <label class="field-label">Contact</label>
+      <select class="select-input" id="or-contact"></select>
+
+      <label class="field-label">Channel</label>
+      <div class="channel-selector" id="or-channel">
+        <button type="button" data-ch="Email" class="active">✉ Email</button>
+        <button type="button" data-ch="WhatsApp">💬 WhatsApp</button>
+        <button type="button" data-ch="Phone">📞 Phone</button>
+        <button type="button" data-ch="In-person">🤝 In-person</button>
+      </div>
+
+      <label class="field-label">Language</label>
+      <div class="lang-selector" id="or-language">
+        <button type="button" data-lang="FR" class="active">FR</button>
+        <button type="button" data-lang="EN">EN</button>
+        <button type="button" data-lang="AR">AR</button>
+      </div>
+
+      <label class="field-label">Template</label>
+      <select class="select-input" id="or-template"><option value="">— Select template —</option></select>
+
+      <label class="field-label">Subject</label>
+      <input class="input" type="text" id="or-subject">
+
+      <label class="field-label">Body</label>
+      <textarea id="or-body" style="min-height:140px;"></textarea>
+
+      <div class="ai-toggle">
+        <input type="checkbox" id="or-ai-toggle">
+        <label for="or-ai-toggle" style="font-size:13px; cursor:pointer;">AI Assist — inject hotel intelligence context</label>
+      </div>
+      <div class="ai-warning" id="or-ai-warning" style="display:none;"></div>
+
+      <div class="modal-actions" style="justify-content:space-between;">
+        <div>
+          <button type="button" class="btn" id="or-copy">Copy to Clipboard</button>
+          <span class="copied-msg" id="or-copied">Copied ✓</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn" id="or-draft">Save as Draft</button>
+          <button type="button" class="btn btn-primary" id="or-send">Log as Sent</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Template Modal -->
+<div class="modal-overlay" id="template-modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 class="modal-title" id="tpl-modal-title">Add Template</h2>
+      <button type="button" class="modal-close" onclick="closeTemplateModal()">&times;</button>
+    </div>
+    <form id="template-form" onsubmit="return false;">
+      <label class="field-label">Category</label>
+      <select class="select-input" id="tpl-category">
+        <option>First Contact</option><option>Follow-up</option><option>Seasonal</option><option>Commercial</option><option>Re-engagement</option><option>Administrative</option>
+      </select>
+      <label class="field-label">Name</label>
+      <input class="input" type="text" id="tpl-name" required>
+      <label class="field-label">Language</label>
+      <select class="select-input" id="tpl-language">
+        <option value="FR">FR</option><option value="EN">EN</option><option value="AR">AR</option>
+      </select>
+      <label class="field-label">Subject</label>
+      <input class="input" type="text" id="tpl-subject">
+      <label class="field-label">Body</label>
+      <textarea id="tpl-body" style="min-height:140px;"></textarea>
+      <div class="merge-chips">
+        <span class="merge-chip" data-field="{{contact_name}}">{{contact_name}}</span>
+        <span class="merge-chip" data-field="{{company_name}}">{{company_name}}</span>
+        <span class="merge-chip" data-field="{{hotel_name}}">{{hotel_name}}</span>
+        <span class="merge-chip" data-field="{{sender_name}}">{{sender_name}}</span>
+        <span class="merge-chip" data-field="{{year}}">{{year}}</span>
+        <span class="merge-chip" data-field="{{ai_context}}">{{ai_context}}</span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" onclick="closeTemplateModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-tpl-save">Save Template</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUserEmail = '';
+let hotelCode = '';
+let allProspects = [];
+let allContacts = [];
+let allOutreach = [];
+let allTemplates = [];
+let engineCache = null;
+let editingProspectId = null;
+let outreachProspectId = null;
+let outreachContactId = null;
+let editingTemplateId = null;
+let currentStep = 1;
+let activeTab = 'prospects';
+let activeTemplateCategory = 'First Contact';
+
+function escHtml(str) {
+  if (str == null) return '';
+  return str.toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showError(msg) {
+  const b = document.getElementById('error-banner');
+  document.getElementById('error-banner-msg').textContent = msg;
+  b.style.display = 'block';
+}
+
+function formatDate(val) {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function isCurrentMonth(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
+function getProspectContacts(prospectId) {
+  return allContacts.filter(c => c.prospect_id === prospectId);
+}
+
+function getProspectOutreach(prospectId) {
+  return allOutreach.filter(o => o.prospect_id === prospectId);
+}
+
+function getPrimaryContact(prospectId) {
+  const contacts = getProspectContacts(prospectId);
+  return contacts.find(c => c.is_primary) || contacts[0] || null;
+}
+
+/* ── KPIs ── */
+function renderKpis() {
+  const nonArchived = allProspects.filter(p => p.status !== 'archived');
+  document.getElementById('kpi-total').textContent = nonArchived.length;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const contactedIds = new Set();
+  allOutreach.forEach(o => {
+    if (o.sent_at && new Date(o.sent_at) >= monthStart) contactedIds.add(o.prospect_id);
+  });
+  document.getElementById('kpi-contacted').textContent = contactedIds.size;
+
+  const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  const openFollowups = allOutreach.filter(o =>
+    o.status === 'sent' && !o.replied_at && o.sent_at && new Date(o.sent_at) < fiveDaysAgo
+  );
+  document.getElementById('kpi-followups').textContent = openFollowups.length;
+
+  const contracted = nonArchived.filter(p => p.status === 'contracted').length;
+  const rate = nonArchived.length > 0 ? ((contracted / nonArchived.length) * 100).toFixed(1) : '0';
+  document.getElementById('kpi-conversion').textContent = rate + '%';
+}
+
+/* ── Filters ── */
+function getFilters() {
+  return {
+    type: document.getElementById('filter-type').value,
+    focus: document.getElementById('filter-focus').value,
+    market: document.getElementById('filter-market').value,
+    status: document.getElementById('filter-status').value,
+    language: document.getElementById('filter-language').value,
+    search: document.getElementById('filter-search').value.trim().toLowerCase()
+  };
+}
+
+function applyFilters() {
+  const f = getFilters();
+  return allProspects.filter(p => {
+    if (f.type && p.company_type !== f.type) return false;
+    if (f.focus) {
+      const focuses = Array.isArray(p.business_focus) ? p.business_focus : [];
+      if (!focuses.includes(f.focus)) return false;
+    }
+    if (f.market) {
+      const markets = Array.isArray(p.primary_markets) ? p.primary_markets : [];
+      if (!markets.includes(f.market)) return false;
+    }
+    if (f.status && p.status !== f.status) return false;
+    if (f.language) {
+      const langs = Array.isArray(p.languages) ? p.languages : [];
+      if (!langs.includes(f.language)) return false;
+    }
+    if (f.search) {
+      const contacts = getProspectContacts(p.id);
+      const contactStr = contacts.map(c => `${c.first_name || ''} ${c.last_name || ''}`).join(' ').toLowerCase();
+      const hay = `${p.company_name || ''} ${contactStr}`.toLowerCase();
+      if (!hay.includes(f.search)) return false;
+    }
+    return true;
+  });
+}
+
+/* ── Table ── */
+function renderFocusPills(focuses) {
+  if (!Array.isArray(focuses) || !focuses.length) return '—';
+  const shown = focuses.slice(0, 3);
+  let html = shown.map(f => `<span class="focus-pill">${escHtml(f)}</span>`).join('');
+  if (focuses.length > 3) html += `<span class="focus-more">+${focuses.length - 3}</span>`;
+  return html;
+}
+
+function statusPillHtml(status) {
+  const cls = 'status-' + (status || 'new');
+  return `<span class="status-pill ${cls}">${escHtml(status || 'new')}</span>`;
+}
+
+function channelIconHtml(channel) {
+  const map = { 'Email': '✉', 'WhatsApp': '💬', 'Phone': '📞', 'In-person': '🤝' };
+  return `<span class="channel-icon">${map[channel] || '•'}</span>`;
+}
+
+function renderTable() {
+  const filtered = applyFilters();
+  renderKpis();
+  const tbody = document.getElementById('prospect-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;color:var(--gray-600);">No prospects match the current filters.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(p => {
+    const primary = getPrimaryContact(p.id);
+    const primaryName = primary ? `${primary.first_name || ''} ${primary.last_name || ''}`.trim() : '—';
+    const outreaches = getProspectOutreach(p.id);
+    const lastOut = outreaches.length ? outreaches.sort((a,b) => (b.sent_at||b.created_at||'').localeCompare(a.sent_at||a.created_at||''))[0] : null;
+    const lastOutStr = lastOut && lastOut.sent_at ? formatDate(lastOut.sent_at) : '—';
+    return `<tr class="prospect-row" data-id="${p.id}">
+      <td><strong>${escHtml(p.company_name)}</strong></td>
+      <td>${escHtml(p.company_type || '—')}</td>
+      <td>${renderFocusPills(p.business_focus)}</td>
+      <td>${escHtml(p.country || '—')}</td>
+      <td>${escHtml(primaryName)}</td>
+      <td>${escHtml(lastOutStr)}</td>
+      <td>${statusPillHtml(p.status)}</td>
+      <td><button class="btn" data-reach="${p.id}" onclick="event.stopPropagation();openOutreachModal('${p.id}')">Reach Out</button></td>
+    </tr>
+    <tr class="expanded-row" id="expanded-${p.id}" style="display:none;">
+      <td class="expanded-panel-cell" colspan="8">${buildExpandedPanel(p)}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.prospect-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const id = tr.dataset.id;
+      const exp = document.getElementById('expanded-' + id);
+      const isVisible = exp.style.display !== 'none';
+      document.querySelectorAll('.expanded-row').forEach(r => r.style.display = 'none');
+      if (!isVisible) {
+        exp.style.display = 'table-row';
+        exp.querySelector('.expanded-panel-cell').innerHTML = buildExpandedPanel(allProspects.find(p => p.id === id));
+      }
+    });
+  });
+}
+
+function buildExpandedPanel(p) {
+  const contacts = getProspectContacts(p.id);
+  const outreaches = getProspectOutreach(p.id).sort((a,b) => (a.sent_at||a.created_at||'').localeCompare(b.sent_at||b.created_at||''));
+
+  const profileHtml = `
+    <div class="detail-line"><strong>Type:</strong> ${escHtml(p.company_type)}</div>
+    <div class="detail-line"><strong>Size:</strong> ${escHtml(p.estimated_size || '—')}</div>
+    <div class="detail-line"><strong>Source:</strong> ${escHtml(p.source || '—')} ${p.source_detail ? '(' + escHtml(p.source_detail) + ')' : ''}</div>
+    <div class="detail-line"><strong>Website:</strong> ${p.website ? '<a href="'+escHtml(p.website)+'" target="_blank">'+escHtml(p.website)+'</a>' : '—'}</div>
+    <div class="detail-line"><strong>Country:</strong> ${escHtml(p.country || '—')}, ${escHtml(p.city || '—')}</div>
+    <div class="detail-line"><strong>Notes:</strong> ${escHtml(p.notes || '—')}</div>`;
+
+  const contactsHtml = contacts.map(c => `
+    <div class="contact-card">
+      <div class="contact-name">${escHtml(c.first_name || '')} ${escHtml(c.last_name || '')}
+        ${c.is_primary ? '<span class="primary-badge">Primary</span>' : ''}
+        <span class="lang-badge">${escHtml(c.preferred_language || '—')}</span>
+      </div>
+      <div class="contact-detail">${escHtml(c.title || '')}</div>
+      <div class="contact-detail">${escHtml(c.email || '')} ${c.phone ? '· ' + escHtml(c.phone) : ''}</div>
+      ${c.linkedin ? '<div class="contact-detail"><a href="'+escHtml(c.linkedin)+'" target="_blank">LinkedIn</a></div>' : ''}
+      <button class="btn" style="margin-top:6px;font-size:11px;" onclick="event.stopPropagation();openOutreachModal('${p.id}','${c.id}')">Reach Out</button>
+    </div>`).join('');
+
+  const outreachHtml = outreaches.length ? outreaches.map(o => `
+    <div class="outreach-item">
+      <span>${escHtml(formatDate(o.sent_at || o.created_at))}</span>
+      ${channelIconHtml(o.channel)}
+      <span class="lang-badge">${escHtml(o.language || '')}</span>
+      ${statusPillHtml(o.status)}
+      <span style="color:var(--gray-600);margin-left:4px;">${escHtml((o.body||'').slice(0,80))}</span>
+    </div>`).join('') : '<div style="color:var(--gray-400);font-size:12px;">No outreach yet.</div>';
+
+  return `<div class="expanded-panel">
+    <div class="expanded-grid">
+      <div class="expanded-section"><h4>Company Profile</h4>${profileHtml}</div>
+      <div class="expanded-section"><h4>Contacts</h4>${contactsHtml}</div>
+      <div class="expanded-section"><h4>Outreach History</h4>${outreachHtml}</div>
+    </div>
+    <div class="expanded-actions">
+      <button class="btn" onclick="event.stopPropagation();openEditProspect('${p.id}')">Edit Prospect</button>
+      <button class="btn" onclick="event.stopPropagation();openAddContactToProspect('${p.id}')">Add Contact</button>
+      <button class="btn btn-danger" onclick="event.stopPropagation();archiveProspect('${p.id}')">Archive</button>
+    </div>
+  </div>`;
+}
+
+/* ── Prospect Modal (New/Edit) ── */
+function openNewProspectModal() {
+  editingProspectId = null;
+  currentStep = 1;
+  document.getElementById('prospect-modal-title').textContent = 'New Prospect';
+  document.getElementById('prospect-form').reset();
+  document.getElementById('pf-size-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === 'Mid'));
+  document.querySelectorAll('input[name="pf-direction"]').forEach(r => r.checked = r.value === 'Outbound');
+  document.getElementById('contacts-container').innerHTML = '';
+  addContactBlock(true);
+  updateStepUI();
+  document.getElementById('prospect-modal-overlay').classList.add('open');
+}
+
+function openEditProspect(id) {
+  const p = allProspects.find(x => x.id === id);
+  if (!p) return;
+  editingProspectId = id;
+  currentStep = 1;
+  document.getElementById('prospect-modal-title').textContent = 'Edit Prospect';
+  document.getElementById('pf-company').value = p.company_name || '';
+  document.getElementById('pf-type').value = p.company_type || '';
+  document.getElementById('pf-country').value = p.country || '';
+  document.getElementById('pf-city').value = p.city || '';
+  document.getElementById('pf-website').value = p.website || '';
+  document.getElementById('pf-size-seg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === (p.estimated_size || 'Mid')));
+  document.getElementById('pf-source').value = p.source || '';
+  document.getElementById('pf-source-detail').value = p.source_detail || '';
+  document.getElementById('pf-notes').value = p.notes || '';
+
+  const focuses = Array.isArray(p.business_focus) ? p.business_focus : [];
+  document.querySelectorAll('#pf-focus input').forEach(cb => cb.checked = focuses.includes(cb.value));
+  const dir = p.direction || 'Outbound';
+  document.querySelectorAll('input[name="pf-direction"]').forEach(r => r.checked = r.value === dir);
+  const markets = Array.isArray(p.primary_markets) ? p.primary_markets : [];
+  document.querySelectorAll('#pf-markets input').forEach(cb => cb.checked = markets.includes(cb.value));
+  const langs = Array.isArray(p.languages) ? p.languages : [];
+  document.querySelectorAll('#pf-languages input').forEach(cb => cb.checked = langs.includes(cb.value));
+
+  const contacts = getProspectContacts(id);
+  const container = document.getElementById('contacts-container');
+  container.innerHTML = '';
+  contacts.forEach((c, i) => addContactBlock(i === 0 && contacts.length === 1, c));
+  if (!contacts.length) addContactBlock(true);
+
+  updateStepUI();
+  document.getElementById('prospect-modal-overlay').classList.add('open');
+}
+
+function openAddContactToProspect(prospectId) {
+  openEditProspect(prospectId);
+  currentStep = 3;
+  updateStepUI();
+  addContactBlock(false);
+}
+
+function closeProspectModal() {
+  document.getElementById('prospect-modal-overlay').classList.remove('open');
+  editingProspectId = null;
+}
+
+function updateStepUI() {
+  document.querySelectorAll('.step-content').forEach((el, i) => el.classList.toggle('active', i + 1 === currentStep));
+  document.querySelectorAll('.step-dot').forEach((el, i) => {
+    el.classList.toggle('active', i + 1 === currentStep);
+    el.classList.toggle('done', i + 1 < currentStep);
+  });
+  document.getElementById('btn-step-prev').style.display = currentStep > 1 ? '' : 'none';
+  document.getElementById('btn-step-next').style.display = currentStep < 3 ? '' : 'none';
+  document.getElementById('btn-prospect-save').style.display = currentStep === 3 ? '' : 'none';
+}
+
+function addContactBlock(isPrimary, data) {
+  const container = document.getElementById('contacts-container');
+  const idx = container.children.length;
+  const existingId = data ? data.id : '';
+  const div = document.createElement('div');
+  div.className = 'contact-form-block';
+  div.dataset.contactId = existingId;
+  div.innerHTML = `
+    <button type="button" class="remove-contact" onclick="removeContactBlock(this)" title="Remove contact">&times;</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><label class="field-label">First Name</label><input class="input cf-first" type="text" value="${escHtml(data?.first_name||'')}"></div>
+      <div><label class="field-label">Last Name</label><input class="input cf-last" type="text" value="${escHtml(data?.last_name||'')}"></div>
+    </div>
+    <label class="field-label">Title</label><input class="input cf-title" type="text" value="${escHtml(data?.title||'')}">
+    <label class="field-label">Email</label><input class="input cf-email" type="email" value="${escHtml(data?.email||'')}">
+    <label class="field-label">Phone</label><input class="input cf-phone" type="text" value="${escHtml(data?.phone||'')}">
+    <label class="field-label">LinkedIn</label><input class="input cf-linkedin" type="text" value="${escHtml(data?.linkedin||'')}">
+    <label class="field-label">Preferred Language</label>
+    <select class="select-input cf-lang"><option value="FR" ${(data?.preferred_language||'FR')==='FR'?'selected':''}>FR</option><option value="EN" ${data?.preferred_language==='EN'?'selected':''}>EN</option><option value="AR" ${data?.preferred_language==='AR'?'selected':''}>AR</option></select>
+    <div style="margin-top:6px;">
+      <label style="font-size:12px;cursor:pointer;"><input type="radio" name="primary-contact" class="cf-primary" ${(data?.is_primary || isPrimary) ? 'checked' : ''}> Set as primary</label>
+    </div>`;
+  container.appendChild(div);
+}
+
+function removeContactBlock(btn) {
+  const block = btn.closest('.contact-form-block');
+  const container = document.getElementById('contacts-container');
+  if (container.children.length <= 1) {
+    alert('Cannot delete the only contact. At least one contact is required.');
+    return;
+  }
+  const contactId = block.dataset.contactId;
+  if (contactId && editingProspectId) {
+    if (!confirm('Delete this contact permanently?')) return;
+    deleteContact(contactId);
+  }
+  block.remove();
+  if (!container.querySelector('.cf-primary:checked') && container.children.length) {
+    container.children[0].querySelector('.cf-primary').checked = true;
+  }
+}
+
+async function deleteContact(contactId) {
+  try {
+    await supabaseClient.from('prospect_contacts').delete().eq('id', contactId);
+    allContacts = allContacts.filter(c => c.id !== contactId);
+  } catch (e) { console.error(e); }
+}
+
+function getContactsFromForm() {
+  const blocks = document.querySelectorAll('.contact-form-block');
+  const contacts = [];
+  blocks.forEach(block => {
+    contacts.push({
+      id: block.dataset.contactId || null,
+      first_name: block.querySelector('.cf-first').value.trim(),
+      last_name: block.querySelector('.cf-last').value.trim(),
+      title: block.querySelector('.cf-title').value.trim(),
+      email: block.querySelector('.cf-email').value.trim(),
+      phone: block.querySelector('.cf-phone').value.trim(),
+      linkedin: block.querySelector('.cf-linkedin').value.trim(),
+      preferred_language: block.querySelector('.cf-lang').value,
+      is_primary: block.querySelector('.cf-primary').checked
+    });
+  });
+  return contacts;
+}
+
+async function saveProspect() {
+  const company = document.getElementById('pf-company').value.trim();
+  const companyType = document.getElementById('pf-type').value;
+  if (!company || !companyType) { alert('Company name and type are required.'); currentStep = 1; updateStepUI(); return; }
+
+  const contacts = getContactsFromForm();
+  if (!contacts.length || !contacts.some(c => c.first_name || c.last_name)) {
+    alert('At least one contact with a name is required.');
+    return;
+  }
+
+  const sizeBtn = document.querySelector('#pf-size-seg button.active');
+  const focuses = [...document.querySelectorAll('#pf-focus input:checked')].map(cb => cb.value);
+  const direction = document.querySelector('input[name="pf-direction"]:checked')?.value || 'Outbound';
+  const markets = [...document.querySelectorAll('#pf-markets input:checked')].map(cb => cb.value);
+  const languages = [...document.querySelectorAll('#pf-languages input:checked')].map(cb => cb.value);
+
+  const prospectData = {
+    hotel_code: hotelCode,
+    company_name: company,
+    company_type: companyType,
+    country: document.getElementById('pf-country').value.trim() || null,
+    city: document.getElementById('pf-city').value.trim() || null,
+    website: document.getElementById('pf-website').value.trim() || null,
+    estimated_size: sizeBtn ? sizeBtn.dataset.val : 'Mid',
+    source: document.getElementById('pf-source').value || null,
+    source_detail: document.getElementById('pf-source-detail').value.trim() || null,
+    notes: document.getElementById('pf-notes').value.trim() || null,
+    business_focus: focuses,
+    direction: direction,
+    primary_markets: markets,
+    languages: languages,
+    updated_at: new Date().toISOString()
+  };
+
+  const saveBtn = document.getElementById('btn-prospect-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  try {
+    let prospectId = editingProspectId;
+    if (editingProspectId) {
+      const { error } = await supabaseClient.from('prospects').update(prospectData).eq('id', editingProspectId);
+      if (error) throw error;
+    } else {
+      prospectData.status = 'new';
+      prospectData.created_by = currentUserEmail;
+      const { data, error } = await supabaseClient.from('prospects').insert(prospectData).select('id').single();
+      if (error) throw error;
+      prospectId = data.id;
+    }
+
+    for (const c of contacts) {
+      const contactPayload = {
+        prospect_id: prospectId,
+        first_name: c.first_name || null,
+        last_name: c.last_name || null,
+        title: c.title || null,
+        email: c.email || null,
+        phone: c.phone || null,
+        linkedin: c.linkedin || null,
+        preferred_language: c.preferred_language || 'FR',
+        is_primary: c.is_primary
+      };
+      if (c.id) {
+        await supabaseClient.from('prospect_contacts').update(contactPayload).eq('id', c.id);
+      } else {
+        await supabaseClient.from('prospect_contacts').insert(contactPayload);
+      }
+    }
+
+    closeProspectModal();
+    await refreshData();
+  } catch (err) {
+    showError('Could not save prospect. Please try again.');
+    console.error(err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Prospect';
+  }
+}
+
+async function archiveProspect(id) {
+  if (!confirm('Archive this prospect? This will hide it from the main view.')) return;
+  try {
+    const { error } = await supabaseClient.from('prospects').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    await refreshData();
+  } catch (e) {
+    showError('Could not archive prospect.');
+    console.error(e);
+  }
+}
+
+/* ── Outreach Modal ── */
+function openOutreachModal(prospectId, contactId) {
+  const p = allProspects.find(x => x.id === prospectId);
+  if (!p) return;
+  outreachProspectId = prospectId;
+  outreachContactId = contactId || null;
+
+  document.getElementById('or-company').value = p.company_name;
+  const contacts = getProspectContacts(prospectId);
+  const sel = document.getElementById('or-contact');
+  sel.innerHTML = contacts.map(c =>
+    `<option value="${c.id}">${escHtml(c.first_name||'')} ${escHtml(c.last_name||'')} — ${escHtml(c.title||'')} [${escHtml(c.preferred_language||'')}]</option>`
+  ).join('');
+  if (contactId) sel.value = contactId;
+  else if (contacts.length) sel.value = contacts.find(c=>c.is_primary)?.id || contacts[0].id;
+
+  document.getElementById('or-channel').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.ch === 'Email'));
+  document.getElementById('or-language').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.lang === 'FR'));
+  document.getElementById('or-subject').value = '';
+  document.getElementById('or-body').value = '';
+  document.getElementById('or-body').removeAttribute('dir');
+  document.getElementById('or-ai-toggle').checked = false;
+  document.getElementById('or-ai-warning').style.display = 'none';
+  document.getElementById('or-template').value = '';
+  populateTemplateDropdown();
+  document.getElementById('outreach-modal-overlay').classList.add('open');
+}
+
+function closeOutreachModal() {
+  document.getElementById('outreach-modal-overlay').classList.remove('open');
+  outreachProspectId = null;
+  outreachContactId = null;
+}
+
+function populateTemplateDropdown() {
+  const lang = document.querySelector('#or-language button.active')?.dataset.lang || 'FR';
+  const sel = document.getElementById('or-template');
+  const filtered = allTemplates.filter(t => t.language === lang);
+  const categories = ['First Contact','Follow-up','Seasonal','Commercial','Re-engagement','Administrative'];
+  let opts = '<option value="">— Select template —</option>';
+  categories.forEach(cat => {
+    const catTemplates = filtered.filter(t => t.category === cat);
+    if (catTemplates.length) {
+      opts += `<optgroup label="${escHtml(cat)}">`;
+      catTemplates.forEach(t => { opts += `<option value="${t.id}">${escHtml(t.name)}</option>`; });
+      opts += '</optgroup>';
+    }
+  });
+  sel.innerHTML = opts;
+}
+
+function getSelectedChannel() {
+  return document.querySelector('#or-channel button.active')?.dataset.ch || 'Email';
+}
+
+function getSelectedLang() {
+  return document.querySelector('#or-language button.active')?.dataset.lang || 'FR';
+}
+
+function resolveMergeFields(text) {
+  const p = allProspects.find(x => x.id === outreachProspectId);
+  const contactId = document.getElementById('or-contact').value;
+  const contact = allContacts.find(c => c.id === contactId);
+  const hotelName = localStorage.getItem('hotelName') || hotelCode;
+  const senderName = currentUserEmail ? currentUserEmail.split('@')[0] : '';
+  const year = new Date().getFullYear().toString();
+
+  let result = text;
+  result = result.replace(/\{\{contact_name\}\}/g, contact?.first_name || '');
+  result = result.replace(/\{\{company_name\}\}/g, p?.company_name || '');
+  result = result.replace(/\{\{hotel_name\}\}/g, hotelName);
+  result = result.replace(/\{\{sender_name\}\}/g, senderName);
+  result = result.replace(/\{\{year\}\}/g, year);
+  result = result.replace(/\{\{ai_context\}\}/g, '');
+  return result;
+}
+
+async function applyAiContext() {
+  const aiOn = document.getElementById('or-ai-toggle').checked;
+  const bodyEl = document.getElementById('or-body');
+  let body = bodyEl.value;
+
+  if (!aiOn) {
+    body = body.replace(/Note:.*?window\..*$/m, '').trim();
+    bodyEl.value = body.replace(/\{\{ai_context\}\}/g, '');
+    document.getElementById('or-ai-warning').style.display = 'none';
+    return;
+  }
+
+  try {
+    if (!engineCache) {
+      const { data, error } = await supabaseClient
+        .from('engine_outputs')
+        .select('engine_json')
+        .eq('hotel_code', hotelCode)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (error || !data) throw new Error('No engine data');
+      engineCache = typeof data.engine_json === 'string' ? JSON.parse(data.engine_json) : data.engine_json;
+    }
+
+    const synthesis = engineCache.cross_segment_synthesis?.summary || '';
+    const fgIssues = engineCache.forecast_gap_issues || [];
+    let topGap = null;
+    let topWindow = '';
+    fgIssues.forEach(issue => {
+      const gap = Number(issue.revenue_gap);
+      if (Number.isFinite(gap) && (!topGap || gap > topGap)) {
+        topGap = gap;
+        topWindow = issue.window_label || issue.window || '';
+      }
+    });
+
+    if (topGap === null) throw new Error('No gap data');
+    const hotelName = localStorage.getItem('hotelName') || hotelCode;
+    const synLine = synthesis ? ' ' + synthesis.split('.')[0] + '.' : '';
+    const aiContext = `Note: ${hotelName} currently shows a forward revenue gap of €${Math.round(topGap).toLocaleString()} in the ${topWindow} window.${synLine}`;
+    bodyEl.value = body.replace(/\{\{ai_context\}\}/g, aiContext) || body + '\n\n' + aiContext;
+    document.getElementById('or-ai-warning').style.display = 'none';
+  } catch (e) {
+    bodyEl.value = body.replace(/\{\{ai_context\}\}/g, '');
+    document.getElementById('or-ai-warning').textContent = 'Engine data not available — AI context skipped';
+    document.getElementById('or-ai-warning').style.display = 'block';
+  }
+}
+
+async function logOutreach(status) {
+  const contactId = document.getElementById('or-contact').value;
+  const channel = getSelectedChannel();
+  const language = getSelectedLang();
+  const templateId = document.getElementById('or-template').value;
+  const tpl = allTemplates.find(t => t.id === templateId);
+  const subject = document.getElementById('or-subject').value.trim();
+  const body = document.getElementById('or-body').value.trim();
+  const aiAssisted = document.getElementById('or-ai-toggle').checked;
+
+  const payload = {
+    prospect_id: outreachProspectId,
+    contact_id: contactId || null,
+    hotel_code: hotelCode,
+    channel: channel,
+    template_category: tpl?.category || null,
+    template_name: tpl?.name || null,
+    language: language,
+    subject: subject,
+    body: body,
+    ai_assisted: aiAssisted,
+    status: status,
+    sent_at: status === 'sent' ? new Date().toISOString() : null,
+    created_by: currentUserEmail
+  };
+
+  try {
+    const { error } = await supabaseClient.from('prospect_outreach').insert(payload);
+    if (error) throw error;
+
+    if (status === 'sent') {
+      const prospect = allProspects.find(p => p.id === outreachProspectId);
+      if (prospect && prospect.status === 'new') {
+        await supabaseClient.from('prospects').update({ status: 'contacted', updated_at: new Date().toISOString() }).eq('id', outreachProspectId);
+      }
+    }
+
+    closeOutreachModal();
+    await refreshData();
+  } catch (err) {
+    showError('Could not save outreach. Please try again.');
+    console.error(err);
+  }
+}
+
+/* ── Templates Tab ── */
+function renderTemplatesTab() {
+  const categories = ['First Contact','Follow-up','Seasonal','Commercial','Re-engagement','Administrative'];
+  const catEl = document.getElementById('template-categories');
+  catEl.innerHTML = categories.map(cat => {
+    const count = allTemplates.filter(t => t.category === cat).length;
+    return `<div class="cat-item ${cat === activeTemplateCategory ? 'active' : ''}" data-cat="${escHtml(cat)}">
+      <span>${escHtml(cat)}</span><span class="cat-badge">${count}</span>
+    </div>`;
+  }).join('');
+  catEl.querySelectorAll('.cat-item').forEach(el => {
+    el.addEventListener('click', () => {
+      activeTemplateCategory = el.dataset.cat;
+      renderTemplatesTab();
+    });
+  });
+
+  const contentEl = document.getElementById('template-content');
+  const catTemplates = allTemplates.filter(t => t.category === activeTemplateCategory);
+  if (!catTemplates.length) {
+    contentEl.innerHTML = '<div style="color:var(--gray-400);padding:20px;">No templates in this category.</div>';
+    return;
+  }
+  contentEl.innerHTML = catTemplates.map(t => {
+    const isGlobal = !t.hotel_code;
+    const badge = isGlobal ? '<span class="global-badge">Global</span>' : '<span class="custom-badge">Custom</span>';
+    return `<div class="template-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="tpl-name">${escHtml(t.name)} <span class="lang-badge">${escHtml(t.language)}</span> ${badge}</div>
+        <div style="display:flex;gap:6px;">
+          ${!isGlobal ? `<button class="btn" style="font-size:11px;" onclick="openEditTemplate('${t.id}')">Edit</button>
+          <button class="btn btn-danger" style="font-size:11px;" onclick="deleteTemplate('${t.id}')">Delete</button>` : ''}
+        </div>
+      </div>
+      ${t.subject ? '<div class="tpl-preview"><strong>Subject:</strong> '+escHtml(t.subject)+'</div>' : ''}
+      <div class="tpl-preview">${escHtml((t.body||'').slice(0, 120))}${(t.body||'').length > 120 ? '…' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+function openNewTemplateModal() {
+  editingTemplateId = null;
+  document.getElementById('tpl-modal-title').textContent = 'Add Template';
+  document.getElementById('template-form').reset();
+  document.getElementById('template-modal-overlay').classList.add('open');
+}
+
+function openEditTemplate(id) {
+  const t = allTemplates.find(x => x.id === id);
+  if (!t) return;
+  editingTemplateId = id;
+  document.getElementById('tpl-modal-title').textContent = 'Edit Template';
+  document.getElementById('tpl-category').value = t.category;
+  document.getElementById('tpl-name').value = t.name;
+  document.getElementById('tpl-language').value = t.language;
+  document.getElementById('tpl-subject').value = t.subject || '';
+  document.getElementById('tpl-body').value = t.body || '';
+  document.getElementById('template-modal-overlay').classList.add('open');
+}
+
+function closeTemplateModal() {
+  document.getElementById('template-modal-overlay').classList.remove('open');
+  editingTemplateId = null;
+}
+
+async function saveTemplate() {
+  const name = document.getElementById('tpl-name').value.trim();
+  if (!name) { alert('Template name is required.'); return; }
+
+  const payload = {
+    hotel_code: hotelCode,
+    category: document.getElementById('tpl-category').value,
+    name: name,
+    language: document.getElementById('tpl-language').value,
+    subject: document.getElementById('tpl-subject').value.trim() || null,
+    body: document.getElementById('tpl-body').value.trim() || null
+  };
+
+  try {
+    if (editingTemplateId) {
+      const { error } = await supabaseClient.from('prospect_templates').update(payload).eq('id', editingTemplateId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseClient.from('prospect_templates').insert(payload);
+      if (error) throw error;
+    }
+    closeTemplateModal();
+    await loadTemplates();
+    renderTemplatesTab();
+  } catch (err) {
+    showError('Could not save template.');
+    console.error(err);
+  }
+}
+
+async function deleteTemplate(id) {
+  const t = allTemplates.find(x => x.id === id);
+  if (!t) return;
+  if (!t.hotel_code) { alert('Cannot delete global templates.'); return; }
+  const sameCatLang = allTemplates.filter(x => x.category === t.category && x.language === t.language);
+  if (sameCatLang.length <= 1) { alert('Cannot delete the only template in this language/category.'); return; }
+  if (!confirm('Delete this template?')) return;
+  try {
+    const { error } = await supabaseClient.from('prospect_templates').delete().eq('id', id);
+    if (error) throw error;
+    await loadTemplates();
+    renderTemplatesTab();
+  } catch (e) {
+    showError('Could not delete template.');
+  }
+}
+
+/* ── Data Loading ── */
+async function loadProspects() {
+  const { data, error } = await supabaseClient
+    .from('prospects')
+    .select('*')
+    .eq('hotel_code', hotelCode);
+  if (error) throw error;
+  allProspects = data || [];
+}
+
+async function loadContacts() {
+  const { data, error } = await supabaseClient
+    .from('prospect_contacts')
+    .select('*');
+  if (error) throw error;
+  allContacts = (data || []).filter(c => allProspects.some(p => p.id === c.prospect_id));
+}
+
+async function loadOutreach() {
+  const { data, error } = await supabaseClient
+    .from('prospect_outreach')
+    .select('*')
+    .eq('hotel_code', hotelCode);
+  if (error) throw error;
+  allOutreach = data || [];
+}
+
+async function loadTemplates() {
+  const { data, error } = await supabaseClient
+    .from('prospect_templates')
+    .select('*')
+    .or(`hotel_code.eq.${hotelCode},hotel_code.is.null`);
+  if (error) throw error;
+  allTemplates = data || [];
+}
+
+async function refreshData() {
+  try {
+    await loadProspects();
+    await loadContacts();
+    await loadOutreach();
+    renderTable();
+    renderKpis();
+    if (activeTab === 'templates') renderTemplatesTab();
+  } catch (err) {
+    console.error(err);
+    showError('Could not refresh data.');
+  }
+}
+
+async function initApp() {
+  setStateView('loading');
+  try {
+    hotelCode = localStorage.getItem('hotelCode') || '';
+    document.getElementById('sidebar-hotel').textContent = hotelCode || 'Hotel';
+    await loadProspects();
+    await loadContacts();
+    await loadOutreach();
+    await loadTemplates();
+    renderTable();
+    renderKpis();
+    renderTemplatesTab();
+    setStateView('dashboard');
+  } catch (err) {
+    console.error(err);
+    setStateView('error');
+  }
+}
+
+function setStateView(view) {
+  ['loading', 'error'].forEach(k => document.getElementById(`${k}-state`).classList.remove('visible'));
+  document.getElementById('dashboard').style.display = view === 'dashboard' ? 'block' : 'none';
+  if (view !== 'dashboard') document.getElementById(`${view}-state`).classList.add('visible');
+}
+
+/* ── Auth ── */
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  errorEl.style.display = 'none';
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    currentUserEmail = data.session.user.email;
+    showApp(currentUserEmail);
+    initApp();
+  } catch (err) {
+    errorEl.textContent = 'Incorrect email or password.';
+    errorEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+  }
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+}
+
+function showApp(email) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = email;
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  currentUserEmail = '';
+  showLogin();
+}
+
+/* ── Event Listeners ── */
+document.getElementById('btn-add-prospect').addEventListener('click', openNewProspectModal);
+document.getElementById('btn-add-contact').addEventListener('click', () => addContactBlock(false));
+document.getElementById('btn-step-next').addEventListener('click', () => {
+  if (currentStep === 1) {
+    if (!document.getElementById('pf-company').value.trim() || !document.getElementById('pf-type').value) {
+      alert('Company name and type are required.'); return;
+    }
+  }
+  currentStep = Math.min(3, currentStep + 1);
+  updateStepUI();
+});
+document.getElementById('btn-step-prev').addEventListener('click', () => {
+  currentStep = Math.max(1, currentStep - 1);
+  updateStepUI();
+});
+document.getElementById('btn-prospect-save').addEventListener('click', saveProspect);
+
+document.getElementById('pf-size-seg').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.getElementById('pf-size-seg').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
+    document.getElementById('tab-prospects').style.display = activeTab === 'prospects' ? '' : 'none';
+    document.getElementById('tab-templates').style.display = activeTab === 'templates' ? '' : 'none';
+    if (activeTab === 'templates') renderTemplatesTab();
+  });
+});
+
+document.getElementById('or-channel').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.getElementById('or-channel').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+document.getElementById('or-language').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.getElementById('or-language').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  populateTemplateDropdown();
+  const lang = btn.dataset.lang;
+  const bodyEl = document.getElementById('or-body');
+  if (lang === 'AR') {
+    bodyEl.setAttribute('dir', 'rtl');
+  } else {
+    bodyEl.removeAttribute('dir');
+  }
+});
+
+document.getElementById('or-template').addEventListener('change', () => {
+  const tplId = document.getElementById('or-template').value;
+  if (!tplId) return;
+  const tpl = allTemplates.find(t => t.id === tplId);
+  if (!tpl) return;
+  const subject = resolveMergeFields(tpl.subject || '');
+  const body = resolveMergeFields(tpl.body || '');
+  document.getElementById('or-subject').value = subject;
+  document.getElementById('or-body').value = body;
+  if (document.getElementById('or-ai-toggle').checked) applyAiContext();
+});
+
+document.getElementById('or-ai-toggle').addEventListener('change', applyAiContext);
+
+document.getElementById('or-copy').addEventListener('click', () => {
+  const subject = document.getElementById('or-subject').value;
+  const body = document.getElementById('or-body').value;
+  navigator.clipboard.writeText((subject ? 'Subject: ' + subject + '\n\n' : '') + body);
+  const msg = document.getElementById('or-copied');
+  msg.style.display = 'inline';
+  setTimeout(() => { msg.style.display = 'none'; }, 2000);
+});
+
+document.getElementById('or-send').addEventListener('click', () => logOutreach('sent'));
+document.getElementById('or-draft').addEventListener('click', () => logOutreach('draft'));
+
+document.getElementById('btn-add-template').addEventListener('click', openNewTemplateModal);
+document.getElementById('btn-tpl-save').addEventListener('click', saveTemplate);
+
+document.querySelectorAll('.merge-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const field = chip.dataset.field;
+    const bodyEl = document.getElementById('tpl-body');
+    const start = bodyEl.selectionStart;
+    const end = bodyEl.selectionEnd;
+    const val = bodyEl.value;
+    bodyEl.value = val.slice(0, start) + field + val.slice(end);
+    bodyEl.selectionStart = bodyEl.selectionEnd = start + field.length;
+    bodyEl.focus();
+  });
+});
+
+['filter-type','filter-focus','filter-market','filter-status','filter-language'].forEach(id => {
+  document.getElementById(id).addEventListener('change', renderTable);
+});
+document.getElementById('filter-search').addEventListener('input', renderTable);
+
+/* ── Init ── */
+(async () => {
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) { showLogin(); return; }
+  currentUserEmail = user.email;
+  showApp(user.email);
+  initApp();
+})();
+</script>
+</body>
+</html>
