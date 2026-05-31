@@ -303,7 +303,7 @@ function detectAvailableModules(engineJson) {
       supportsChart: true,
       supportsTable: true,
       defaultFormat: 'chart',
-      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'pms_pace'))
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'weekly_pickup_delta'))
     },
     {
       id: 'revenue_exposure',
@@ -313,7 +313,7 @@ function detectAvailableModules(engineJson) {
       supportsChart: false,
       supportsTable: true,
       defaultFormat: 'table',
-      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'forecast_gap'))
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'cross_segment_synthesis'))
     },
     {
       id: 'corporate_at_risk',
@@ -333,7 +333,7 @@ function detectAvailableModules(engineJson) {
       supportsChart: false,
       supportsTable: true,
       defaultFormat: 'table',
-      available: !!(engineJson.corporate_account_pace_issues && engineJson.corporate_account_pace_issues.length > 0 && engineJson.corporate_account_pace_issues[0].accounts_ahead && engineJson.corporate_account_pace_issues[0].accounts_ahead.length > 0)
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'corporate_pace_opportunity'))
     },
     {
       id: 'financial_impact',
@@ -353,7 +353,7 @@ function detectAvailableModules(engineJson) {
       supportsChart: false,
       supportsTable: false,
       defaultFormat: 'table',
-      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'causal_chain'))
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'causal_chain_synthesis'))
     }
   ];
 
