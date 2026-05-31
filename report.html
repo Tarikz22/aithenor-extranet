@@ -784,7 +784,8 @@ function buildCustomSectionFromParsed(parsed) {
     type: parsed.type === 'chart' ? 'chart' : 'table',
     chartConfig: parsed.chartConfig || null,
     tableData: parsed.tableData || { headers: [], rows: [] },
-    narrative: parsed.narrative || ''
+    narrative: parsed.narrative || '',
+    query: ''
   };
 }
 
@@ -836,7 +837,77 @@ function removeCustomSection(sectionId) {
   customSections = customSections.filter(s => s.id !== sectionId);
   const el = document.querySelector(`.rb-custom-section[data-custom-id="${sectionId}"]`);
   if (el) el.remove();
+  refreshQueuedCustomCardsInGrid();
+  syncContinueButtonIfVisible();
 }
+
+function truncateCustomQuery(query, maxLen = 60) {
+  const text = String(query || '');
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + '...';
+}
+
+function buildQueuedCustomCardHtml(index, sec) {
+  const queryPreview = truncateCustomQuery(sec.query || '');
+  return `<div class="module-card custom-queued-card" data-custom-index="${index}"
+    style="padding:14px; border-radius:8px; border:0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); position:relative;">
+    <div style="display:flex; align-items:flex-start; gap:10px;">
+      <span style="font-size:16px;">✦</span>
+      <div style="flex:1;">
+        <div style="font-size:14px; font-weight:500; color:var(--color-text-primary); margin-bottom:2px;">
+          ${rbEscHtml(sec.title)}
+        </div>
+        <div style="font-size:12px; color:var(--color-text-secondary);">
+          ${rbEscHtml(queryPreview)}
+        </div>
+        <div style="margin-top:6px;">
+          <span style="font-size:11px; font-weight:500; padding:2px 8px; border-radius:999px; background:#fef3c7; color:#92400e; letter-spacing:0.06em;">CUSTOM</span>
+        </div>
+      </div>
+      <button type="button" onclick="removeQueuedCustomSection(${index})"
+        style="background:none; border:none; color:var(--color-text-tertiary); cursor:pointer; font-size:16px; padding:0; line-height:1;">✕</button>
+    </div>
+  </div>`;
+}
+
+function refreshQueuedCustomCardsInGrid() {
+  const grid = document.getElementById('rb-module-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.custom-queued-card').forEach(el => el.remove());
+  customSections.forEach((sec, index) => {
+    grid.insertAdjacentHTML('beforeend', buildQueuedCustomCardHtml(index, sec));
+  });
+}
+
+function appendQueuedCustomCardToGrid(sec) {
+  const grid = document.getElementById('rb-module-grid');
+  if (!grid) return;
+  const index = customSections.indexOf(sec);
+  if (index === -1) return;
+  grid.insertAdjacentHTML('beforeend', buildQueuedCustomCardHtml(index, sec));
+}
+
+function removeQueuedCustomSection(index) {
+  if (index < 0 || index >= customSections.length) return;
+  customSections.splice(index, 1);
+  refreshQueuedCustomCardsInGrid();
+  syncContinueButtonIfVisible();
+  const errEl = document.getElementById('rb-step-error');
+  if (errEl && canContinueReport()) errEl.style.display = 'none';
+}
+
+function canContinueReport() {
+  const hasStandardModule = Object.values(selectedModules).some(m => m.selected);
+  const hasCustomSection = customSections.length > 0;
+  return hasStandardModule || hasCustomSection;
+}
+
+function syncContinueButtonIfVisible() {
+  const btn = document.getElementById('rb-continue-btn');
+  if (btn) btn.disabled = !canContinueReport();
+}
+
+window.removeQueuedCustomSection = removeQueuedCustomSection;
 
 function initSingleCustomSectionChart(sec) {
   if (typeof Chart === 'undefined') return;
@@ -962,11 +1033,15 @@ async function handleCustomSectionGenerate() {
   }
   try {
     const sec = await generateCustomSectionFromQuery(userQuery);
+    sec.query = userQuery;
     customSections.push(sec);
     const onCanvas = !!document.getElementById('rb-report-canvas');
     if (onCanvas) {
       appendCustomSectionToCanvas(sec);
       showCustomToast();
+    } else {
+      appendQueuedCustomCardToGrid(sec);
+      syncContinueButtonIfVisible();
     }
     if (statusEl) {
       statusEl.style.color = 'var(--green)';
@@ -1067,7 +1142,7 @@ Rules:
       }
     });
     const continueBtn = document.getElementById('rb-continue-btn');
-    if (continueBtn) continueBtn.disabled = selectedCount === 0;
+    if (continueBtn) continueBtn.disabled = !canContinueReport();
     const errEl = document.getElementById('rb-step-error');
     if (errEl && selectedCount > 0) errEl.style.display = 'none';
   } catch (err) {
@@ -1548,6 +1623,14 @@ function initReportCharts() {
   }
 }
 
+function buildCustomLayoutRowHtml(sec) {
+  return `<div class="layout-row rb-custom-layout-row" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; border:0.5px solid var(--color-border-tertiary); background:var(--color-background-primary);">
+    <span style="color:var(--color-text-tertiary); font-size:18px;">⠿</span>
+    <span style="flex:1; font-size:14px; font-weight:500; color:var(--color-text-primary);">${rbEscHtml(sec.title)}</span>
+    <span style="font-size:11px; font-weight:500; padding:2px 8px; border-radius:999px; background:#fef3c7; color:#92400e;">CUSTOM</span>
+  </div>`;
+}
+
 function renderLayoutConfig() {
   const selectedIds = (window._modules || [])
     .filter(m => selectedModules[m.id]?.selected)
@@ -1577,7 +1660,7 @@ function renderLayoutConfig() {
           <button type="button" class="rb-order-arrow" data-dir="down" data-idx="${idx}"${idx === moduleOrder.length - 1 ? ' disabled' : ''}>↓</button>
         </div>
       </div>`;
-    }).join('');
+    }).join('') + customSections.map(sec => buildCustomLayoutRowHtml(sec)).join('');
     bindOrderEvents();
   }
 
@@ -2224,8 +2307,9 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
       </div>
 
       <div class="rb-section-label">Select modules</div>
-      <div class="rb-module-grid">
+      <div class="rb-module-grid" id="rb-module-grid">
         ${availableModules.map(moduleCardHtml).join('')}
+        ${customSections.map((sec, index) => buildQueuedCustomCardHtml(index, sec)).join('')}
       </div>
 
       <button type="button" id="rb-add-custom-step1" class="rb-export-btn rb-add-custom-btn">+ Add Custom Section</button>
@@ -2250,8 +2334,7 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
   }
 
   function syncContinueButton() {
-    const btn = document.getElementById('rb-continue-btn');
-    if (btn) btn.disabled = selectedModuleCount() === 0;
+    syncContinueButtonIfVisible();
   }
 
   function toggleModule(modId) {
@@ -2260,7 +2343,7 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
     syncModuleCard(modId);
     syncContinueButton();
     const errEl = document.getElementById('rb-step-error');
-    if (errEl && selectedModuleCount() > 0) errEl.style.display = 'none';
+    if (errEl && canContinueReport()) errEl.style.display = 'none';
   }
 
   container.querySelectorAll('.rb-audience-card').forEach(card => {
@@ -2306,7 +2389,9 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
 
   document.getElementById('rb-continue-btn').addEventListener('click', () => {
     const errEl = document.getElementById('rb-step-error');
-    if (selectedModuleCount() === 0) {
+    const hasStandardModule = Object.values(selectedModules).some(m => m.selected);
+    const hasCustomSection = customSections.length > 0;
+    if (!hasStandardModule && !hasCustomSection) {
       errEl.textContent = 'Please select at least one module to continue.';
       errEl.style.display = 'block';
       return;
