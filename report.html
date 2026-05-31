@@ -231,6 +231,53 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   border: 1px solid var(--navy); background: var(--color-background-primary); color: var(--navy);
 }
 .rb-export-btn:hover { background: var(--gold-pale); }
+.rb-add-custom-btn { margin-bottom: 16px; }
+.rb-describe-block { margin-bottom: 24px; }
+.rb-describe-row { display: flex; gap: 8px; align-items: stretch; }
+.rb-describe-input {
+  flex: 1; padding: 10px 12px; border-radius: 8px; border: 0.5px solid var(--color-border-tertiary);
+  font-size: 13px; resize: vertical; min-height: 60px; font-family: inherit; color: var(--color-text-primary);
+}
+.rb-describe-btn {
+  padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none;
+  background: var(--navy); color: var(--white); cursor: pointer; font-family: inherit; white-space: nowrap;
+  align-self: flex-start;
+}
+.rb-describe-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.rb-describe-confirm { font-size: 12px; color: var(--green); margin-top: 8px; }
+.rb-custom-badge {
+  display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  padding: 3px 8px; border-radius: 999px; background: var(--gold-pale); color: var(--navy); border: 1px solid var(--gold);
+}
+.rb-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.rb-custom-remove { font-size: 12px; color: var(--color-text-tertiary); text-decoration: none; }
+.rb-custom-remove:hover { color: var(--red); }
+.rb-modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(15,31,61,0.45); z-index: 200;
+  align-items: center; justify-content: center; padding: 24px;
+}
+.rb-modal-overlay.visible { display: flex; }
+.rb-modal {
+  width: 100%; max-width: 520px; background: var(--color-background-primary);
+  border-radius: 12px; padding: 24px; box-shadow: 0 24px 60px rgba(15,31,61,0.2);
+}
+.rb-modal h3 { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+.rb-modal-sub { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 16px; }
+.rb-modal textarea {
+  width: 100%; min-height: 100px; padding: 10px 12px; border-radius: 8px;
+  border: 0.5px solid var(--color-border-tertiary); font-size: 13px; font-family: inherit; resize: vertical;
+}
+.rb-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+.rb-modal-generate {
+  flex: 1; padding: 12px; border-radius: 8px; border: none; background: var(--navy);
+  color: var(--white); font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.rb-modal-cancel {
+  padding: 12px 16px; border-radius: 8px; border: 1px solid var(--navy); background: var(--color-background-primary);
+  color: var(--navy); cursor: pointer; font-family: inherit;
+}
+.rb-modal-loading { display: none; text-align: center; padding: 20px; color: var(--color-text-secondary); font-size: 13px; }
+.rb-modal-error { color: var(--red); font-size: 12px; margin-top: 10px; display: none; }
 .rb-report-canvas {
   max-width: 900px; margin: 0 auto; background: var(--color-background-primary);
   box-shadow: 0 4px 24px rgba(15,31,61,0.08); padding: 32px 36px;
@@ -405,6 +452,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   </div>
 </div>
 
+<div class="rb-modal-overlay" id="rb-custom-modal">
+  <div class="rb-modal">
+    <h3>Add Custom Analysis</h3>
+    <p class="rb-modal-sub">Ask anything calculable from your hotel data</p>
+    <div id="rb-modal-form">
+      <textarea id="rb-custom-query" placeholder="e.g. Weekend vs weekday RevPAR trend, Average occupancy on Wednesdays, ADR by segment for April..."></textarea>
+      <div class="rb-modal-error" id="rb-custom-modal-error"></div>
+      <div class="rb-modal-actions">
+        <button type="button" class="rb-modal-generate" id="rb-custom-generate-btn">Generate Section</button>
+        <button type="button" class="rb-modal-cancel" id="rb-custom-cancel-btn">Cancel</button>
+      </div>
+    </div>
+    <div class="rb-modal-loading" id="rb-custom-modal-loading">Aithenor is calculating...</div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
@@ -417,6 +480,9 @@ let selectedAudience = 'gm';
 let selectedModules = {};
 let moduleOrder = [];
 let reportChartInstances = [];
+let customSections = [];
+let pendingCustomSections = [];
+let customSectionChartInstances = [];
 
 function unwrapEngineJson(raw) {
   let j = typeof raw === 'string'
@@ -604,6 +670,356 @@ function formatBadgeForModule(modId) {
 function destroyReportCharts() {
   reportChartInstances.forEach(c => { try { c.destroy(); } catch (_) {} });
   reportChartInstances = [];
+  customSectionChartInstances.forEach(c => { try { c.destroy(); } catch (_) {} });
+  customSectionChartInstances = [];
+}
+
+function selectDataForQuery(queryText) {
+  const q = queryText.toLowerCase();
+  const data = {};
+  data.hotel_code = hotelCode;
+  data.engine_date = engineDate;
+  data.overall = {
+    total_rn_ty: engineJson?.focus?.total_rn_ty,
+    total_rn_ly: engineJson?.focus?.total_rn_ly,
+    total_rev_ty: engineJson?.focus?.total_rev_ty,
+    overall_adr_ty: engineJson?.focus?.overall_adr_ty
+  };
+  if (q.match(/weekend|weekday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|daily|day of week|trend|weekly|monthly|quarter|q1|q2|q3|q4|january|february|march|april|may|june|july|august|september|october|november|december/)) {
+    data.str_daily_series = engineJson?.str_daily_series;
+  }
+  if (q.match(/segment|negotiated|discount|retail|corporate|wholesale|transient|group/)) {
+    data.segment_analysis = engineJson?.focus?.segment_analysis;
+    data.active_signals = engineJson?.focus?.active_signals;
+  }
+  if (q.match(/account|corporate|company|manager|client/)) {
+    data.corporate_accounts = engineJson?.corporate_account_pace_issues;
+  }
+  if (q.match(/forward|pace|pickup|forecast|gap|otb|on.the.books|window|days/)) {
+    data.weekly_pickup = engineJson?.weekly_pickup_delta_issues;
+    data.forecast_gaps = engineJson?.forecast_gap_issues;
+  }
+  return data;
+}
+
+async function callNlQuery(systemPrompt, userQuery) {
+  const response = await fetch('/api/nl-query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userQuery }]
+    })
+  });
+  if (!response.ok) throw new Error('Query failed');
+  const result = await response.json();
+  if (result.error) throw new Error(result.message || result.error);
+  return result.content || '';
+}
+
+function parseNlJsonResponse(content) {
+  const cleaned = String(content || '').replace(/```json|```/g, '').trim();
+  return JSON.parse(cleaned);
+}
+
+function buildCustomAnalysisSystemPrompt(userQuery) {
+  return `You are a hotel commercial intelligence engine with access to raw hotel performance data.
+
+The user will ask you to calculate or analyse something from the data provided.
+
+You must respond ONLY with a valid JSON object in this exact format — no preamble, no markdown, no explanation:
+{
+  "title": "Section title (short, max 6 words)",
+  "type": "table" or "chart",
+  "chartConfig": {
+    "chartType": "bar" or "line" or "horizontalBar",
+    "labels": ["label1", "label2"],
+    "datasets": [
+      {
+        "label": "Dataset name",
+        "data": [number1, number2],
+        "color": "#0f2744" or "#C9A84C" or "#e74c3c"
+      }
+    ]
+  },
+  "tableData": {
+    "headers": ["Col1", "Col2"],
+    "rows": [["val1", "val2"]]
+  },
+  "narrative": "2-3 sentence commercial interpretation of the result. Be specific — reference actual numbers from the calculation."
+}
+
+Rules:
+- Use "table" type when showing ranked lists, comparisons with multiple columns, or account-level data
+- Use "chart" type for trends, time series, day-of-week patterns, or comparisons between 2-3 values
+- hotel_occ values are strings like "56.2%" — convert to number (56.2) for calculations
+- All monetary values in EUR, formatted as numbers not strings in datasets
+- narrative must reference specific calculated values, not generic commentary
+- If the query cannot be answered from the provided data, return: {"error": "Cannot calculate this from available data"}
+
+Available data: ${JSON.stringify(selectDataForQuery(userQuery))}`;
+}
+
+function buildCustomSectionFromParsed(parsed) {
+  return {
+    id: 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    title: parsed.title || 'Custom Analysis',
+    type: parsed.type === 'chart' ? 'chart' : 'table',
+    chartConfig: parsed.chartConfig || null,
+    tableData: parsed.tableData || { headers: [], rows: [] },
+    narrative: parsed.narrative || ''
+  };
+}
+
+async function generateCustomSectionFromQuery(userQuery) {
+  const content = await callNlQuery(buildCustomAnalysisSystemPrompt(userQuery), userQuery);
+  const parsed = parseNlJsonResponse(content);
+  if (parsed.error) throw new Error(parsed.error);
+  return buildCustomSectionFromParsed(parsed);
+}
+
+function buildCustomSectionHtml(sec) {
+  let dataHtml = '';
+  if (sec.type === 'chart' && sec.chartConfig) {
+    dataHtml = `<div class="rb-chart-wrap"><canvas id="chart-${rbEscHtml(sec.id)}"></canvas></div>`;
+  } else if (sec.tableData?.rows?.length) {
+    const rows = sec.tableData.rows.map(r => r.map(c => rbEscHtml(String(c))));
+    dataHtml = buildTableHtml(sec.tableData.headers || [], rows);
+  } else {
+    dataHtml = '<p class="rb-text-only">No data available for this section.</p>';
+  }
+  return `<section class="rb-report-section rb-custom-section" data-custom-id="${rbEscHtml(sec.id)}">
+    <div class="rb-section-head">
+      <span class="rb-custom-badge">CUSTOM</span>
+      <a href="#" class="rb-custom-remove" data-custom-id="${rbEscHtml(sec.id)}">✕ Remove</a>
+    </div>
+    <h2 class="rb-section-title" contenteditable="true">${rbEscHtml(sec.title)}</h2>
+    <div class="rb-section-data">${dataHtml}</div>
+    <p class="rb-section-narrative" contenteditable="true">${rbEscHtml(sec.narrative)}</p>
+  </section>`;
+}
+
+function appendCustomSectionToCanvas(sec) {
+  const container = document.getElementById('rb-custom-sections') || document.getElementById('rb-report-canvas');
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', buildCustomSectionHtml(sec));
+  wireCustomSectionRemove(container.querySelector(`.rb-custom-section[data-custom-id="${sec.id}"] .rb-custom-remove`));
+  initSingleCustomSectionChart(sec);
+}
+
+function wireCustomSectionRemove(linkEl) {
+  if (!linkEl) return;
+  linkEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    removeCustomSection(linkEl.dataset.customId);
+  });
+}
+
+function removeCustomSection(sectionId) {
+  customSections = customSections.filter(s => s.id !== sectionId);
+  const el = document.querySelector(`.rb-custom-section[data-custom-id="${sectionId}"]`);
+  if (el) el.remove();
+}
+
+function initSingleCustomSectionChart(sec) {
+  if (typeof Chart === 'undefined') return;
+  if (sec.type !== 'chart' || !sec.chartConfig) return;
+  const canvas = document.getElementById('chart-' + sec.id);
+  if (!canvas || canvas.dataset.chartInit === '1') return;
+  canvas.dataset.chartInit = '1';
+  const cfg = sec.chartConfig;
+  const chartType = cfg.chartType === 'horizontalBar' ? 'bar' : (cfg.chartType || 'bar');
+  const datasets = (cfg.datasets || []).map(ds => ({
+    label: ds.label || '',
+    data: ds.data || [],
+    backgroundColor: ds.color || '#0f2744',
+    borderColor: ds.color || '#0f2744',
+    borderWidth: chartType === 'line' ? 2 : 1,
+    fill: chartType === 'line' ? false : undefined
+  }));
+  const chart = new Chart(canvas, {
+    type: chartType,
+    data: { labels: cfg.labels || [], datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: datasets.length > 1 } },
+      indexAxis: cfg.chartType === 'horizontalBar' ? 'y' : 'x',
+      scales: chartType === 'line' || chartType === 'bar'
+        ? { y: { beginAtZero: true } }
+        : undefined
+    }
+  });
+  customSectionChartInstances.push(chart);
+}
+
+function initCustomSectionCharts() {
+  customSections.forEach(initSingleCustomSectionChart);
+}
+
+function openCustomSectionModal() {
+  const modal = document.getElementById('rb-custom-modal');
+  const form = document.getElementById('rb-modal-form');
+  const loading = document.getElementById('rb-custom-modal-loading');
+  const errEl = document.getElementById('rb-custom-modal-error');
+  const queryEl = document.getElementById('rb-custom-query');
+  if (!modal) return;
+  if (queryEl) queryEl.value = '';
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (form) form.style.display = 'block';
+  if (loading) loading.style.display = 'none';
+  modal.classList.add('visible');
+}
+
+function closeCustomSectionModal() {
+  const modal = document.getElementById('rb-custom-modal');
+  if (modal) modal.classList.remove('visible');
+}
+
+async function handleCustomSectionGenerate() {
+  const queryEl = document.getElementById('rb-custom-query');
+  const form = document.getElementById('rb-modal-form');
+  const loading = document.getElementById('rb-custom-modal-loading');
+  const errEl = document.getElementById('rb-custom-modal-error');
+  const genBtn = document.getElementById('rb-custom-generate-btn');
+  const userQuery = (queryEl?.value || '').trim();
+  if (!userQuery) return;
+  if (!engineJson) {
+    if (errEl) {
+      errEl.textContent = 'Could not calculate: No engine data loaded';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+  if (form) form.style.display = 'none';
+  if (loading) loading.style.display = 'block';
+  if (errEl) errEl.style.display = 'none';
+  if (genBtn) genBtn.disabled = true;
+  try {
+    const sec = await generateCustomSectionFromQuery(userQuery);
+    customSections.push(sec);
+    if (document.getElementById('rb-report-canvas')) {
+      appendCustomSectionToCanvas(sec);
+    }
+    closeCustomSectionModal();
+  } catch (err) {
+    if (form) form.style.display = 'block';
+    if (loading) loading.style.display = 'none';
+    if (errEl) {
+      errEl.textContent = 'Could not calculate: ' + (err.message || 'Unable to generate section');
+      errEl.style.display = 'block';
+    }
+  } finally {
+    if (genBtn) genBtn.disabled = false;
+  }
+}
+
+async function processPendingCustomSections() {
+  if (!pendingCustomSections.length) return;
+  const queries = [...pendingCustomSections];
+  pendingCustomSections = [];
+  for (const q of queries) {
+    try {
+      const sec = await generateCustomSectionFromQuery(q);
+      customSections.push(sec);
+      appendCustomSectionToCanvas(sec);
+    } catch (err) {
+      console.warn('Pending custom section failed:', q, err);
+    }
+  }
+}
+
+async function applyReportDescription() {
+  const input = document.getElementById('report-describe-input');
+  const btn = document.getElementById('report-describe-btn');
+  const confirmEl = document.getElementById('report-describe-confirm');
+  const desc = (input?.value || '').trim();
+  if (!desc || !engineJson) return;
+  const systemPrompt = `You are a hotel report configurator.
+
+The user will describe what they want in their report. You must respond ONLY with a valid JSON object — no preamble, no markdown:
+
+{
+  "standard_modules": ["module_id1", "module_id2"],
+  "custom_sections": ["free text query 1", "free text query 2"]
+}
+
+Available standard module ids: performance_overview, segment_analysis, str_performance, forward_pace, revenue_exposure, corporate_at_risk, corporate_ahead, financial_impact, causal_chain
+
+Rules:
+- standard_modules: list only modules relevant to what the user described
+- custom_sections: list any analyses that cannot be covered by the standard modules above — phrase each as a clear calculation request
+- If the user asks for "everything" or a "full report" — return all 9 standard modules and no custom sections
+- Keep custom_sections queries short and specific`;
+  if (btn) { btn.disabled = true; btn.textContent = 'Building...'; }
+  if (confirmEl) confirmEl.style.display = 'none';
+  try {
+    const content = await callNlQuery(systemPrompt, desc);
+    const parsed = parseNlJsonResponse(content);
+    const moduleIds = Array.isArray(parsed.standard_modules) ? parsed.standard_modules : [];
+    const customQueries = Array.isArray(parsed.custom_sections) ? parsed.custom_sections : [];
+    Object.keys(selectedModules).forEach(id => {
+      if (selectedModules[id]) selectedModules[id].selected = false;
+    });
+    let selectedCount = 0;
+    moduleIds.forEach(id => {
+      if (selectedModules[id]) {
+        selectedModules[id].selected = true;
+        selectedCount += 1;
+      }
+    });
+    pendingCustomSections = customQueries.filter(q => String(q).trim());
+    if (confirmEl) {
+      confirmEl.style.color = 'var(--green)';
+      confirmEl.textContent = `✓ ${selectedCount} modules selected, ${pendingCustomSections.length} custom sections queued`;
+      confirmEl.style.display = 'block';
+    }
+    const container = document.getElementById('report-builder-content');
+    moduleIds.forEach(id => {
+      const card = container?.querySelector(`.rb-module-card[data-module-id="${id}"]:not(.unavailable)`);
+      if (!card) return;
+      card.classList.add('selected');
+      card.classList.remove('deselected');
+      const cb = card.querySelector('[data-module-check]');
+      if (cb) cb.checked = true;
+    });
+    container?.querySelectorAll('.rb-module-card:not(.unavailable)').forEach(card => {
+      const modId = card.dataset.moduleId;
+      if (!moduleIds.includes(modId)) {
+        card.classList.remove('selected');
+        card.classList.add('deselected');
+        const cb = card.querySelector('[data-module-check]');
+        if (cb) cb.checked = false;
+      }
+    });
+    const continueBtn = document.getElementById('rb-continue-btn');
+    if (continueBtn) continueBtn.disabled = selectedCount === 0;
+    const errEl = document.getElementById('rb-step-error');
+    if (errEl && selectedCount > 0) errEl.style.display = 'none';
+  } catch (err) {
+    if (confirmEl) {
+      confirmEl.textContent = 'Could not interpret description. Please try again.';
+      confirmEl.style.color = 'var(--red)';
+      confirmEl.style.display = 'block';
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Build for me →'; }
+  }
+}
+
+function getCustomSectionExportContent(sec) {
+  const sectionEl = document.querySelector(`.rb-custom-section[data-custom-id="${sec.id}"]`);
+  const title = sectionEl?.querySelector('.rb-section-title')?.innerText?.trim() || sec.title;
+  const narrative = sectionEl?.querySelector('.rb-section-narrative')?.innerText?.trim() || sec.narrative;
+  return { title, narrative, tableData: sec.tableData, type: sec.type };
+}
+
+function initCustomSectionModal() {
+  document.getElementById('rb-custom-generate-btn')?.addEventListener('click', handleCustomSectionGenerate);
+  document.getElementById('rb-custom-cancel-btn')?.addEventListener('click', closeCustomSectionModal);
+  document.getElementById('rb-custom-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'rb-custom-modal') closeCustomSectionModal();
+  });
 }
 
 function buildTableHtml(headers, rows) {
@@ -1176,6 +1592,7 @@ function renderReportCanvas() {
         <a class="rb-canvas-back" id="rb-canvas-back" href="#">← Back to Layout</a>
         <span class="rb-audience-badge">${rbEscHtml(audienceBadgeLabel())}</span>
         <div class="rb-export-btns">
+          <button type="button" class="rb-export-btn" id="rb-add-custom-canvas">+ Add Custom Section</button>
           <button type="button" class="rb-export-btn" id="rb-export-pdf">Export PDF</button>
           <button type="button" class="rb-export-btn" id="rb-export-pptx">Export PPTX</button>
         </div>
@@ -1183,6 +1600,7 @@ function renderReportCanvas() {
       <div class="rb-report-canvas" id="rb-report-canvas">
         <div class="rb-report-cover">${rbEscHtml(hotelCode)} — Commercial Intelligence Report — ${rbEscHtml(reportDate)}</div>
         ${sectionsHtml}
+        <div id="rb-custom-sections">${customSections.map(buildCustomSectionHtml).join('')}</div>
       </div>
     </div>
   `;
@@ -1195,8 +1613,15 @@ function renderReportCanvas() {
 
   document.getElementById('rb-export-pdf').addEventListener('click', exportReportPdf);
   document.getElementById('rb-export-pptx').addEventListener('click', exportReportPptx);
+  document.getElementById('rb-add-custom-canvas')?.addEventListener('click', openCustomSectionModal);
 
-  requestAnimationFrame(() => initReportCharts());
+  container.querySelectorAll('.rb-custom-remove').forEach(link => wireCustomSectionRemove(link));
+
+  requestAnimationFrame(() => {
+    initReportCharts();
+    initCustomSectionCharts();
+    processPendingCustomSections();
+  });
 }
 
 function getSectionExportContent(modId) {
@@ -1477,6 +1902,58 @@ function exportReportPdf() {
     }
   });
 
+  customSections.forEach(sec => {
+    const { title, narrative, tableData, type } = getCustomSectionExportContent(sec);
+    checkPage(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(150, 120, 50);
+    doc.text('Custom Analysis', margin, y);
+    y += 6;
+    doc.setFontSize(13);
+    doc.setTextColor(15, 31, 61);
+    doc.text(title, margin, y);
+    y += 8;
+
+    if (type === 'table' && tableData?.rows?.length && doc.autoTable) {
+      doc.autoTable({
+        startY: y,
+        head: [tableData.headers],
+        body: tableData.rows,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [15, 31, 61], textColor: 255 },
+        theme: 'grid'
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    } else if (type !== 'table') {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Chart visualization — see narrative below.', margin, y);
+      y += 10;
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text('No data available for this section.', margin, y);
+      y += 10;
+    }
+
+    if (narrative) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      const nLines = doc.splitTextToSize(narrative, pageW - margin * 2);
+      nLines.forEach(line => {
+        checkPage(6);
+        doc.text(line, margin, y);
+        y += 4.5;
+      });
+      y += 6;
+    }
+  });
+
   addFooter();
   doc.save(`Aithenor_Report_${hotelCode}_${reportFileDateStamp()}.pdf`);
 }
@@ -1533,6 +2010,41 @@ function exportReportPptx() {
     const narrText = modId === 'causal_chain' ? '' : narrative;
     if (narrText) {
       slide.addText(narrText, { x: 0.4, y: Math.max(bodyY, 3.8), w: 9.2, h: 1.5, fontSize: 10, color: '6B6B67', valign: 'top' });
+    }
+  });
+
+  customSections.forEach(sec => {
+    const { title, narrative, tableData, type } = getCustomSectionExportContent(sec);
+    const slide = pptx.addSlide();
+    slide.addText('Custom Analysis', { x: 0.4, y: 0.2, w: 9.2, fontSize: 10, bold: true, color: 'C9A84C' });
+    slide.addText(title, { x: 0.4, y: 0.5, w: 9.2, fontSize: 18, bold: true, color: navy });
+
+    let bodyY = 1.1;
+    if (type === 'table' && tableData?.rows?.length) {
+      const tableRows = [
+        tableData.headers.map(h => ({ text: h, options: { bold: true, color: 'FFFFFF', fill: { color: navy } } })),
+        ...tableData.rows.map((row, ri) =>
+          row.map(cell => ({
+            text: String(cell).replace(/<[^>]+>/g, ''),
+            options: { fill: { color: ri % 2 === 0 ? 'F8F9FA' : 'FFFFFF' }, color: '1A1A18', fontSize: 9 }
+          }))
+        )
+      ];
+      slide.addTable(tableRows, { x: 0.4, y: bodyY, w: 9.2, fontSize: 9, border: { pt: 0.5, color: 'E8E8E5' } });
+      bodyY = Math.min(4.2, bodyY + 0.35 * (tableData.rows.length + 2));
+    } else if (type === 'chart') {
+      slide.addText('Chart visualization — see narrative below.', {
+        x: 0.4, y: bodyY, w: 9.2, fontSize: 11, color: '888888'
+      });
+      bodyY = 2.0;
+    } else {
+      slide.addText('No data available for this section.', {
+        x: 0.4, y: bodyY, w: 9.2, fontSize: 11, color: '888888'
+      });
+    }
+
+    if (narrative) {
+      slide.addText(narrative, { x: 0.4, y: Math.max(bodyY, 3.8), w: 9.2, h: 1.5, fontSize: 10, color: '6B6B67', valign: 'top' });
     }
   });
 
@@ -1613,6 +2125,18 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
   const container = document.getElementById('report-builder-content');
   container.innerHTML = `
     <div id="rb-step-1">
+      <div id="report-describe-block" class="rb-describe-block">
+        <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-text-tertiary); margin-bottom:8px;">
+          DESCRIBE YOUR REPORT (OPTIONAL)
+        </p>
+        <div class="rb-describe-row">
+          <textarea id="report-describe-input" class="rb-describe-input"
+            placeholder="e.g. I need a weekend trend analysis, April segment performance, and a summary of at-risk corporate accounts..."></textarea>
+          <button type="button" id="report-describe-btn" class="rb-describe-btn">Build for me →</button>
+        </div>
+        <div id="report-describe-confirm" class="rb-describe-confirm" style="display:none;"></div>
+      </div>
+
       <div class="rb-section-label">Who is this report for?</div>
       <div class="rb-audience-row">
         ${audiences.map(a => `
@@ -1628,6 +2152,8 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
       <div class="rb-module-grid">
         ${availableModules.map(moduleCardHtml).join('')}
       </div>
+
+      <button type="button" id="rb-add-custom-step1" class="rb-export-btn rb-add-custom-btn">+ Add Custom Section</button>
 
       <div id="rb-step-error" class="rb-step-error" style="display:none;"></div>
       <button type="button" id="rb-continue-btn" class="rb-continue-btn">Continue to Layout →</button>
@@ -1715,6 +2241,9 @@ function renderModuleSelector(availableModules, preserveSelections = false) {
     setProgressStep(2);
     renderLayoutConfig();
   });
+
+  document.getElementById('rb-add-custom-step1')?.addEventListener('click', openCustomSectionModal);
+  document.getElementById('report-describe-btn')?.addEventListener('click', applyReportDescription);
 
   syncContinueButton();
 }
@@ -1827,6 +2356,7 @@ async function bootApp() {
     showError('No hotel selected. Please return to Configuration.', 'config.html');
     return;
   }
+  initCustomSectionModal();
   await loadLatestEngineOutput();
 }
 
