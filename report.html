@@ -1,1 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aithenor — Report Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #0F1F3D;
+  --navy-mid: #1B3A6B;
+  --navy-light: #243F72;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --gold-pale: #FBF6EA;
+  --cream: #FAFAF7;
+  --white: #FFFFFF;
+  --red: #C0392B;
+  --red-light: #FDECEA;
+  --orange: #D35400;
+  --orange-light: #FEF0E7;
+  --amber: #B8860B;
+  --amber-light: #FEF9E7;
+  --green: #1A6B3C;
+  --green-light: #E8F5ED;
+  --gray-100: #F5F5F3;
+  --gray-200: #E8E8E5;
+  --gray-300: #D8D8D3;
+  --gray-400: #9A9A95;
+  --gray-600: #6B6B67;
+  --gray-900: #1A1A18;
+  --sidebar-w: 260px;
+  --color-border-tertiary: var(--gray-200);
+  --color-background-primary: var(--white);
+  --color-text-primary: var(--gray-900);
+  --color-text-secondary: var(--gray-600);
+  --color-text-tertiary: var(--gray-400);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--color-text-primary); min-height: 100vh; }
+.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--navy); display: flex; flex-direction: column; z-index: 100; border-right: 1px solid rgba(201,168,76,0.15); }
+.sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.logo-text { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--white); letter-spacing: 4px; text-transform: uppercase; }
+.logo-sub { font-size: 9px; color: var(--gold); letter-spacing: 2.5px; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
+.hotel-card { margin: 16px 14px; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); border-radius: 8px; padding: 12px 14px; }
+.hotel-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 600; color: var(--white); }
+.hotel-meta { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.3px; }
+.nav { padding: 8px 0; flex: 1; overflow-y: auto; }
+.nav-section { padding: 12px 20px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.25); font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
+.nav-item:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--white); border-left-color: var(--gold); background: rgba(201,168,76,0.07); }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--red); color: white; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; min-width: 18px; text-align: center; }
+.sidebar-bottom { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+.sync-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.35); }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.main { margin-left: var(--sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { background: var(--color-background-primary); border-bottom: 1px solid var(--color-border-tertiary); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--navy); }
+.topbar-sub { color: var(--color-text-secondary); font-size: 12px; letter-spacing: .04em; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.chip { border: 1px solid var(--gray-200); padding: 7px 10px; border-radius: 999px; font-size: 12px; color: var(--color-text-secondary); }
+.content { padding: 24px 32px 40px; flex: 1; }
+.page-header { margin-bottom: 28px; }
+.page-header h1 { font-family: 'Cormorant Garamond', serif; font-size: 32px; color: var(--navy); margin-bottom: 6px; }
+.page-header p { color: var(--color-text-secondary); font-size: 14px; }
+.progress-steps { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+.progress-step { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--color-border-tertiary); background: var(--color-background-primary); color: var(--color-text-tertiary); }
+.progress-step.active { border-color: var(--gold); background: var(--gold-pale); color: var(--navy); }
+.progress-step-num { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; background: var(--gray-200); color: var(--color-text-secondary); }
+.progress-step.active .progress-step-num { background: var(--gold); color: var(--navy); }
+#loading-state { text-align: center; padding: 60px 20px; color: var(--color-text-secondary); }
+.loading-spinner { width: 36px; height: 36px; border: 3px solid var(--gray-200); border-top-color: var(--navy); border-radius: 50%; margin: 0 auto 14px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#error-state { display: none; text-align: center; padding: 60px 20px; color: var(--red); }
+#error-state a { display: inline-block; margin-top: 16px; color: var(--navy-mid); text-decoration: none; font-size: 13px; }
+#error-state a:hover { color: var(--navy); }
+.page-footer { padding: 16px 32px; border-top: 1px solid var(--color-border-tertiary); background: var(--color-background-primary); font-size: 11px; color: var(--color-text-tertiary); text-align: center; }
+.login-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 24px; }
+.login-card { width: 100%; max-width: 440px; background: rgba(255,255,255,0.92); border: 1px solid rgba(15,31,61,0.1); border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(15,31,61,0.12); }
+.brand-kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.brand-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; margin-bottom: 8px; color: var(--navy); }
+.brand-copy { color: var(--color-text-secondary); line-height: 1.6; margin-bottom: 18px; }
+.field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); margin: 12px 0 6px; }
+.input { width: 100%; border: 1px solid var(--gray-300); border-radius: 10px; padding: 12px; font-family: inherit; }
+.login-btn { width: 100%; margin-top: 16px; border: none; border-radius: 10px; padding: 12px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
+.login-error { display: none; margin-top: 10px; color: var(--red); font-size: 12px; }
+.app-screen { display: none; }
+@media (max-width: 980px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 18px; }
+}
+</style>
+</head>
+<body>
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="brand-kicker">Aithenor</div>
+    <h1 class="brand-title">Report Builder</h1>
+    <div class="brand-copy">Generate a branded report from your live engine data.</div>
+    <form onsubmit="handleLogin(event)">
+      <label class="field-label">Email</label>
+      <input class="input" type="email" id="login-email" required>
+      <label class="field-label">Password</label>
+      <input class="input" type="password" id="login-password" required>
+      <button class="login-btn" id="login-btn" type="submit">Sign In</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
 
+<div class="app-screen" id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Aithenor</div>
+      <div class="logo-sub">Strategic Intelligence</div>
+    </div>
+    <div class="hotel-card">
+      <div class="hotel-name" id="sidebar-hotel">Hotel</div>
+      <div class="hotel-meta" id="sidebar-period">Loading...</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Executive</div>
+      <a class="nav-item" href="gm.html">
+        <span class="nav-icon">✦</span>
+        GM Briefing
+      </a>
+
+      <div class="nav-section">Intelligence</div>
+      <a class="nav-item" href="index.html">
+        <span class="nav-icon">◈</span>
+        Insights
+        <span class="nav-badge" id="badge-count">—</span>
+      </a>
+
+      <div class="nav-section">Execution</div>
+      <a class="nav-item" href="accounts.html">
+        <span class="nav-icon">◉</span>
+        Accounts
+      </a>
+      <a class="nav-item" href="sales.html">
+        <span class="nav-icon">◎</span>
+        Sales Activity
+      </a>
+      <a class="nav-item" href="weekly.html">
+        <span class="nav-icon">◎</span>
+        Weekly Intel
+      </a>
+      <a class="nav-item active" href="report.html">
+        <span class="nav-icon">◫</span>
+        Report Builder
+      </a>
+
+      <div class="nav-section">Settings</div>
+      <a class="nav-item" href="config.html">
+        <span class="nav-icon">◇</span>
+        Configuration
+      </a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sync-status"><div class="sync-dot"></div><span>Connected to Supabase</span></div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07);">
+        <div id="user-email" style="font-size:11px; color:rgba(255,255,255,0.3); margin-bottom:6px; word-break:break-all;"></div>
+        <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.3); font-size:11px; padding:5px 12px; border-radius:3px; cursor:pointer; font-family:'DM Sans',sans-serif;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Report Builder</div>
+        <div class="topbar-sub">Generate a branded report from your live engine data</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="chip" id="engine-date-chip" style="display:none;"></span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-header">
+        <h1>Report Builder</h1>
+        <p>Generate a branded report from your live engine data</p>
+        <div class="progress-steps">
+          <div class="progress-step active">
+            <span class="progress-step-num">1</span>
+            Select Modules
+          </div>
+          <div class="progress-step">
+            <span class="progress-step-num">2</span>
+            Configure Layout
+          </div>
+          <div class="progress-step">
+            <span class="progress-step-num">3</span>
+            Preview &amp; Export
+          </div>
+        </div>
+      </div>
+
+      <div id="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading engine data...</p>
+      </div>
+
+      <div id="error-state">
+        <p id="error-message"></p>
+        <a href="index.html">← Return to Insights</a>
+      </div>
+
+      <div id="report-builder-content"></div>
+    </div>
+
+    <div class="page-footer">
+      Aithenor — Confidential · Report Builder uses the latest engine output for the selected hotel.
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let hotelCode = '';
+let engineJson = null;
+let engineDate = null;
+
+function unwrapEngineJson(raw) {
+  let j = typeof raw === 'string'
+    ? (() => { try { return JSON.parse(raw); } catch { return {}; } })()
+    : (raw || {});
+  const inner = j?.engine;
+  if (inner != null && typeof inner === 'object' && !Array.isArray(inner)) j = inner;
+  return j;
+}
+
+function getByPath(obj, path) {
+  return path.split('.').reduce((o, key) => (o != null ? o[key] : undefined), obj);
+}
+
+function isNonEmpty(val) {
+  if (val == null) return false;
+  if (Array.isArray(val)) return val.length > 0;
+  if (typeof val === 'string') return val.trim().length > 0;
+  if (typeof val === 'number') return Number.isFinite(val);
+  if (typeof val === 'object') return Object.keys(val).length > 0;
+  return true;
+}
+
+function issuesArray(engineJson) {
+  return Array.isArray(engineJson?.issues) ? engineJson.issues : [];
+}
+
+function hasIssueCardType(engineJson, cardType) {
+  return issuesArray(engineJson).some(issue => issue?.card_type === cardType);
+}
+
+function detectAvailableModules(ej) {
+  const corpCard = Array.isArray(ej?.corporate_account_pace_issues)
+    ? ej.corporate_account_pace_issues[0]
+    : null;
+
+  const defs = [
+    {
+      id: 'performance_overview',
+      label: 'Performance Overview',
+      description: 'Hotel-wide room night totals and year-over-year performance snapshot.',
+      dataPath: 'focus.total_rn_ty',
+      supportsChart: false,
+      supportsTable: true,
+      defaultFormat: 'table',
+      available: isNonEmpty(getByPath(ej, 'focus.total_rn_ty'))
+    },
+    {
+      id: 'segment_analysis',
+      label: 'Segment Mix Analysis',
+      description: 'Segment-level room night growth, ADR variance, and share shifts.',
+      dataPath: 'focus.segment_analysis',
+      supportsChart: true,
+      supportsTable: true,
+      defaultFormat: 'chart',
+      available: isNonEmpty(getByPath(ej, 'focus.segment_analysis'))
+    },
+    {
+      id: 'str_performance',
+      label: 'STR Competitive Performance',
+      description: 'MPI, ARI, and RGI indices from the primary STR issue card.',
+      dataPath: 'issues[].card_metrics.avgARI',
+      supportsChart: true,
+      supportsTable: true,
+      defaultFormat: 'chart',
+      available: issuesArray(ej).some(issue => issue?.card_metrics?.avgARI != null)
+    },
+    {
+      id: 'forward_pace',
+      label: 'Forward OTB Pace',
+      description: 'On-the-books pace gaps by forward window from PMS data.',
+      dataPath: 'issues[].card_type=pms_pace',
+      supportsChart: true,
+      supportsTable: true,
+      defaultFormat: 'chart',
+      available: hasIssueCardType(ej, 'pms_pace')
+    },
+    {
+      id: 'revenue_exposure',
+      label: 'Revenue Exposure',
+      description: 'Forecast gap quantification showing revenue at risk by window.',
+      dataPath: 'issues[].card_type=forecast_gap',
+      supportsChart: false,
+      supportsTable: true,
+      defaultFormat: 'table',
+      available: hasIssueCardType(ej, 'forecast_gap')
+    },
+    {
+      id: 'corporate_at_risk',
+      label: 'Corporate Accounts — At Risk',
+      description: 'Negotiated accounts pacing behind last year with revenue impact.',
+      dataPath: 'corporate_account_pace_issues[0].accounts_at_risk',
+      supportsChart: false,
+      supportsTable: true,
+      defaultFormat: 'table',
+      available: isNonEmpty(corpCard?.accounts_at_risk)
+    },
+    {
+      id: 'corporate_ahead',
+      label: 'Corporate Accounts — Ahead',
+      description: 'Negotiated accounts pacing ahead of last year.',
+      dataPath: 'corporate_account_pace_issues[0].accounts_ahead',
+      supportsChart: false,
+      supportsTable: true,
+      defaultFormat: 'table',
+      available: isNonEmpty(corpCard?.accounts_ahead)
+    },
+    {
+      id: 'financial_impact',
+      label: 'Financial Impact Summary',
+      description: 'Issue-level revenue quantification and room nights at risk.',
+      dataPath: 'financial_quantification_summary.issue_level_quantification',
+      supportsChart: false,
+      supportsTable: true,
+      defaultFormat: 'table',
+      available: isNonEmpty(getByPath(ej, 'financial_quantification_summary.issue_level_quantification'))
+    },
+    {
+      id: 'causal_chain',
+      label: 'Commercial Diagnosis',
+      description: 'Cross-segment causal chain narrative linking drivers to outcomes.',
+      dataPath: 'issues[].card_type=causal_chain',
+      supportsChart: false,
+      supportsTable: false,
+      defaultFormat: 'table',
+      available: hasIssueCardType(ej, 'causal_chain')
+    }
+  ];
+
+  return defs;
+}
+
+function renderModuleSelector(availableModules) {
+  console.log('modules detected:', availableModules);
+}
+
+function showLoading(show) {
+  document.getElementById('loading-state').style.display = show ? 'block' : 'none';
+}
+
+function showError(message, returnHref) {
+  showLoading(false);
+  document.getElementById('error-message').textContent = message;
+  const link = document.querySelector('#error-state a');
+  if (link) {
+    link.href = returnHref || 'index.html';
+    link.textContent = returnHref === 'config.html'
+      ? '← Return to Configuration'
+      : '← Return to Insights';
+  }
+  document.getElementById('error-state').style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-state').style.display = 'none';
+}
+
+function formatEngineDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+async function loadLatestEngineOutput() {
+  hideError();
+  showLoading(true);
+
+  const { data, error } = await supabaseClient
+    .from('engine_outputs')
+    .select('engine_json, generated_at')
+    .eq('hotel_code', hotelCode)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    showError('No engine data found for this hotel. Please run an analysis first.');
+    return;
+  }
+
+  engineJson = unwrapEngineJson(data.engine_json);
+  engineDate = data.generated_at;
+
+  document.getElementById('sidebar-hotel').textContent = hotelCode;
+  document.getElementById('sidebar-period').textContent = formatEngineDate(engineDate) || 'Latest run';
+
+  const dateChip = document.getElementById('engine-date-chip');
+  if (engineDate) {
+    dateChip.textContent = `Engine data · ${formatEngineDate(engineDate)}`;
+    dateChip.style.display = 'inline-block';
+  }
+
+  const availableModules = detectAvailableModules(engineJson);
+  renderModuleSelector(availableModules);
+  showLoading(false);
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  errorEl.style.display = 'none';
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    errorEl.textContent = 'Incorrect email or password. Please try again.';
+    errorEl.style.display = 'block';
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+    return;
+  }
+  showApp(data.session.user.email);
+  btn.textContent = 'Sign In';
+  btn.disabled = false;
+  bootApp();
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+}
+
+function showApp(email) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = email;
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  showLogin();
+}
+
+async function bootApp() {
+  hotelCode = localStorage.getItem('hotelCode') || '';
+  if (!hotelCode) {
+    showError('No hotel selected. Please return to Configuration.', 'config.html');
+    return;
+  }
+  await loadLatestEngineOutput();
+}
+
+(async () => {
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) {
+    showLogin();
+    return;
+  }
+  showApp(user.email);
+  await bootApp();
+})();
+</script>
+</body>
+</html>
