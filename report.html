@@ -742,11 +742,15 @@ function getModuleTableData(modId) {
       };
     }
     case 'segment_analysis': {
+      const displayNameMap = {};
+      (engineJson?.focus?.active_signals || []).forEach(s => {
+        displayNameMap[s.bucket] = s.display_name;
+      });
       const segs = engineJson?.focus?.segment_analysis || [];
       return {
         headers: ['Segment', 'RN TY', 'RN LY', 'Variance %', 'ADR TY', 'ADR LY', 'ADR Var %'],
         rows: segs.map(s => [
-          rbEscHtml(s.segment || s.display_name || '—'),
+          rbEscHtml(displayNameMap[s.segment] || s.segment || '—'),
           rbFmtNum(s.rnTY ?? s.rn_ty),
           rbFmtNum(s.rnLY ?? s.rn_ly),
           rbFmtPct(s.rnGrowth ?? s.rn_growth ?? s.variance_pct),
@@ -787,19 +791,19 @@ function getModuleTableData(modId) {
       };
     }
     case 'revenue_exposure': {
-      const items = (engineJson?.forecast_gap_issues || []).slice(0, 3);
+      const revItems = engineJson.forecast_gap_issues || [];
       return {
         headers: ['Window', 'Forecast RN', 'OTB RN', 'Gap RN', 'Forecast Revenue', 'OTB Revenue', 'Gap €'],
-        rows: items.map(f => {
-          const q = f.quantification || {};
+        rows: revItems.slice(0, 3).map(item => {
+          const q = item.quantification || {};
           return [
-            rbEscHtml(f.window_label || f.finding_key || '—'),
-            rbFmtNum(q.forecast_rn ?? q.plan_rn),
-            rbFmtNum(q.otb_rn ?? q.total_otb_rn),
-            rbFmtNum(q.gap_rn),
-            rbFmtEur(q.forecast_revenue ?? q.plan_revenue),
-            rbFmtEur(q.otb_revenue),
-            rbFmtEur(q.gap_revenue ?? q.rev_gap)
+            rbEscHtml(item.window_label || '—'),
+            rbFmtNum(q.total_forecast_rn),
+            rbFmtNum(q.total_otb_rn),
+            rbFmtNum(q.rn_gap),
+            rbFmtEur(q.total_forecast_rev),
+            rbFmtEur(q.total_otb_rev),
+            rbFmtEur(q.rev_gap)
           ];
         })
       };
@@ -843,8 +847,15 @@ function getModuleTableData(modId) {
         rows: items.map(q => {
           const qs = q.quantified_signals || {};
           const rr = qs.revenue_range || {};
+          const issueLabel = q.finding_key
+            ? String(q.finding_key)
+              .replace(/_/g, ' ')
+              .replace(/^RET ISSUE |^CORP |^FCG /i, '')
+              .replace(/\b\w/g, c => c.toUpperCase())
+              .trim()
+            : (q.issue_title || q.title || '—');
           return [
-            rbEscHtml(q.issue_title || q.title || q.finding_key || '—'),
+            rbEscHtml(issueLabel),
             rbFmtNum(qs.room_nights_at_risk),
             rbFmtEur(rr.min ?? rr.low),
             rbFmtEur(rr.max ?? rr.high),
@@ -893,11 +904,15 @@ function initReportCharts() {
   if (selectedModules.segment_analysis?.selected && segFmt === 'chart') {
     const canvas = document.getElementById('chart-segment_analysis');
     const segs = engineJson?.focus?.segment_analysis || [];
+    const displayNameMap = {};
+    (engineJson?.focus?.active_signals || []).forEach(s => {
+      displayNameMap[s.bucket] = s.display_name;
+    });
     if (canvas && segs.length) {
       reportChartInstances.push(new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: segs.map(s => s.segment || s.display_name || '—'),
+          labels: segs.map(s => displayNameMap[s.segment] || s.segment || '—'),
           datasets: [{
             label: 'RN TY',
             data: segs.map(s => rbNum(s.rnTY ?? s.rn_ty)),
@@ -918,21 +933,24 @@ function initReportCharts() {
   const paceFmt = selectedModules.forward_pace?.format;
   if (selectedModules.forward_pace?.selected && paceFmt === 'chart') {
     const canvas = document.getElementById('chart-forward_pace');
-    const items = (engineJson?.weekly_pickup_delta_issues || []).slice(0, 3);
-    if (canvas && items.length) {
+    const paceItems = engineJson.weekly_pickup_delta_issues || [];
+    const windowLabels = ['Days 1–30', 'Days 31–60', 'Days 61–90'];
+    const otbValues = paceItems.map(w => rbNum(w.signal?.current_rn_otb));
+    const lyValues = paceItems.map(w => rbNum(w.signal?.prior_rn_otb));
+    if (canvas && paceItems.length) {
       reportChartInstances.push(new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: items.map(w => w.window_label || w.window_class || '—'),
+          labels: paceItems.map((_, i) => windowLabels[i] || '—'),
           datasets: [
             {
               label: 'OTB RN',
-              data: items.map(w => rbNum(w.pace_data?.otb_rn_ty ?? w.pace_data?.otb_rn)),
+              data: otbValues,
               backgroundColor: '#0F1F3D'
             },
             {
               label: 'LY RN',
-              data: items.map(w => rbNum(w.pace_data?.otb_rn_stly ?? w.pace_data?.otb_rn_ly)),
+              data: lyValues,
               backgroundColor: '#C9A84C'
             }
           ]
