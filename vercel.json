@@ -1,6 +1,14 @@
 {
   "routes": [
     { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/gm", "dest": "/gm.html" },
+    { "src": "/accounts", "dest": "/accounts.html" },
+    { "src": "/config", "dest": "/config.html" },
+    { "src": "/costs", "dest": "/costs.html" },
+    { "src": "/sales", "dest": "/sales.html" },
+    { "src": "/sales_prospect", "dest": "/sales_prospect.html" },
+    { "src": "/weekly", "dest": "/weekly.html" },
+    { "src": "/report", "dest": "/report.html" },
     { "src": "/api/(.*)", "dest": "/api/$1" }
   ]
 }
