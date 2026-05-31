@@ -613,13 +613,77 @@ function buildTableHtml(headers, rows) {
   return `<table class="rb-data-table"><thead><tr>${headers.map(h => `<th>${rbEscHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
+function rbNoModuleDataHtml(message) {
+  return `<p class="rb-text-only">${rbEscHtml(message)}</p>`;
+}
+
+function getModuleDataGuard(modId) {
+  switch (modId) {
+    case 'performance_overview':
+      if (!isNonEmpty(getByPath(engineJson, 'focus.total_rn_ty'))) {
+        return 'No performance data available for this hotel.';
+      }
+      break;
+    case 'segment_analysis':
+      if (!(engineJson?.focus?.segment_analysis?.length)) {
+        return 'No segment analysis data available for this hotel.';
+      }
+      break;
+    case 'str_performance':
+      if (!getStrIssue()) {
+        return 'No STR performance data available for this hotel.';
+      }
+      break;
+    case 'forward_pace':
+      if (!(engineJson?.weekly_pickup_delta_issues?.length)) {
+        return 'No forward pace data available for this hotel.';
+      }
+      break;
+    case 'revenue_exposure':
+      if (!(engineJson?.forecast_gap_issues?.length)) {
+        return 'No revenue exposure data available for this hotel.';
+      }
+      break;
+    case 'corporate_at_risk': {
+      const card = (engineJson?.corporate_account_pace_issues || [])
+        .find(c => c.card_type === 'corporate_pace_risk');
+      const accounts = card?.accounts_at_risk || [];
+      if (!accounts.length) {
+        return 'No corporate account data available for this hotel.';
+      }
+      break;
+    }
+    case 'corporate_ahead': {
+      const card = (engineJson?.corporate_account_pace_issues || [])
+        .find(c => c.card_type === 'corporate_pace_opportunity');
+      const accounts = card?.accounts_ahead || [];
+      if (!accounts.length) {
+        return 'No corporate account data available for this hotel.';
+      }
+      break;
+    }
+    case 'financial_impact':
+      if (!(engineJson?.financial_quantification_summary?.issue_level_quantification?.length)) {
+        return 'No financial impact data available for this hotel.';
+      }
+      break;
+    case 'causal_chain':
+      if (!engineJson?.cross_segment_synthesis?.causal_chain_card) {
+        return 'No commercial diagnosis data available for this hotel.';
+      }
+      break;
+  }
+  return null;
+}
+
 function getStrIssue() {
   return issuesArray(engineJson).find(i => i?.card_metrics?.avgARI != null) || null;
 }
 
 function buildModuleNarrative(modId, context) {
-  const opener = narrativeOpener();
-  switch (modId) {
+  try {
+    const opener = narrativeOpener();
+    switch (modId) {
     case 'performance_overview': {
       const f = engineJson?.focus || {};
       const rnTy = rbFmtNum(f.total_rn_ty);
@@ -746,6 +810,10 @@ function buildModuleNarrative(modId, context) {
     }
     default:
       return `${opener} review the data below.`;
+    }
+  } catch (e) {
+    console.warn('Narrative build failed for', modId, e);
+    return '';
   }
 }
 
@@ -891,6 +959,9 @@ function getModuleTableData(modId) {
 }
 
 function renderModuleDataHtml(modId, format) {
+  const guardMsg = getModuleDataGuard(modId);
+  if (guardMsg) return rbNoModuleDataHtml(guardMsg);
+
   if (modId === 'causal_chain') {
     const cc = engineJson?.cross_segment_synthesis?.causal_chain_card;
     const text = cc?.primary_story || engineJson?.commercial_verdict?.verdict_text || 'No diagnosis available.';
@@ -1356,16 +1427,30 @@ function exportReportPdf() {
     y += 8;
 
     if (modId === 'causal_chain') {
+      if (!textBody && !narrative) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(150, 150, 150);
+        doc.text('No data available for this section.', margin, y);
+        y += 10;
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(26, 26, 24);
+        const lines = doc.splitTextToSize(textBody || narrative, pageW - margin * 2);
+        lines.forEach(line => {
+          checkPage(6);
+          doc.text(line, margin, y);
+          y += 5;
+        });
+      }
+    } else if (!pdfTable || !pdfTable.rows || !pdfTable.rows.length) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.setTextColor(26, 26, 24);
-      const lines = doc.splitTextToSize(textBody || narrative, pageW - margin * 2);
-      lines.forEach(line => {
-        checkPage(6);
-        doc.text(line, margin, y);
-        y += 5;
-      });
-    } else if (pdfTable.rows.length && doc.autoTable) {
+      doc.setTextColor(150, 150, 150);
+      doc.text('No data available for this section.', margin, y);
+      y += 10;
+    } else if (doc.autoTable) {
       doc.autoTable({
         startY: y,
         head: [pdfTable.headers],
@@ -1420,8 +1505,14 @@ function exportReportPptx() {
 
     let bodyY = 1.1;
     if (modId === 'causal_chain') {
-      slide.addText(textBody || narrative, { x: 0.4, y: bodyY, w: 9.2, h: 3.5, fontSize: 11, color: '1A1A18', valign: 'top' });
-    } else if (tableData.rows.length) {
+      if (textBody || narrative) {
+        slide.addText(textBody || narrative, { x: 0.4, y: bodyY, w: 9.2, h: 3.5, fontSize: 11, color: '1A1A18', valign: 'top' });
+      } else {
+        slide.addText('No data available for this section.', {
+          x: 0.4, y: bodyY, w: 9.2, fontSize: 11, color: '888888'
+        });
+      }
+    } else if (tableData.rows && tableData.rows.length) {
       const tableRows = [
         tableData.headers.map(h => ({ text: h, options: { bold: true, color: 'FFFFFF', fill: { color: navy } } })),
         ...tableData.rows.map((row, ri) =>
@@ -1433,6 +1524,10 @@ function exportReportPptx() {
       ];
       slide.addTable(tableRows, { x: 0.4, y: bodyY, w: 9.2, fontSize: 9, border: { pt: 0.5, color: 'E8E8E5' } });
       bodyY = Math.min(4.2, bodyY + 0.35 * (tableData.rows.length + 2));
+    } else {
+      slide.addText('No data available for this section.', {
+        x: 0.4, y: bodyY, w: 9.2, fontSize: 11, color: '888888'
+      });
     }
 
     const narrText = modId === 'causal_chain' ? '' : narrative;
