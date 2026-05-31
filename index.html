@@ -6250,6 +6250,10 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
   const groupPipelineIssues = Array.isArray(engineJson?.group_pipeline_issues)
     ? engineJson.group_pipeline_issues : [];
 
+  const FI_EMPTY_PACE = `<div style="padding: 20px 0; color: var(--color-text-tertiary); font-size: 13px; font-style: italic;">No forward pace data available for this period.</div>`;
+  const FI_EMPTY_CORPORATE = `<div style="padding: 20px 0; color: var(--color-text-tertiary); font-size: 13px; font-style: italic;">No corporate account data available for this hotel. Upload a negotiated accounts report to enable this section.</div>`;
+  const FI_EMPTY_GROUPS = `<div style="padding: 20px 0; color: var(--color-text-tertiary); font-size: 13px; font-style: italic;">No groups pipeline data available for this hotel. Upload a Delphi groups export to enable this section.</div>`;
+
   console.log('WPD cards:', engineJson?.weekly_pickup_delta_issues?.length);
   console.log('Corporate cards:', engineJson?.corporate_account_pace_issues?.length);
   console.log('Group pipeline cards:', engineJson?.group_pipeline_issues?.length);
@@ -6258,7 +6262,8 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
 
   if (!weeklyPickupIssues.length && !corporatePaceIssues.length &&
       !groupPipelineIssues.length) {
-    return { cardsHtml: '', count: 0, insightPills: [] };
+    const html = FI_EMPTY_PACE + FI_EMPTY_GROUPS + FI_EMPTY_CORPORATE;
+    return { cardsHtml: `<div class="fi-mosaic-grid">${html}</div>`, count: 0, insightPills: [] };
   }
 
   const sortedWeekly = [...weeklyPickupIssues].sort(
@@ -6371,9 +6376,20 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
 
   let html = '';
 
+  if (!weeklyPickupIssues.length) {
+    html += FI_EMPTY_PACE;
+  }
+
   // Window tiles (combined pickup + pipeline per window)
   const windowTiles = windowKeys.map(renderWindowTile).filter(Boolean);
   html += windowTiles.join('');
+
+  if (!groupPipelineIssues.length) {
+    html += FI_EMPTY_GROUPS;
+  }
+
+  const riskCard = corporatePaceIssues.find(c => c.card_type === 'corporate_pace_risk');
+  const atRisk = riskCard?.accounts_at_risk || [];
 
   // Corporate risk tile
   corpRiskCards.forEach((c, i) => {
@@ -6384,6 +6400,10 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
   corpOppCards.forEach((c, i) => {
     html += renderCorporatePaceOpportunityIssueCard(c, snapshotDate, i);
   });
+
+  if (atRisk.length === 0 && corporatePaceIssues.length === 0) {
+    html += FI_EMPTY_CORPORATE;
+  }
 
   const count = windowTiles.length + corpRiskCards.length + corpOppCards.length;
 
