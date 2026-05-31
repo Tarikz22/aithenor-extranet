@@ -356,6 +356,7 @@ textarea { min-height: 100px; resize: vertical; }
       <div class="step-content active" id="step-1">
         <label class="field-label">Company Name *</label>
         <input class="input" type="text" id="pf-company" required>
+        <div id="pf-duplicate-warning" style="display:none; margin-top:6px; padding:8px 10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; font-size:12px; color:#92400e;"></div>
         <label class="field-label">Company Type *</label>
         <select class="select-input" id="pf-type" required>
           <option value="">Select...</option>
@@ -560,7 +561,7 @@ textarea { min-height: 100px; resize: vertical; }
     </div>
     <form id="quick-entry-form" onsubmit="return false;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <div><label class="field-label">Company Name *</label><input class="input" type="text" id="qe-company" placeholder="Company name" required autocomplete="off"></div>
+        <div><label class="field-label">Company Name *</label><input class="input" type="text" id="qe-company" placeholder="Company name" required autocomplete="off"><div id="qe-duplicate-warning" style="display:none; margin-top:6px; padding:8px 10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; font-size:12px; color:#92400e;"></div></div>
         <div><label class="field-label">Type *</label><select class="select-input" id="qe-type" required><option value="">Select...</option><option>Travel Agency</option><option>Event Company</option><option>DMC</option><option>Corporate</option><option>Association</option><option>Government</option><option>Other</option></select></div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
@@ -639,7 +640,7 @@ textarea { min-height: 100px; resize: vertical; }
 </div>
 
 <div class="modal-overlay" id="save-template-overlay">
-  <div class="modal" style="max-width:480px;">
+  <div class="modal" style="max-width:560px;">
     <div class="modal-head">
       <h2 class="modal-title">Save as Template</h2>
       <button type="button" class="modal-close" onclick="closeSaveAsTemplateModal()">&times;</button>
@@ -647,7 +648,7 @@ textarea { min-height: 100px; resize: vertical; }
     <form id="save-template-form" onsubmit="return false;">
 
       <label class="field-label">Template Name *</label>
-      <input class="input" type="text" id="st-name" placeholder="e.g. My Arabic intro" autocomplete="off">
+      <input class="input" type="text" id="st-name" placeholder="e.g. My intro template" autocomplete="off">
 
       <label class="field-label">Category *</label>
       <select class="select-input" id="st-category">
@@ -659,17 +660,46 @@ textarea { min-height: 100px; resize: vertical; }
         <option value="administrative">Administrative</option>
       </select>
 
-      <label class="field-label">Language</label>
-      <input class="input" type="text" id="st-language" readonly style="background:var(--gray-50); color:var(--gray-500); cursor:not-allowed;">
+      <label class="field-label" style="margin-top:10px;">Languages to save *</label>
+      <div style="display:flex; gap:16px; margin-bottom:10px;">
+        <label style="font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="st-lang-fr" value="fr"> French (FR)
+        </label>
+        <label style="font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="st-lang-en" value="en"> English (EN)
+        </label>
+        <label style="font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="st-lang-ar" value="ar"> Arabic (AR)
+        </label>
+      </div>
 
-      <label class="field-label">Subject</label>
-      <input class="input" type="text" id="st-subject" readonly style="background:var(--gray-50); color:var(--gray-500);">
+      <div id="st-panel-fr" style="display:none;">
+        <div style="font-size:12px; font-weight:600; color:var(--navy); margin-bottom:4px;">🇫🇷 French version</div>
+        <label class="field-label">Subject (FR)</label>
+        <input class="input" type="text" id="st-subject-fr" placeholder="Email subject in French">
+        <label class="field-label">Body (FR) *</label>
+        <textarea class="input" id="st-body-fr" rows="5" placeholder="Template body in French&#10;&#10;Use merge fields: {{contact_name}}, {{company_name}}, {{hotel_name}}, {{sender_name}}, {{year}}, {{ai_context}}" style="font-size:12px; line-height:1.5;"></textarea>
+      </div>
 
-      <label class="field-label">Body preview</label>
-      <textarea class="input" id="st-body-preview" rows="5" readonly style="background:var(--gray-50); color:var(--gray-500); resize:none; font-size:12px; line-height:1.5;"></textarea>
+      <div id="st-panel-en" style="display:none;">
+        <div style="font-size:12px; font-weight:600; color:var(--navy); margin-bottom:4px; margin-top:10px;">🇬🇧 English version</div>
+        <label class="field-label">Subject (EN)</label>
+        <input class="input" type="text" id="st-subject-en" placeholder="Email subject in English">
+        <label class="field-label">Body (EN) *</label>
+        <textarea class="input" id="st-body-en" rows="5" placeholder="Template body in English&#10;&#10;Use merge fields: {{contact_name}}, {{company_name}}, {{hotel_name}}, {{sender_name}}, {{year}}, {{ai_context}}" style="font-size:12px; line-height:1.5;"></textarea>
+      </div>
 
-      <div style="font-size:11px; color:var(--gray-500); margin-top:4px;">
-        Subject and body are saved exactly as currently drafted — including any edits you made. Merge fields are preserved so they resolve correctly on next use.
+      <div id="st-panel-ar" style="display:none;">
+        <div style="font-size:12px; font-weight:600; color:var(--navy); margin-bottom:4px; margin-top:10px;">🇲🇦 Arabic version</div>
+        <label class="field-label">Subject (AR)</label>
+        <input class="input" type="text" id="st-subject-ar" placeholder="Email subject in Arabic">
+        <label class="field-label">Body (AR) *</label>
+        <textarea class="input" id="st-body-ar" rows="5" dir="rtl" placeholder="نص القالب بالعربية" style="font-size:12px; line-height:1.5;"></textarea>
+      </div>
+
+      <div style="font-size:11px; color:var(--gray-500); margin-top:8px; padding:8px; background:var(--gray-50); border-radius:6px;">
+        <strong>Available merge fields:</strong>
+        {{contact_name}} · {{company_name}} · {{hotel_name}} · {{sender_name}} · {{year}} · {{ai_context}}
       </div>
 
       <div id="st-error" style="display:none; color:var(--red); font-size:12px; margin-top:6px;"></div>
@@ -702,6 +732,7 @@ let editingTemplateId = null;
 let currentStep = 1;
 let activeTab = 'prospects';
 let activeTemplateCategory = 'first_contact';
+let prospectDuplicateHandler = null;
 
 const COUNTRY_CITY_DATA = {
   'Morocco': ['Casablanca','Rabat','Marrakech','Fes','Tangier','Agadir','Meknes','Oujda','Kenitra','Tetouan','Other'],
@@ -764,6 +795,50 @@ const COUNTRY_PHONE_CODES = {
 function escHtml(str) {
   if (str == null) return '';
   return str.toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function checkProspectDuplicate(value, warningElId, excludeId = null) {
+  const warningEl = document.getElementById(warningElId);
+  if (!warningEl) return;
+
+  const trimmed = (value || '').trim().toLowerCase();
+  if (trimmed.length < 2) {
+    warningEl.style.display = 'none';
+    return;
+  }
+
+  const match = allProspects.find(p =>
+    p.id !== excludeId &&
+    p.status !== 'archived' &&
+    (p.company_name || '').trim().toLowerCase() === trimmed
+  );
+
+  if (match) {
+    warningEl.innerHTML =
+      `⚠ <strong>${escHtml(match.company_name)}</strong> ` +
+      `already exists as a ${escHtml(match.company_type || '')} ` +
+      `from ${escHtml(match.country || 'unknown country')}. ` +
+      `<span style="text-decoration:underline; cursor:pointer;" onclick="highlightProspect('${match.id}')">View existing</span>`;
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
+function highlightProspect(prospectId) {
+  closeProspectModal();
+
+  setTimeout(() => {
+    const row = document.querySelector(`tr[data-prospect-id="${prospectId}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.background = '#fef3c7';
+      setTimeout(() => {
+        row.style.background = '';
+        row.click();
+      }, 600);
+    }
+  }, 300);
 }
 
 function showError(msg) {
@@ -1125,6 +1200,7 @@ function buildExpandedPanel(p) {
         ${statusPillHtml(o.status)}
         <span style="color:var(--gray-600);margin-left:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${escHtml((o.body||'').slice(0,80))}</span>
         <span style="font-size:11px;color:var(--gray-400);flex-shrink:0;">&#9660;</span>
+        <button style="flex-shrink:0; background:none; border:none; cursor:pointer; color:var(--gray-400); font-size:14px; padding:2px 4px; margin-left:4px;" title="Delete this outreach record" onclick="event.stopPropagation();deleteOutreach('${o.id}','${p.id}')">×</button>
       </div>
       <div class="outreach-full" style="display:none;margin-top:8px;padding:10px;background:var(--gray-100);border-radius:8px;font-size:12px;line-height:1.6;">
         ${o.subject ? `<div style="font-weight:600;color:var(--navy);margin-bottom:6px;">Subject: ${escHtml(o.subject)}</div>` : ''}
@@ -1236,6 +1312,7 @@ function closeProspectModal() {
   document.querySelector('.step-dot[data-step="3"]').style.display = '';
   document.getElementById('btn-step-next').dataset.maxStep = '3';
   document.getElementById('btn-prospect-save').dataset.companyOnly = '';
+  document.getElementById('pf-duplicate-warning').style.display = 'none';
 }
 
 function updateStepUI() {
@@ -1786,6 +1863,7 @@ function resetQuickEntryForm() {
   document.getElementById('qe-notes').value = '';
   document.getElementById('qe-error').style.display = 'none';
   document.getElementById('qe-error').textContent = '';
+  document.getElementById('qe-duplicate-warning').style.display = 'none';
 }
 
 function populateQuickEntryCountries() {
@@ -1962,6 +2040,14 @@ function openEditCompanyOnly(id) {
   currentStep = 1;
   document.getElementById('prospect-modal-title').textContent = 'Edit Company';
   document.getElementById('pf-company').value = p.company_name || '';
+  const companyInput = document.getElementById('pf-company');
+  if (prospectDuplicateHandler) {
+    companyInput.removeEventListener('input', prospectDuplicateHandler);
+  }
+  prospectDuplicateHandler = function() {
+    checkProspectDuplicate(this.value, 'pf-duplicate-warning', editingProspectId);
+  };
+  companyInput.addEventListener('input', prospectDuplicateHandler);
   document.getElementById('pf-type').value = p.company_type || '';
   populateCountryDropdown();
   document.getElementById('pf-country').value = p.country || '';
@@ -2036,9 +2122,9 @@ function closeEditContactModal() {
 }
 
 function openSaveAsTemplateModal() {
-  const subject = document.getElementById('or-subject').value.trim();
   const body = document.getElementById('or-body').value.trim();
-  const lang = document.querySelector('#or-lang-tabs .lang-tab.active')?.dataset.lang || 'FR';
+  const subject = document.getElementById('or-subject').value.trim();
+  const currentLang = (document.querySelector('#or-lang-tabs .lang-tab.active')?.dataset.lang || 'fr').toLowerCase();
 
   if (!body) {
     showError('Select a template and make your edits before saving.');
@@ -2046,13 +2132,26 @@ function openSaveAsTemplateModal() {
   }
 
   document.getElementById('st-name').value = '';
-  document.getElementById('st-language').value = lang.toUpperCase();
-  document.getElementById('st-subject').value = subject;
-  document.getElementById('st-body-preview').value = body;
+  document.getElementById('st-category').value = 'first_contact';
   document.getElementById('st-error').style.display = 'none';
 
-  document.getElementById('save-template-overlay').classList.add('open');
+  ['fr','en','ar'].forEach(lang => {
+    const cb = document.getElementById(`st-lang-${lang}`);
+    cb.checked = false;
+    document.getElementById(`st-panel-${lang}`).style.display = 'none';
+    document.getElementById(`st-subject-${lang}`).value = '';
+    document.getElementById(`st-body-${lang}`).value = '';
+  });
 
+  const cb = document.getElementById(`st-lang-${currentLang}`);
+  if (cb) {
+    cb.checked = true;
+    document.getElementById(`st-panel-${currentLang}`).style.display = 'block';
+    document.getElementById(`st-subject-${currentLang}`).value = subject;
+    document.getElementById(`st-body-${currentLang}`).value = body;
+  }
+
+  document.getElementById('save-template-overlay').classList.add('open');
   setTimeout(() => {
     document.getElementById('st-name').focus();
   }, 100);
@@ -2068,9 +2167,6 @@ async function saveAsTemplate() {
 
   const name = document.getElementById('st-name').value.trim();
   const category = document.getElementById('st-category').value;
-  const language = document.getElementById('st-language').value.toLowerCase();
-  const subject = document.getElementById('st-subject').value.trim();
-  const body = document.getElementById('st-body-preview').value.trim();
 
   if (!name) {
     errorEl.textContent = 'Template name is required.';
@@ -2078,20 +2174,42 @@ async function saveAsTemplate() {
     return;
   }
 
-  if (!body) {
-    errorEl.textContent = 'Body cannot be empty.';
+  const selected = [];
+  ['fr','en','ar'].forEach(lang => {
+    const cb = document.getElementById(`st-lang-${lang}`);
+    if (cb.checked) {
+      const body = document.getElementById(`st-body-${lang}`).value.trim();
+      const subject = document.getElementById(`st-subject-${lang}`).value.trim();
+      selected.push({ lang, body, subject });
+    }
+  });
+
+  if (!selected.length) {
+    errorEl.textContent = 'Select at least one language.';
     errorEl.style.display = 'block';
     return;
   }
 
-  const duplicate = allTemplates.find(t =>
-    t.name.toLowerCase() === name.toLowerCase() &&
-    (t.language||'').toLowerCase() === language &&
-    t.category === category &&
-    t.hotel_code === hotelCode
+  const emptyBody = selected.find(s => !s.body);
+  if (emptyBody) {
+    errorEl.textContent = `Body is required for the ${emptyBody.lang.toUpperCase()} version.`;
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const duplicates = selected.filter(s =>
+    allTemplates.find(t =>
+      t.name.toLowerCase() === name.toLowerCase() &&
+      (t.language||'').toLowerCase() === s.lang &&
+      t.category === category &&
+      t.hotel_code === hotelCode
+    )
   );
-  if (duplicate) {
-    errorEl.textContent = 'A template with this name already exists for this category and language. Use a different name.';
+  if (duplicates.length) {
+    errorEl.textContent =
+      `A template named "${name}" already exists for ` +
+      duplicates.map(d => d.lang.toUpperCase()).join(', ') +
+      ` in this category. Use a different name.`;
     errorEl.style.display = 'block';
     return;
   }
@@ -2101,42 +2219,45 @@ async function saveAsTemplate() {
   saveBtn.textContent = 'Saving...';
 
   try {
+    const inserts = selected.map(s => ({
+      hotel_code: hotelCode,
+      category: category,
+      name: name,
+      language: s.lang,
+      subject: s.subject || null,
+      body: s.body,
+      is_active: true,
+      created_by: currentUserEmail
+    }));
+
     const { data, error } = await supabaseClient
       .from('prospect_templates')
-      .insert({
-        hotel_code: hotelCode,
-        category: category,
-        name: name,
-        language: language,
-        subject: subject || null,
-        body: body,
-        is_active: true,
-        created_by: currentUserEmail
-      })
-      .select('*')
-      .single();
+      .insert(inserts)
+      .select('*');
 
     if (error) throw error;
 
-    allTemplates.push(data);
+    (data || []).forEach(t => allTemplates.push(t));
 
     closeSaveAsTemplateModal();
 
     const hint = document.getElementById('or-outlook-hint');
     if (hint) {
-      hint.textContent = `Template "${name}" saved and ready to use.`;
+      const langs = selected.map(s => s.lang.toUpperCase()).join('/');
+      hint.textContent = `Template "${name}" saved in ${langs}.`;
       hint.style.display = 'block';
-      hint.style.color = 'var(--green)';
+      hint.style.color = 'var(--green, #16a34a)';
       setTimeout(() => {
         hint.style.display = 'none';
         hint.style.color = '';
+        hint.textContent = '';
       }, 3000);
     }
 
     if (activeTab === 'templates') renderTemplatesTab();
 
   } catch (err) {
-    errorEl.textContent = 'Could not save template. Please try again.';
+    errorEl.textContent = 'Could not save. Please try again.';
     errorEl.style.display = 'block';
     console.error(err);
   } finally {
@@ -2204,10 +2325,37 @@ async function saveEditContact() {
 }
 
 /* ── Outreach Expand ── */
+async function deleteOutreach(outreachId, prospectId) {
+  if (!confirm('Delete this outreach record? This cannot be undone.')) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('prospect_outreach')
+      .delete()
+      .eq('id', outreachId);
+
+    if (error) throw error;
+
+    allOutreach = allOutreach.filter(o => o.id !== outreachId);
+
+    await refreshData();
+
+    setTimeout(() => {
+      const row = document.querySelector(`tr[data-prospect-id="${prospectId}"]`);
+      if (row) row.click();
+    }, 200);
+
+  } catch (err) {
+    console.error('Delete outreach error:', err);
+    alert('Could not delete. Please try again.');
+  }
+}
+
 function toggleOutreachExpand(headerEl) {
   const item = headerEl.closest('.outreach-item');
   const full = item.querySelector('.outreach-full');
-  const arrow = headerEl.querySelector('span:last-child');
+  const spans = headerEl.querySelectorAll('span');
+  const arrow = spans[spans.length - 1];
   const isOpen = full.style.display !== 'none';
   full.style.display = isOpen ? 'none' : 'block';
   arrow.innerHTML = isOpen ? '&#9660;' : '&#9650;';
@@ -2495,6 +2643,25 @@ document.getElementById('quick-entry-form').addEventListener('keydown', function
   document.getElementById(id).addEventListener('change', renderTable);
 });
 document.getElementById('filter-search').addEventListener('input', renderTable);
+
+['fr','en','ar'].forEach(lang => {
+  document.getElementById(`st-lang-${lang}`).addEventListener('change', function() {
+    document.getElementById(`st-panel-${lang}`).style.display = this.checked ? 'block' : 'none';
+  });
+});
+
+const companyInput = document.getElementById('pf-company');
+if (prospectDuplicateHandler) {
+  companyInput.removeEventListener('input', prospectDuplicateHandler);
+}
+prospectDuplicateHandler = function() {
+  checkProspectDuplicate(this.value, 'pf-duplicate-warning', null);
+};
+companyInput.addEventListener('input', prospectDuplicateHandler);
+
+document.getElementById('qe-company').addEventListener('input', function() {
+  checkProspectDuplicate(this.value, 'qe-duplicate-warning');
+});
 
 /* ── Init ── */
 (async () => {
