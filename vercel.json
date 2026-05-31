@@ -9,6 +9,9 @@
     { "src": "/sales_prospect", "dest": "/sales_prospect.html" },
     { "src": "/weekly", "dest": "/weekly.html" },
     { "src": "/report", "dest": "/report.html" },
-    { "src": "/api/(.*)", "dest": "/api/$1" }
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/og-image.png", "dest": "/og-image.png" },
+    { "src": "/sitemap.xml", "dest": "/sitemap.xml" },
+    { "src": "/robots.txt", "dest": "/robots.txt" }
   ]
 }
