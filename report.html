@@ -625,9 +625,13 @@ function buildModuleNarrative(modId, context) {
       return `${opener} total room nights of ${rnTy} against ${rnLy} LY benchmark with ADR ${adrTy} vs plan.`;
     }
     case 'segment_analysis': {
+      const displayNameMap = {};
+      (engineJson?.focus?.active_signals || []).forEach(s => {
+        displayNameMap[s.bucket] = s.display_name;
+      });
       const segs = (engineJson?.focus?.segment_analysis || []).slice(0, 3);
       const top = segs[0];
-      const name = top?.segment || top?.display_name || 'key segment';
+      const name = displayNameMap[top?.segment] || top?.segment || 'key segment';
       const growth = rbFmtPct(top?.rnGrowth ?? top?.rn_growth);
       if (selectedAudience === 'gm') {
         return `${opener} ${name} drives mix with ${growth} RN variance — adjust channel and rate strategy accordingly.`;
@@ -1136,6 +1140,160 @@ function exportReportPdf() {
   let y = margin;
   let pageNum = 1;
 
+  function fmtNum(n) {
+    if (n == null || isNaN(n)) return '—';
+    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function fmtEur(n) {
+    if (n == null || isNaN(n)) return '—';
+    return fmtNum(n) + ' €';
+  }
+
+  function fmtPctPdf(v) {
+    const n = rbNum(v);
+    const pct = (Math.abs(n) <= 1 && n !== 0 && !String(v).includes('%')) ? n * 100 : n;
+    return pct.toFixed(1) + '%';
+  }
+
+  function buildPdfTableData(modId) {
+    switch (modId) {
+      case 'performance_overview': {
+        const f = engineJson?.focus || {};
+        return {
+          headers: ['Metric', 'Last Year', 'This Year'],
+          rows: [
+            ['Room Nights', fmtNum(f.total_rn_ly), fmtNum(f.total_rn_ty)],
+            ['Revenue (€)', fmtEur(f.total_rev_ly), fmtEur(f.total_rev_ty)],
+            ['ADR (€)', fmtEur(f.overall_adr_ly), fmtEur(f.overall_adr_ty)]
+          ]
+        };
+      }
+      case 'segment_analysis': {
+        const displayNameMap = {};
+        (engineJson?.focus?.active_signals || []).forEach(s => {
+          displayNameMap[s.bucket] = s.display_name;
+        });
+        const segs = engineJson?.focus?.segment_analysis || [];
+        return {
+          headers: ['Segment', 'RN TY', 'RN LY', 'Variance %', 'ADR TY', 'ADR LY', 'ADR Var %'],
+          rows: segs.map(s => [
+            displayNameMap[s.segment] || s.segment || '—',
+            fmtNum(s.rnTY ?? s.rn_ty),
+            fmtNum(s.rnLY ?? s.rn_ly),
+            fmtPctPdf(s.rnGrowth ?? s.rn_growth ?? s.variance_pct),
+            fmtEur(s.adrTY ?? s.adr_ty),
+            fmtEur(s.adrLY ?? s.adr_ly),
+            fmtPctPdf(s.adrVariance ?? s.adr_variance ?? s.adrVar)
+          ])
+        };
+      }
+      case 'str_performance': {
+        const cm = getStrIssue()?.card_metrics || {};
+        return {
+          headers: ['Metric', 'Value'],
+          rows: [
+            ['MPI', rbNum(cm.avgMPI).toFixed(1)],
+            ['ARI', rbNum(cm.avgARI).toFixed(1)],
+            ['RGI', rbNum(cm.avgRGI).toFixed(1)],
+            ['Occupancy %', fmtPctPdf(cm.avgOcc ?? cm.avg_occ)]
+          ]
+        };
+      }
+      case 'forward_pace': {
+        const paceItems = engineJson.weekly_pickup_delta_issues || [];
+        const windowLabels = ['Days 1–30', 'Days 31–60', 'Days 61–90'];
+        const paceRows = paceItems.map((w, i) => [
+          windowLabels[i] || w.window_class || `Window ${i + 1}`,
+          fmtNum(w.signal?.current_rn_otb),
+          fmtNum(w.signal?.prior_rn_otb),
+          fmtNum(w.signal?.gap_to_forecast),
+          w.signal?.gap_direction || '—'
+        ]);
+        return {
+          headers: ['Window', 'OTB RN', 'LY RN', 'Gap to Forecast', 'Direction'],
+          rows: paceRows
+        };
+      }
+      case 'revenue_exposure': {
+        const revItems = engineJson.forecast_gap_issues || [];
+        return {
+          headers: ['Window', 'Forecast RN', 'OTB RN', 'Gap RN', 'Forecast Revenue', 'OTB Revenue', 'Gap €'],
+          rows: revItems.slice(0, 3).map(item => {
+            const q = item.quantification || {};
+            return [
+              item.window_label || '—',
+              fmtNum(q.total_forecast_rn),
+              fmtNum(q.total_otb_rn),
+              fmtNum(q.rn_gap),
+              fmtEur(q.total_forecast_rev),
+              fmtEur(q.total_otb_rev),
+              fmtEur(q.rev_gap)
+            ];
+          })
+        };
+      }
+      case 'corporate_at_risk': {
+        const card = (engineJson?.corporate_account_pace_issues || []).find(c => c.card_type === 'corporate_pace_risk');
+        const accounts = [...(card?.accounts_at_risk || [])].sort((a, b) => rbNum(a.variance_rn) - rbNum(b.variance_rn));
+        return {
+          headers: ['Account', 'Sector', 'Account Manager', 'FY LY RN', 'Projected RN', 'Variance RN', 'Variance %'],
+          rows: accounts.map(a => [
+            a.company_name || '—',
+            a.sector || '—',
+            a.account_manager || '—',
+            fmtNum(a.fy_ly_rn),
+            fmtNum(a.full_year_projected_rn),
+            fmtNum(a.variance_rn),
+            fmtPctPdf(a.variance_pct ?? a.variance_vs_ly)
+          ])
+        };
+      }
+      case 'corporate_ahead': {
+        const card = (engineJson?.corporate_account_pace_issues || []).find(c => c.card_type === 'corporate_pace_opportunity');
+        const accounts = [...(card?.accounts_ahead || [])].sort((a, b) => rbNum(b.variance_rn) - rbNum(a.variance_rn));
+        return {
+          headers: ['Account', 'Sector', 'Account Manager', 'FY LY RN', 'Projected RN', 'Variance RN', 'Variance %'],
+          rows: accounts.map(a => [
+            a.company_name || '—',
+            a.sector || '—',
+            a.account_manager || '—',
+            fmtNum(a.fy_ly_rn),
+            fmtNum(a.full_year_projected_rn),
+            fmtNum(a.variance_rn),
+            fmtPctPdf(a.variance_pct ?? a.variance_vs_ly)
+          ])
+        };
+      }
+      case 'financial_impact': {
+        const items = engineJson?.financial_quantification_summary?.issue_level_quantification || [];
+        return {
+          headers: ['Issue', 'Room Nights at Risk', 'Revenue Range Low', 'Revenue Range High', 'Confidence'],
+          rows: items.map(q => {
+            const qs = q.quantified_signals || {};
+            const rr = qs.revenue_range || {};
+            const issueLabel = q.finding_key
+              ? String(q.finding_key)
+                .replace(/_/g, ' ')
+                .replace(/^RET ISSUE |^CORP |^FCG /i, '')
+                .replace(/\b\w/g, c => c.toUpperCase())
+                .trim()
+              : (q.issue_title || q.title || '—');
+            return [
+              issueLabel,
+              fmtNum(qs.room_nights_at_risk),
+              fmtEur(rr.min ?? rr.low),
+              fmtEur(rr.max ?? rr.high),
+              q.confidence || qs.confidence || '—'
+            ];
+          })
+        };
+      }
+      default:
+        return { headers: [], rows: [] };
+    }
+  }
+
   function addFooter() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
@@ -1171,7 +1329,8 @@ function exportReportPdf() {
   y += 12;
 
   moduleOrder.forEach(modId => {
-    const { title, narrative, tableData, textBody } = getSectionExportContent(modId);
+    const { title, narrative, textBody } = getSectionExportContent(modId);
+    const pdfTable = buildPdfTableData(modId);
     checkPage(20);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
@@ -1189,11 +1348,11 @@ function exportReportPdf() {
         doc.text(line, margin, y);
         y += 5;
       });
-    } else if (tableData.rows.length && doc.autoTable) {
+    } else if (pdfTable.rows.length && doc.autoTable) {
       doc.autoTable({
         startY: y,
-        head: [tableData.headers],
-        body: tableData.rows.map(r => r.map(c => String(c).replace(/<[^>]+>/g, ''))),
+        head: [pdfTable.headers],
+        body: pdfTable.rows,
         margin: { left: margin, right: margin },
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [15, 31, 61], textColor: 255 },
