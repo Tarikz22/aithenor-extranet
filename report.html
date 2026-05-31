@@ -634,13 +634,20 @@ function buildModuleNarrative(modId, context) {
       return `${opener} total room nights of ${rnTy} against ${rnLy} LY benchmark with ADR ${adrTy} vs plan.`;
     }
     case 'segment_analysis': {
+      const bucketToDisplay = {
+        transient_negotiated: 'Negotiated',
+        transient_discount: 'Discount',
+        transient_retail: 'Retail Transient',
+        group_corporate: 'Corporate Groups',
+        transient_wholesale: 'Wholesale Transient'
+      };
       const displayNameMap = {};
       (engineJson?.focus?.active_signals || []).forEach(s => {
-        displayNameMap[s.bucket] = s.display_name;
+        if (s.bucket && s.display_name) displayNameMap[s.bucket] = s.display_name;
       });
       const segs = (engineJson?.focus?.segment_analysis || []).slice(0, 3);
       const top = segs[0];
-      const name = displayNameMap[top?.segment] || top?.segment || 'key segment';
+      const name = displayNameMap[top?.segment] || bucketToDisplay[top?.segment] || top?.segment || 'key segment';
       const growth = rbFmtPct(top?.rnGrowth ?? top?.rn_growth);
       if (selectedAudience === 'gm') {
         return `${opener} ${name} drives mix with ${growth} RN variance — adjust channel and rate strategy accordingly.`;
@@ -664,7 +671,8 @@ function buildModuleNarrative(modId, context) {
     }
     case 'forward_pace': {
       const w = (engineJson?.weekly_pickup_delta_issues || [])[0];
-      const win = w?.window_label || w?.window_class || 'forward window';
+      const windowClassMap = { window_1: 'Days 1–30', window_2: 'Days 31–60', window_3: 'Days 61–90' };
+      const win = w?.window_label || windowClassMap[w?.window_class] || 'Days 1–30';
       const gap = rbFmtNum(w?.signal?.gap_to_forecast ?? w?.pace_data?.pace_gap_rn);
       if (selectedAudience === 'gm') {
         return `${opener} ${win} shows a ${gap} RN gap vs forecast — accelerate pickup and group conversion.`;
