@@ -6,6 +6,10 @@
 <title>Aithenor — Report Builder</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundled.js"></script>
 <style>
 :root {
   --navy: #0F1F3D;
@@ -173,6 +177,93 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
   transition: background 0.15s, opacity 0.15s;
 }
 .rb-continue-btn:disabled { background: var(--gray-300); color: var(--color-text-tertiary); cursor: not-allowed; }
+.rb-step2-header { margin-bottom: 20px; }
+.rb-step2-header h2 { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--navy); margin-bottom: 4px; }
+.rb-step2-header p { font-size: 13px; color: var(--color-text-secondary); }
+.rb-order-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.rb-order-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary);
+  border-radius: 8px; cursor: grab;
+}
+.rb-order-row.dragging { opacity: 0.5; }
+.rb-order-handle { color: var(--color-text-tertiary); font-size: 16px; user-select: none; }
+.rb-order-label { flex: 1; font-weight: 600; font-size: 13px; color: var(--color-text-primary); }
+.rb-order-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 4px; background: var(--gray-100); color: var(--color-text-secondary);
+}
+.rb-order-arrows { display: flex; gap: 4px; }
+.rb-order-arrow {
+  width: 28px; height: 28px; border: 1px solid var(--color-border-tertiary); border-radius: 6px;
+  background: var(--color-background-primary); cursor: pointer; font-size: 14px; color: var(--navy);
+  display: inline-flex; align-items: center; justify-content: center; font-family: inherit;
+}
+.rb-order-arrow:disabled { opacity: 0.35; cursor: not-allowed; }
+.rb-step-actions { display: flex; flex-direction: column; gap: 10px; }
+.rb-back-btn {
+  padding: 10px 16px; border-radius: 8px; font-size: 13px; border: 1px solid var(--color-border-tertiary);
+  background: var(--color-background-primary); color: var(--color-text-secondary); cursor: pointer; font-family: inherit;
+}
+.rb-canvas-toolbar {
+  position: sticky; top: 64px; z-index: 40; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 20px;
+  background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 8px;
+}
+.rb-canvas-back { font-size: 13px; color: var(--navy-mid); text-decoration: none; cursor: pointer; }
+.rb-canvas-back:hover { color: var(--navy); }
+.rb-audience-badge {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 999px; background: var(--navy); color: var(--white);
+}
+.rb-export-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.rb-export-btn {
+  padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
+  border: 1px solid var(--navy); background: var(--color-background-primary); color: var(--navy);
+}
+.rb-export-btn:hover { background: var(--gold-pale); }
+.rb-report-canvas {
+  max-width: 900px; margin: 0 auto; background: var(--color-background-primary);
+  box-shadow: 0 4px 24px rgba(15,31,61,0.08); padding: 32px 36px;
+}
+.rb-report-cover {
+  text-align: center; padding-bottom: 24px; margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+  font-family: 'Cormorant Garamond', serif; font-size: 20px; color: var(--navy);
+}
+.rb-report-section {
+  padding: 24px 0; border-bottom: 2px dashed var(--color-border-tertiary);
+  page-break-inside: avoid;
+}
+.rb-report-section:last-child { border-bottom: none; }
+.rb-section-title {
+  font-family: 'Cormorant Garamond', serif; font-size: 20px; color: var(--navy);
+  margin-bottom: 14px; outline: none; border-bottom: 1px dashed transparent;
+}
+.rb-section-title:focus { border-bottom-color: var(--gold); }
+.rb-section-narrative {
+  font-size: 13px; line-height: 1.65; color: var(--color-text-primary); margin-top: 14px;
+  outline: none; padding: 8px; border-radius: 4px; border: 1px dashed transparent;
+}
+.rb-section-narrative:focus { border-color: var(--gold); background: var(--gold-pale); }
+.rb-data-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.rb-data-table th {
+  text-align: left; padding: 8px 10px; background: var(--gray-100);
+  color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--color-border-tertiary);
+}
+.rb-data-table td { padding: 8px 10px; border-bottom: 1px solid var(--gray-100); color: var(--color-text-primary); }
+.rb-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; }
+.rb-kpi-box {
+  text-align: center; padding: 16px; border: 0.5px solid var(--color-border-tertiary); border-radius: 8px;
+  background: var(--gray-100);
+}
+.rb-kpi-box .rb-kpi-val { font-size: 28px; font-weight: 600; color: var(--navy); }
+.rb-kpi-box .rb-kpi-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-tertiary); margin-top: 4px; }
+.rb-kpi-box.pos .rb-kpi-val { color: var(--green); }
+.rb-kpi-box.neg .rb-kpi-val { color: var(--red); }
+.rb-chart-wrap { position: relative; height: 260px; margin-top: 8px; }
+.rb-text-only { font-size: 13px; line-height: 1.65; color: var(--color-text-primary); }
 @media (max-width: 980px) {
   .sidebar { display: none; }
   .main { margin-left: 0; }
@@ -315,6 +406,8 @@ let engineJson = null;
 let engineDate = null;
 let selectedAudience = 'gm';
 let selectedModules = {};
+let moduleOrder = [];
+let reportChartInstances = [];
 
 function unwrapEngineJson(raw) {
   let j = typeof raw === 'string'
@@ -447,8 +540,714 @@ function detectAvailableModules(engineJson) {
   return defs;
 }
 
+function rbNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function rbFmtNum(v) {
+  return rbNum(v).toLocaleString('fr-FR');
+}
+
+function rbFmtEur(v) {
+  return rbNum(v).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+}
+
+function rbFmtPct(v) {
+  const n = rbNum(v);
+  const pct = (Math.abs(n) <= 1 && n !== 0 && !String(v).includes('%')) ? n * 100 : n;
+  return pct.toFixed(1) + '%';
+}
+
+function getModuleMeta(id) {
+  return (window._modules || []).find(m => m.id === id) || { id, label: id };
+}
+
+function audienceBadgeLabel() {
+  return { gm: 'GM REPORT', owner: 'OWNER REPORT', corporate: 'CORPORATE REPORT' }[selectedAudience] || 'GM REPORT';
+}
+
+function narrativeOpener() {
+  return {
+    gm: 'Action required:',
+    owner: "The hotel's position on",
+    corporate: 'Performance against benchmark indicates'
+  }[selectedAudience] || 'Action required:';
+}
+
+function reportFileDateStamp() {
+  const d = engineDate ? new Date(engineDate) : new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+function formatBadgeForModule(modId) {
+  const meta = getModuleMeta(modId);
+  const fmt = selectedModules[modId]?.format || meta.defaultFormat || 'table';
+  if (meta.supportsChart && meta.supportsTable) return fmt.toUpperCase();
+  if (meta.supportsChart) return 'CHART';
+  if (meta.supportsTable) return 'TABLE';
+  return 'TEXT';
+}
+
+function destroyReportCharts() {
+  reportChartInstances.forEach(c => { try { c.destroy(); } catch (_) {} });
+  reportChartInstances = [];
+}
+
+function buildTableHtml(headers, rows) {
+  if (!rows.length) {
+    return '<p class="rb-text-only">No data available for this module.</p>';
+  }
+  return `<table class="rb-data-table"><thead><tr>${headers.map(h => `<th>${rbEscHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function getStrIssue() {
+  return issuesArray(engineJson).find(i => i?.card_metrics?.avgARI != null) || null;
+}
+
+function buildModuleNarrative(modId, context) {
+  const opener = narrativeOpener();
+  switch (modId) {
+    case 'performance_overview': {
+      const f = engineJson?.focus || {};
+      const rnTy = rbFmtNum(f.total_rn_ty);
+      const rnLy = rbFmtNum(f.total_rn_ly);
+      const adrTy = rbFmtEur(f.overall_adr_ty);
+      if (selectedAudience === 'gm') {
+        return `${opener} room nights stand at ${rnTy} vs ${rnLy} LY with ADR at ${adrTy}. Review pace and pricing levers for the next 30 days.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} revenue performance shows ${rnTy} room nights (${rnLy} LY) and ADR ${adrTy}, supporting asset value through commercial discipline.`;
+      }
+      return `${opener} total room nights of ${rnTy} against ${rnLy} LY benchmark with ADR ${adrTy} vs plan.`;
+    }
+    case 'segment_analysis': {
+      const segs = (engineJson?.focus?.segment_analysis || []).slice(0, 3);
+      const top = segs[0];
+      const name = top?.segment || top?.display_name || 'key segment';
+      const growth = rbFmtPct(top?.rnGrowth ?? top?.rn_growth);
+      if (selectedAudience === 'gm') {
+        return `${opener} ${name} drives mix with ${growth} RN variance — adjust channel and rate strategy accordingly.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} segment mix is anchored by ${name} (${growth} vs LY), shaping revenue quality for the asset.`;
+      }
+      return `${opener} segment ${name} records ${growth} room night variance vs benchmark cohort.`;
+    }
+    case 'str_performance': {
+      const cm = getStrIssue()?.card_metrics || {};
+      const rgi = rbNum(cm.avgRGI).toFixed(1);
+      const mpi = rbNum(cm.avgMPI).toFixed(1);
+      if (selectedAudience === 'gm') {
+        return `${opener} RGI at ${rgi} and MPI at ${mpi} vs fair share — calibrate rate and inventory against comp set movement.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} competitive indices (RGI ${rgi}, MPI ${mpi}) reflect market share and rate positioning for the asset.`;
+      }
+      return `${opener} STR indices RGI ${rgi} / MPI ${mpi} vs comp-set benchmark baseline of 100.`;
+    }
+    case 'forward_pace': {
+      const w = (engineJson?.weekly_pickup_delta_issues || [])[0];
+      const win = w?.window_label || w?.window_class || 'forward window';
+      const gap = rbFmtNum(w?.signal?.gap_to_forecast ?? w?.pace_data?.pace_gap_rn);
+      if (selectedAudience === 'gm') {
+        return `${opener} ${win} shows a ${gap} RN gap vs forecast — accelerate pickup and group conversion.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} forward ${win} OTB pace carries a ${gap} RN variance vs forecast, affecting near-term revenue visibility.`;
+      }
+      return `${opener} forward window ${win} OTB variance of ${gap} RN vs forecast benchmark.`;
+    }
+    case 'revenue_exposure': {
+      const fg = (engineJson?.forecast_gap_issues || [])[0];
+      const q = fg?.quantification || {};
+      const gapEur = rbFmtEur(q.gap_revenue ?? q.rev_gap);
+      const win = fg?.window_label || 'forecast window';
+      if (selectedAudience === 'gm') {
+        return `${opener} ${win} exposes ${gapEur} revenue gap — close with targeted sales and displacement control.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} ${win} forecast gap of ${gapEur} represents measurable revenue exposure to the asset.`;
+      }
+      return `${opener} ${win} revenue gap of ${gapEur} vs forecast benchmark.`;
+    }
+    case 'corporate_at_risk': {
+      const card = (engineJson?.corporate_account_pace_issues || []).find(c => c.card_type === 'corporate_pace_risk');
+      const n = (card?.accounts_at_risk || []).length;
+      const rn = rbFmtNum(card?.total_rn_at_risk);
+      if (selectedAudience === 'gm') {
+        return `${opener} ${n} corporate accounts are behind pace (${rn} RN shortfall) — activate account managers this week.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} ${n} negotiated accounts trail LY by ${rn} room nights, creating contracted revenue risk.`;
+      }
+      return `${opener} ${n} corporate accounts below benchmark with ${rn} RN at risk.`;
+    }
+    case 'corporate_ahead': {
+      const card = (engineJson?.corporate_account_pace_issues || []).find(c => c.card_type === 'corporate_pace_opportunity');
+      const n = (card?.accounts_ahead || []).length;
+      if (selectedAudience === 'gm') {
+        return `${opener} ${n} accounts are ahead of LY — protect share and expand contracted volume.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} ${n} corporate accounts exceed LY pace, strengthening contracted revenue quality.`;
+      }
+      return `${opener} ${n} corporate accounts outperform LY benchmark.`;
+    }
+    case 'financial_impact': {
+      const q = (engineJson?.financial_quantification_summary?.issue_level_quantification || [])[0];
+      const qs = q?.quantified_signals || {};
+      const rr = qs.revenue_range || {};
+      const low = rbFmtEur(rr.min ?? rr.low);
+      const high = rbFmtEur(rr.max ?? rr.high);
+      if (selectedAudience === 'gm') {
+        return `${opener} quantified exposure ranges ${low}–${high} — prioritise actions on highest-confidence issues.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} financial quantification shows ${low}–${high} directional revenue exposure across active issues.`;
+      }
+      return `${opener} issue-level revenue range ${low}–${high} vs benchmark tolerance.`;
+    }
+    case 'causal_chain': {
+      const cc = engineJson?.cross_segment_synthesis?.causal_chain_card;
+      const story = cc?.primary_story || engineJson?.commercial_verdict?.verdict_text || '';
+      const snippet = String(story).slice(0, 120);
+      if (selectedAudience === 'gm') {
+        return `${opener} commercial diagnosis — ${snippet}${story.length > 120 ? '…' : ''} Execute on the primary driver identified.`;
+      }
+      if (selectedAudience === 'owner') {
+        return `${opener} strategic diagnosis — ${snippet}${story.length > 120 ? '…' : ''}`;
+      }
+      return `${opener} cross-segment synthesis — ${snippet}${story.length > 120 ? '…' : ''}`;
+    }
+    default:
+      return `${opener} review the data below.`;
+  }
+}
+
+function getModuleTableData(modId) {
+  switch (modId) {
+    case 'performance_overview': {
+      const f = engineJson?.focus || {};
+      return {
+        headers: ['Metric', 'Last Year', 'This Year'],
+        rows: [
+          ['Room Nights', rbFmtNum(f.total_rn_ly), rbFmtNum(f.total_rn_ty)],
+          ['Revenue (€)', rbFmtEur(f.total_rev_ly), rbFmtEur(f.total_rev_ty)],
+          ['ADR (€)', rbFmtEur(f.overall_adr_ly), rbFmtEur(f.overall_adr_ty)]
+        ]
+      };
+    }
+    case 'segment_analysis': {
+      const segs = engineJson?.focus?.segment_analysis || [];
+      return {
+        headers: ['Segment', 'RN TY', 'RN LY', 'Variance %', 'ADR TY', 'ADR LY', 'ADR Var %'],
+        rows: segs.map(s => [
+          rbEscHtml(s.segment || s.display_name || '—'),
+          rbFmtNum(s.rnTY ?? s.rn_ty),
+          rbFmtNum(s.rnLY ?? s.rn_ly),
+          rbFmtPct(s.rnGrowth ?? s.rn_growth ?? s.variance_pct),
+          rbFmtEur(s.adrTY ?? s.adr_ty),
+          rbFmtEur(s.adrLY ?? s.adr_ly),
+          rbFmtPct(s.adrVariance ?? s.adr_variance ?? s.adrVar)
+        ])
+      };
+    }
+    case 'str_performance': {
+      const cm = getStrIssue()?.card_metrics || {};
+      return {
+        headers: ['Metric', 'Value'],
+        rows: [
+          ['MPI', rbNum(cm.avgMPI).toFixed(1)],
+          ['ARI', rbNum(cm.avgARI).toFixed(1)],
+          ['RGI', rbNum(cm.avgRGI).toFixed(1)],
+          ['Occupancy %', rbFmtPct(cm.avgOcc ?? cm.avg_occ)]
+        ]
+      };
+    }
+    case 'forward_pace': {
+      const items = (engineJson?.weekly_pickup_delta_issues || []).slice(0, 3);
+      return {
+        headers: ['Window', 'OTB RN', 'Variance vs LY', 'Variance %'],
+        rows: items.map(w => {
+          const pd = w.pace_data || {};
+          const otb = pd.otb_rn_ty ?? pd.otb_rn ?? w.signal?.otb_rn;
+          const varRn = pd.pace_gap_rn ?? w.signal?.gap_to_forecast;
+          const varPct = pd.pace_gap_pct ?? w.signal?.pace_gap_pct;
+          return [
+            rbEscHtml(w.window_label || w.window_class || '—'),
+            rbFmtNum(otb),
+            rbFmtNum(varRn),
+            rbFmtPct(varPct)
+          ];
+        })
+      };
+    }
+    case 'revenue_exposure': {
+      const items = (engineJson?.forecast_gap_issues || []).slice(0, 3);
+      return {
+        headers: ['Window', 'Forecast RN', 'OTB RN', 'Gap RN', 'Forecast Revenue', 'OTB Revenue', 'Gap €'],
+        rows: items.map(f => {
+          const q = f.quantification || {};
+          return [
+            rbEscHtml(f.window_label || f.finding_key || '—'),
+            rbFmtNum(q.forecast_rn ?? q.plan_rn),
+            rbFmtNum(q.otb_rn ?? q.total_otb_rn),
+            rbFmtNum(q.gap_rn),
+            rbFmtEur(q.forecast_revenue ?? q.plan_revenue),
+            rbFmtEur(q.otb_revenue),
+            rbFmtEur(q.gap_revenue ?? q.rev_gap)
+          ];
+        })
+      };
+    }
+    case 'corporate_at_risk': {
+      const card = (engineJson?.corporate_account_pace_issues || []).find(c => c.card_type === 'corporate_pace_risk');
+      const accounts = [...(card?.accounts_at_risk || [])].sort((a, b) => rbNum(a.variance_rn) - rbNum(b.variance_rn));
+      return {
+        headers: ['Account', 'Sector', 'Account Manager', 'FY LY RN', 'Projected RN', 'Variance RN', 'Variance %'],
+        rows: accounts.map(a => [
+          rbEscHtml(a.company_name || '—'),
+          rbEscHtml(a.sector || '—'),
+          rbEscHtml(a.account_manager || '—'),
+          rbFmtNum(a.fy_ly_rn),
+          rbFmtNum(a.full_year_projected_rn),
+          rbFmtNum(a.variance_rn),
+          rbFmtPct(a.variance_pct ?? a.variance_vs_ly)
+        ])
+      };
+    }
+    case 'corporate_ahead': {
+      const card = (engineJson?.corporate_account_pace_issues || []).find(c => c.card_type === 'corporate_pace_opportunity');
+      const accounts = [...(card?.accounts_ahead || [])].sort((a, b) => rbNum(b.variance_rn) - rbNum(a.variance_rn));
+      return {
+        headers: ['Account', 'Sector', 'Account Manager', 'FY LY RN', 'Projected RN', 'Variance RN', 'Variance %'],
+        rows: accounts.map(a => [
+          rbEscHtml(a.company_name || '—'),
+          rbEscHtml(a.sector || '—'),
+          rbEscHtml(a.account_manager || '—'),
+          rbFmtNum(a.fy_ly_rn),
+          rbFmtNum(a.full_year_projected_rn),
+          rbFmtNum(a.variance_rn),
+          rbFmtPct(a.variance_pct ?? a.variance_vs_ly)
+        ])
+      };
+    }
+    case 'financial_impact': {
+      const items = engineJson?.financial_quantification_summary?.issue_level_quantification || [];
+      return {
+        headers: ['Issue', 'Room Nights at Risk', 'Revenue Range Low', 'Revenue Range High', 'Confidence'],
+        rows: items.map(q => {
+          const qs = q.quantified_signals || {};
+          const rr = qs.revenue_range || {};
+          return [
+            rbEscHtml(q.issue_title || q.title || q.finding_key || '—'),
+            rbFmtNum(qs.room_nights_at_risk),
+            rbFmtEur(rr.min ?? rr.low),
+            rbFmtEur(rr.max ?? rr.high),
+            rbEscHtml(q.confidence || qs.confidence || '—')
+          ];
+        })
+      };
+    }
+    default:
+      return { headers: [], rows: [] };
+  }
+}
+
+function renderModuleDataHtml(modId, format) {
+  if (modId === 'causal_chain') {
+    const cc = engineJson?.cross_segment_synthesis?.causal_chain_card;
+    const text = cc?.primary_story || engineJson?.commercial_verdict?.verdict_text || 'No diagnosis available.';
+    return `<div class="rb-text-only rb-causal-body" contenteditable="true">${rbEscHtml(text)}</div>`;
+  }
+
+  const effectiveFormat = format || selectedModules[modId]?.format || 'table';
+
+  if (modId === 'str_performance' && effectiveFormat === 'chart') {
+    const cm = getStrIssue()?.card_metrics || {};
+    const kpi = (val, label) => {
+      const n = rbNum(val);
+      const cls = n >= 100 ? 'pos' : 'neg';
+      return `<div class="rb-kpi-box ${cls}"><div class="rb-kpi-val">${n.toFixed(1)}</div><div class="rb-kpi-lbl">${label}</div></div>`;
+    };
+    return `<div class="rb-kpi-row">${kpi(cm.avgMPI, 'MPI')}${kpi(cm.avgARI, 'ARI')}${kpi(cm.avgRGI, 'RGI')}</div>`;
+  }
+
+  if (effectiveFormat === 'chart' && (modId === 'segment_analysis' || modId === 'forward_pace')) {
+    return `<div class="rb-chart-wrap"><canvas id="chart-${modId}"></canvas></div>`;
+  }
+
+  const { headers, rows } = getModuleTableData(modId);
+  return buildTableHtml(headers, rows);
+}
+
+function initReportCharts() {
+  if (!window.Chart) return;
+  destroyReportCharts();
+
+  const segFmt = selectedModules.segment_analysis?.format;
+  if (selectedModules.segment_analysis?.selected && segFmt === 'chart') {
+    const canvas = document.getElementById('chart-segment_analysis');
+    const segs = engineJson?.focus?.segment_analysis || [];
+    if (canvas && segs.length) {
+      reportChartInstances.push(new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: segs.map(s => s.segment || s.display_name || '—'),
+          datasets: [{
+            label: 'RN TY',
+            data: segs.map(s => rbNum(s.rnTY ?? s.rn_ty)),
+            backgroundColor: segs.map(s => rbNum(s.rnGrowth ?? s.rn_growth) >= 0 ? '#1A6B3C' : '#C0392B')
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true } }
+        }
+      }));
+    }
+  }
+
+  const paceFmt = selectedModules.forward_pace?.format;
+  if (selectedModules.forward_pace?.selected && paceFmt === 'chart') {
+    const canvas = document.getElementById('chart-forward_pace');
+    const items = (engineJson?.weekly_pickup_delta_issues || []).slice(0, 3);
+    if (canvas && items.length) {
+      reportChartInstances.push(new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: items.map(w => w.window_label || w.window_class || '—'),
+          datasets: [
+            {
+              label: 'OTB RN',
+              data: items.map(w => rbNum(w.pace_data?.otb_rn_ty ?? w.pace_data?.otb_rn)),
+              backgroundColor: '#0F1F3D'
+            },
+            {
+              label: 'LY RN',
+              data: items.map(w => rbNum(w.pace_data?.otb_rn_stly ?? w.pace_data?.otb_rn_ly)),
+              backgroundColor: '#C9A84C'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      }));
+    }
+  }
+}
+
 function renderLayoutConfig() {
-  console.log('step 2', selectedAudience, selectedModules);
+  const selectedIds = (window._modules || [])
+    .filter(m => selectedModules[m.id]?.selected)
+    .map(m => m.id);
+  if (!moduleOrder.length || moduleOrder.some(id => !selectedModules[id]?.selected)) {
+    moduleOrder = [...selectedIds];
+  } else {
+    moduleOrder = moduleOrder.filter(id => selectedModules[id]?.selected);
+    selectedIds.forEach(id => {
+      if (!moduleOrder.includes(id)) moduleOrder.push(id);
+    });
+  }
+
+  const container = document.getElementById('report-builder-content');
+
+  function renderOrderList() {
+    const list = container.querySelector('#rb-order-list');
+    if (!list) return;
+    list.innerHTML = moduleOrder.map((modId, idx) => {
+      const meta = getModuleMeta(modId);
+      return `<div class="rb-order-row" draggable="true" data-module-id="${rbEscHtml(modId)}" data-idx="${idx}">
+        <span class="rb-order-handle">⠿</span>
+        <span class="rb-order-label">${rbEscHtml(meta.label)}</span>
+        <span class="rb-order-badge">${formatBadgeForModule(modId)}</span>
+        <div class="rb-order-arrows">
+          <button type="button" class="rb-order-arrow" data-dir="up" data-idx="${idx}"${idx === 0 ? ' disabled' : ''}>↑</button>
+          <button type="button" class="rb-order-arrow" data-dir="down" data-idx="${idx}"${idx === moduleOrder.length - 1 ? ' disabled' : ''}>↓</button>
+        </div>
+      </div>`;
+    }).join('');
+    bindOrderEvents();
+  }
+
+  function bindOrderEvents() {
+    container.querySelectorAll('.rb-order-arrow').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        const dir = btn.dataset.dir;
+        const swap = dir === 'up' ? idx - 1 : idx + 1;
+        if (swap < 0 || swap >= moduleOrder.length) return;
+        [moduleOrder[idx], moduleOrder[swap]] = [moduleOrder[swap], moduleOrder[idx]];
+        renderOrderList();
+      });
+    });
+
+    let dragIdx = null;
+    container.querySelectorAll('.rb-order-row').forEach(row => {
+      row.addEventListener('dragstart', (e) => {
+        dragIdx = Number(row.dataset.idx);
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        dragIdx = null;
+      });
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const dropIdx = Number(row.dataset.idx);
+        if (dragIdx == null || dragIdx === dropIdx) return;
+        const moved = moduleOrder.splice(dragIdx, 1)[0];
+        moduleOrder.splice(dropIdx, 0, moved);
+        renderOrderList();
+      });
+    });
+  }
+
+  container.innerHTML = `
+    <div id="rb-step-2">
+      <div class="rb-step2-header">
+        <h2>Step 2 — Configure Layout</h2>
+        <p>Drag modules to reorder them in your report</p>
+      </div>
+      <div class="rb-order-list" id="rb-order-list"></div>
+      <div class="rb-step-actions">
+        <button type="button" id="rb-layout-back" class="rb-back-btn">← Back to Module Selection</button>
+        <button type="button" id="rb-generate-btn" class="rb-continue-btn">Generate Report</button>
+      </div>
+    </div>
+  `;
+
+  renderOrderList();
+
+  document.getElementById('rb-layout-back').addEventListener('click', () => {
+    setProgressStep(1);
+    renderModuleSelector(window._modules, true);
+  });
+
+  document.getElementById('rb-generate-btn').addEventListener('click', () => {
+    setProgressStep(3);
+    renderReportCanvas();
+  });
+}
+
+function renderReportCanvas() {
+  destroyReportCharts();
+  const container = document.getElementById('report-builder-content');
+  const reportDate = formatEngineDate(engineDate) || new Date().toLocaleDateString('en-GB');
+  const sectionsHtml = moduleOrder.map(modId => {
+    const meta = getModuleMeta(modId);
+    const fmt = selectedModules[modId]?.format || meta.defaultFormat || 'table';
+    const narrative = buildModuleNarrative(modId);
+    return `<section class="rb-report-section" data-module-id="${rbEscHtml(modId)}">
+      <h2 class="rb-section-title" contenteditable="true">${rbEscHtml(meta.label)}</h2>
+      <div class="rb-section-data">${renderModuleDataHtml(modId, fmt)}</div>
+      <p class="rb-section-narrative" contenteditable="true">${rbEscHtml(narrative)}</p>
+    </section>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div id="rb-step-3">
+      <div class="rb-canvas-toolbar">
+        <a class="rb-canvas-back" id="rb-canvas-back" href="#">← Back to Layout</a>
+        <span class="rb-audience-badge">${rbEscHtml(audienceBadgeLabel())}</span>
+        <div class="rb-export-btns">
+          <button type="button" class="rb-export-btn" id="rb-export-pdf">Export PDF</button>
+          <button type="button" class="rb-export-btn" id="rb-export-pptx">Export PPTX</button>
+        </div>
+      </div>
+      <div class="rb-report-canvas" id="rb-report-canvas">
+        <div class="rb-report-cover">${rbEscHtml(hotelCode)} — Commercial Intelligence Report — ${rbEscHtml(reportDate)}</div>
+        ${sectionsHtml}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('rb-canvas-back').addEventListener('click', (e) => {
+    e.preventDefault();
+    setProgressStep(2);
+    renderLayoutConfig();
+  });
+
+  document.getElementById('rb-export-pdf').addEventListener('click', exportReportPdf);
+  document.getElementById('rb-export-pptx').addEventListener('click', exportReportPptx);
+
+  requestAnimationFrame(() => initReportCharts());
+}
+
+function getSectionExportContent(modId) {
+  const section = document.querySelector(`.rb-report-section[data-module-id="${modId}"]`);
+  const title = section?.querySelector('.rb-section-title')?.innerText?.trim() || getModuleMeta(modId).label;
+  const narrative = section?.querySelector('.rb-section-narrative')?.innerText?.trim() || '';
+  const tableData = getModuleTableData(modId);
+  const meta = getModuleMeta(modId);
+  const fmt = selectedModules[modId]?.format || meta.defaultFormat || 'table';
+  let textBody = '';
+  if (modId === 'causal_chain') {
+    textBody = section?.querySelector('.rb-causal-body')?.innerText?.trim()
+      || engineJson?.cross_segment_synthesis?.causal_chain_card?.primary_story
+      || engineJson?.commercial_verdict?.verdict_text || '';
+  }
+  return { title, narrative, tableData, fmt, textBody, modId };
+}
+
+function exportReportPdf() {
+  if (!window.jspdf?.jsPDF) {
+    alert('PDF library not loaded. Please refresh the page.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  let y = margin;
+  let pageNum = 1;
+
+  function addFooter() {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Page ${pageNum}`, pageW - margin, pageH - 10, { align: 'right' });
+  }
+
+  function newPage() {
+    addFooter();
+    doc.addPage();
+    pageNum += 1;
+    y = margin;
+  }
+
+  function checkPage(need) {
+    if (y + need > pageH - 20) newPage();
+  }
+
+  doc.setFillColor(15, 31, 61);
+  doc.rect(0, 0, pageW, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('AITHENOR — STRATEGIC INTELLIGENCE', margin, 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`${hotelCode}  ·  ${formatEngineDate(engineDate)}`, margin, 20);
+  y = 36;
+
+  doc.setTextColor(26, 26, 24);
+  doc.setFontSize(12);
+  doc.text(`${hotelCode} — Commercial Intelligence Report — ${formatEngineDate(engineDate)}`, margin, y);
+  y += 12;
+
+  moduleOrder.forEach(modId => {
+    const { title, narrative, tableData, textBody } = getSectionExportContent(modId);
+    checkPage(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 31, 61);
+    doc.text(title, margin, y);
+    y += 8;
+
+    if (modId === 'causal_chain') {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(26, 26, 24);
+      const lines = doc.splitTextToSize(textBody || narrative, pageW - margin * 2);
+      lines.forEach(line => {
+        checkPage(6);
+        doc.text(line, margin, y);
+        y += 5;
+      });
+    } else if (tableData.rows.length && doc.autoTable) {
+      doc.autoTable({
+        startY: y,
+        head: [tableData.headers],
+        body: tableData.rows.map(r => r.map(c => String(c).replace(/<[^>]+>/g, ''))),
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [15, 31, 61], textColor: 255 },
+        theme: 'grid'
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    if (modId !== 'causal_chain' && narrative) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      const nLines = doc.splitTextToSize(narrative, pageW - margin * 2);
+      nLines.forEach(line => {
+        checkPage(6);
+        doc.text(line, margin, y);
+        y += 4.5;
+      });
+      y += 6;
+    }
+  });
+
+  addFooter();
+  doc.save(`Aithenor_Report_${hotelCode}_${reportFileDateStamp()}.pdf`);
+}
+
+function exportReportPptx() {
+  if (!window.PptxGenJS) {
+    alert('PPTX library not loaded. Please refresh the page.');
+    return;
+  }
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_16x9';
+  const navy = '0F1F3D';
+  const reportDate = formatEngineDate(engineDate) || '';
+
+  const titleSlide = pptx.addSlide();
+  titleSlide.addText(hotelCode, { x: 0.5, y: 1.2, w: 9, fontSize: 28, bold: true, color: navy });
+  titleSlide.addText('Commercial Intelligence Report', { x: 0.5, y: 2.0, w: 9, fontSize: 16, color: '6B6B67' });
+  titleSlide.addText(reportDate, { x: 0.5, y: 2.6, w: 9, fontSize: 12, color: '6B6B67' });
+  titleSlide.addText(audienceBadgeLabel(), { x: 0.5, y: 3.2, w: 9, fontSize: 11, color: navy });
+  titleSlide.addText('AITHENOR STRATEGIC INTELLIGENCE', { x: 0.5, y: 5.0, w: 9, fontSize: 9, color: '9A9A95' });
+
+  moduleOrder.forEach(modId => {
+    const { title, narrative, tableData, textBody } = getSectionExportContent(modId);
+    const slide = pptx.addSlide();
+    slide.addText(title, { x: 0.4, y: 0.3, w: 9.2, fontSize: 18, bold: true, color: navy });
+
+    let bodyY = 1.1;
+    if (modId === 'causal_chain') {
+      slide.addText(textBody || narrative, { x: 0.4, y: bodyY, w: 9.2, h: 3.5, fontSize: 11, color: '1A1A18', valign: 'top' });
+    } else if (tableData.rows.length) {
+      const tableRows = [
+        tableData.headers.map(h => ({ text: h, options: { bold: true, color: 'FFFFFF', fill: { color: navy } } })),
+        ...tableData.rows.map((row, ri) =>
+          row.map(cell => ({
+            text: String(cell).replace(/<[^>]+>/g, ''),
+            options: { fill: { color: ri % 2 === 0 ? 'F8F9FA' : 'FFFFFF' }, color: '1A1A18', fontSize: 9 }
+          }))
+        )
+      ];
+      slide.addTable(tableRows, { x: 0.4, y: bodyY, w: 9.2, fontSize: 9, border: { pt: 0.5, color: 'E8E8E5' } });
+      bodyY = Math.min(4.2, bodyY + 0.35 * (tableData.rows.length + 2));
+    }
+
+    const narrText = modId === 'causal_chain' ? '' : narrative;
+    if (narrText) {
+      slide.addText(narrText, { x: 0.4, y: Math.max(bodyY, 3.8), w: 9.2, h: 1.5, fontSize: 10, color: '6B6B67', valign: 'top' });
+    }
+  });
+
+  pptx.writeFile({ fileName: `Aithenor_Report_${hotelCode}_${reportFileDateStamp()}.pptx` });
 }
 
 function rbEscHtml(str) {
@@ -466,17 +1265,19 @@ function setProgressStep(stepNum) {
   });
 }
 
-function renderModuleSelector(availableModules) {
-  selectedAudience = 'gm';
-  selectedModules = {};
-  availableModules.forEach(mod => {
-    if (mod.available) {
-      selectedModules[mod.id] = {
-        selected: true,
-        format: mod.defaultFormat || 'table'
-      };
-    }
-  });
+function renderModuleSelector(availableModules, preserveSelections = false) {
+  if (!preserveSelections) {
+    selectedAudience = 'gm';
+    selectedModules = {};
+    availableModules.forEach(mod => {
+      if (mod.available) {
+        selectedModules[mod.id] = {
+          selected: true,
+          format: mod.defaultFormat || 'table'
+        };
+      }
+    });
+  }
 
   const audiences = [
     { id: 'gm', icon: '🏨', title: 'GM', desc: 'Weekly operational brief with actions' },
