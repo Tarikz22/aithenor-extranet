@@ -278,6 +278,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 }
 .rb-modal-loading { display: none; text-align: center; padding: 20px; color: var(--color-text-secondary); font-size: 13px; }
 .rb-modal-error { color: var(--red); font-size: 12px; margin-top: 10px; display: none; }
+.rb-btn-spinner {
+  display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-right: 8px;
+  border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%;
+  animation: rb-spin 0.7s linear infinite;
+}
+@keyframes rb-spin { to { transform: rotate(360deg); } }
+.rb-modal-generate .rb-btn-spinner { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
+.rb-describe-btn .rb-btn-spinner { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
 .rb-report-canvas {
   max-width: 900px; margin: 0 auto; background: var(--color-background-primary);
   box-shadow: 0 4px 24px rgba(15,31,61,0.08); padding: 32px 36px;
@@ -458,14 +466,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
     <p class="rb-modal-sub">Ask anything calculable from your hotel data</p>
     <div id="rb-modal-form">
       <textarea id="rb-custom-query" placeholder="e.g. Weekend vs weekday RevPAR trend, Average occupancy on Wednesdays, ADR by segment for April..."></textarea>
-      <div class="rb-modal-error" id="rb-custom-modal-error"></div>
+      <div id="custom-section-status" style="display:none; font-size:12px; color:var(--color-text-secondary); padding:8px 0;"></div>
       <div class="rb-modal-actions">
         <button type="button" class="rb-modal-generate" id="rb-custom-generate-btn">Generate Section</button>
         <button type="button" class="rb-modal-cancel" id="rb-custom-cancel-btn">Cancel</button>
       </div>
     </div>
-    <div class="rb-modal-loading" id="rb-custom-modal-loading">Aithenor is calculating...</div>
   </div>
+</div>
+
+<div id="custom-toast" style="
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:#0f2744; color:white; padding:10px 20px; border-radius:8px;
+  font-size:13px; font-weight:500; z-index:9999; display:none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+  ✓ Custom section added — scroll down to view
 </div>
 
 <script>
@@ -483,6 +498,8 @@ let reportChartInstances = [];
 let customSections = [];
 let pendingCustomSections = [];
 let customSectionChartInstances = [];
+let customSectionGenerating = false;
+let reportDescribePending = false;
 
 function unwrapEngineJson(raw) {
   let j = typeof raw === 'string'
@@ -857,60 +874,116 @@ function initCustomSectionCharts() {
   customSections.forEach(initSingleCustomSectionChart);
 }
 
+function showCustomToast() {
+  const toast = document.getElementById('custom-toast');
+  if (!toast) return;
+  toast.style.transition = '';
+  toast.style.display = 'block';
+  toast.style.opacity = '1';
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.5s';
+    toast.style.opacity = '0';
+    setTimeout(() => { toast.style.display = 'none'; }, 500);
+  }, 3000);
+}
+
+function setGenerateButtonLoading(loading) {
+  const genBtn = document.getElementById('rb-custom-generate-btn');
+  const queryEl = document.getElementById('rb-custom-query');
+  const cancelBtn = document.getElementById('rb-custom-cancel-btn');
+  if (genBtn) {
+    genBtn.disabled = loading;
+    genBtn.innerHTML = loading
+      ? '<span class="rb-btn-spinner"></span>Generating...'
+      : 'Generate Section';
+  }
+  if (queryEl) queryEl.disabled = loading;
+  if (cancelBtn) cancelBtn.disabled = loading;
+}
+
+function resetCustomSectionStatus() {
+  const statusEl = document.getElementById('custom-section-status');
+  if (!statusEl) return;
+  statusEl.style.display = 'none';
+  statusEl.style.color = 'var(--color-text-secondary)';
+  statusEl.textContent = '';
+}
+
+function setDescribeButtonLoading(loading) {
+  const btn = document.getElementById('report-describe-btn');
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<span class="rb-btn-spinner"></span>Building your report...'
+    : 'Build for me →';
+}
+
 function openCustomSectionModal() {
   const modal = document.getElementById('rb-custom-modal');
-  const form = document.getElementById('rb-modal-form');
-  const loading = document.getElementById('rb-custom-modal-loading');
-  const errEl = document.getElementById('rb-custom-modal-error');
   const queryEl = document.getElementById('rb-custom-query');
-  if (!modal) return;
-  if (queryEl) queryEl.value = '';
-  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-  if (form) form.style.display = 'block';
-  if (loading) loading.style.display = 'none';
+  if (!modal || customSectionGenerating) return;
+  if (queryEl) {
+    queryEl.value = '';
+    queryEl.disabled = false;
+  }
+  resetCustomSectionStatus();
+  setGenerateButtonLoading(false);
   modal.classList.add('visible');
 }
 
 function closeCustomSectionModal() {
+  if (customSectionGenerating) return;
   const modal = document.getElementById('rb-custom-modal');
   if (modal) modal.classList.remove('visible');
+  resetCustomSectionStatus();
+  setGenerateButtonLoading(false);
 }
 
 async function handleCustomSectionGenerate() {
+  if (customSectionGenerating) return;
   const queryEl = document.getElementById('rb-custom-query');
-  const form = document.getElementById('rb-modal-form');
-  const loading = document.getElementById('rb-custom-modal-loading');
-  const errEl = document.getElementById('rb-custom-modal-error');
-  const genBtn = document.getElementById('rb-custom-generate-btn');
+  const statusEl = document.getElementById('custom-section-status');
   const userQuery = (queryEl?.value || '').trim();
   if (!userQuery) return;
   if (!engineJson) {
-    if (errEl) {
-      errEl.textContent = 'Could not calculate: No engine data loaded';
-      errEl.style.display = 'block';
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = 'Could not calculate: No engine data loaded';
     }
     return;
   }
-  if (form) form.style.display = 'none';
-  if (loading) loading.style.display = 'block';
-  if (errEl) errEl.style.display = 'none';
-  if (genBtn) genBtn.disabled = true;
+  customSectionGenerating = true;
+  setGenerateButtonLoading(true);
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--color-text-secondary)';
+    statusEl.textContent = 'Aithenor is calculating from your hotel data...';
+  }
   try {
     const sec = await generateCustomSectionFromQuery(userQuery);
     customSections.push(sec);
-    if (document.getElementById('rb-report-canvas')) {
+    const onCanvas = !!document.getElementById('rb-report-canvas');
+    if (onCanvas) {
       appendCustomSectionToCanvas(sec);
+      showCustomToast();
     }
+    if (statusEl) {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = '✓ Section ready';
+    }
+    await new Promise(r => setTimeout(r, 1000));
+    customSectionGenerating = false;
+    setGenerateButtonLoading(false);
     closeCustomSectionModal();
   } catch (err) {
-    if (form) form.style.display = 'block';
-    if (loading) loading.style.display = 'none';
-    if (errEl) {
-      errEl.textContent = 'Could not calculate: ' + (err.message || 'Unable to generate section');
-      errEl.style.display = 'block';
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = 'Could not calculate: ' + (err.message || 'Unable to generate section');
     }
-  } finally {
-    if (genBtn) genBtn.disabled = false;
+    customSectionGenerating = false;
+    setGenerateButtonLoading(false);
   }
 }
 
@@ -930,8 +1003,8 @@ async function processPendingCustomSections() {
 }
 
 async function applyReportDescription() {
+  if (reportDescribePending) return;
   const input = document.getElementById('report-describe-input');
-  const btn = document.getElementById('report-describe-btn');
   const confirmEl = document.getElementById('report-describe-confirm');
   const desc = (input?.value || '').trim();
   if (!desc || !engineJson) return;
@@ -951,7 +1024,8 @@ Rules:
 - custom_sections: list any analyses that cannot be covered by the standard modules above — phrase each as a clear calculation request
 - If the user asks for "everything" or a "full report" — return all 9 standard modules and no custom sections
 - Keep custom_sections queries short and specific`;
-  if (btn) { btn.disabled = true; btn.textContent = 'Building...'; }
+  reportDescribePending = true;
+  setDescribeButtonLoading(true);
   if (confirmEl) confirmEl.style.display = 'none';
   try {
     const content = await callNlQuery(systemPrompt, desc);
@@ -971,7 +1045,7 @@ Rules:
     pendingCustomSections = customQueries.filter(q => String(q).trim());
     if (confirmEl) {
       confirmEl.style.color = 'var(--green)';
-      confirmEl.textContent = `✓ ${selectedCount} modules selected, ${pendingCustomSections.length} custom sections queued`;
+      confirmEl.textContent = `✓ ${selectedCount} modules selected`;
       confirmEl.style.display = 'block';
     }
     const container = document.getElementById('report-builder-content');
@@ -1003,7 +1077,8 @@ Rules:
       confirmEl.style.display = 'block';
     }
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Build for me →'; }
+    reportDescribePending = false;
+    setDescribeButtonLoading(false);
   }
 }
 
