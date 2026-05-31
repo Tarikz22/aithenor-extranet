@@ -909,6 +909,16 @@ function syncContinueButtonIfVisible() {
 
 window.removeQueuedCustomSection = removeQueuedCustomSection;
 
+function isPercentageDataset(label) {
+  const l = (label || '').toLowerCase();
+  return l.includes('occupancy') || l.includes('occ') || l.includes('%');
+}
+
+function isMonetaryDataset(label) {
+  const l = (label || '').toLowerCase();
+  return l.includes('adr') || l.includes('revpar') || l.includes('revenue') || l.includes('€') || l.includes('rate');
+}
+
 function initSingleCustomSectionChart(sec) {
   if (typeof Chart === 'undefined') return;
   if (sec.type !== 'chart' || !sec.chartConfig) return;
@@ -916,15 +926,63 @@ function initSingleCustomSectionChart(sec) {
   if (!canvas || canvas.dataset.chartInit === '1') return;
   canvas.dataset.chartInit = '1';
   const cfg = sec.chartConfig;
-  const chartType = cfg.chartType === 'horizontalBar' ? 'bar' : (cfg.chartType || 'bar');
-  const datasets = (cfg.datasets || []).map(ds => ({
-    label: ds.label || '',
-    data: ds.data || [],
-    backgroundColor: ds.color || '#0f2744',
-    borderColor: ds.color || '#0f2744',
-    borderWidth: chartType === 'line' ? 2 : 1,
-    fill: chartType === 'line' ? false : undefined
-  }));
+  const isHorizontal = cfg.chartType === 'horizontalBar';
+  const chartType = isHorizontal ? 'bar' : (cfg.chartType || 'bar');
+  const datasets = (cfg.datasets || []).map(ds => {
+    const entry = {
+      label: ds.label || '',
+      data: ds.data || [],
+      backgroundColor: ds.color || '#0f2744',
+      borderColor: ds.color || '#0f2744',
+      borderWidth: chartType === 'line' ? 2 : 1,
+      fill: chartType === 'line' ? false : undefined
+    };
+    if (!isHorizontal) {
+      entry.yAxisID = isPercentageDataset(ds.label) ? 'y_pct' : 'y_val';
+    }
+    return entry;
+  });
+
+  const hasMixed = !isHorizontal &&
+    datasets.some(d => d.yAxisID === 'y_pct') &&
+    datasets.some(d => d.yAxisID === 'y_val');
+
+  if (!hasMixed) {
+    datasets.forEach(d => { delete d.yAxisID; });
+  }
+
+  let scales;
+  if (chartType === 'line' || chartType === 'bar') {
+    scales = hasMixed ? {
+      y_val: {
+        type: 'linear',
+        position: 'left',
+        beginAtZero: true,
+        title: { display: true, text: '€', font: { size: 11 } },
+        grid: { color: 'rgba(0,0,0,0.06)' }
+      },
+      y_pct: {
+        type: 'linear',
+        position: 'right',
+        beginAtZero: true,
+        max: 100,
+        title: { display: true, text: '%', font: { size: 11 } },
+        grid: { drawOnChartArea: false }
+      },
+      x: {
+        grid: { color: 'rgba(0,0,0,0.04)' }
+      }
+    } : {
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(0,0,0,0.06)' }
+      },
+      x: {
+        grid: { color: 'rgba(0,0,0,0.04)' }
+      }
+    };
+  }
+
   const chart = new Chart(canvas, {
     type: chartType,
     data: { labels: cfg.labels || [], datasets },
@@ -932,10 +990,8 @@ function initSingleCustomSectionChart(sec) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: datasets.length > 1 } },
-      indexAxis: cfg.chartType === 'horizontalBar' ? 'y' : 'x',
-      scales: chartType === 'line' || chartType === 'bar'
-        ? { y: { beginAtZero: true } }
-        : undefined
+      indexAxis: isHorizontal ? 'y' : 'x',
+      scales
     }
   });
   customSectionChartInstances.push(chart);
