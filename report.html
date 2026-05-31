@@ -259,9 +259,9 @@ function hasIssueCardType(engineJson, cardType) {
   return issuesArray(engineJson).some(issue => issue?.card_type === cardType);
 }
 
-function detectAvailableModules(ej) {
-  const corpCard = Array.isArray(ej?.corporate_account_pace_issues)
-    ? ej.corporate_account_pace_issues[0]
+function detectAvailableModules(engineJson) {
+  const corpCard = Array.isArray(engineJson?.corporate_account_pace_issues)
+    ? engineJson.corporate_account_pace_issues[0]
     : null;
 
   const defs = [
@@ -273,7 +273,7 @@ function detectAvailableModules(ej) {
       supportsChart: false,
       supportsTable: true,
       defaultFormat: 'table',
-      available: isNonEmpty(getByPath(ej, 'focus.total_rn_ty'))
+      available: isNonEmpty(getByPath(engineJson, 'focus.total_rn_ty'))
     },
     {
       id: 'segment_analysis',
@@ -283,7 +283,7 @@ function detectAvailableModules(ej) {
       supportsChart: true,
       supportsTable: true,
       defaultFormat: 'chart',
-      available: isNonEmpty(getByPath(ej, 'focus.segment_analysis'))
+      available: isNonEmpty(getByPath(engineJson, 'focus.segment_analysis'))
     },
     {
       id: 'str_performance',
@@ -293,7 +293,7 @@ function detectAvailableModules(ej) {
       supportsChart: true,
       supportsTable: true,
       defaultFormat: 'chart',
-      available: issuesArray(ej).some(issue => issue?.card_metrics?.avgARI != null)
+      available: issuesArray(engineJson).some(issue => issue?.card_metrics?.avgARI != null)
     },
     {
       id: 'forward_pace',
@@ -303,7 +303,7 @@ function detectAvailableModules(ej) {
       supportsChart: true,
       supportsTable: true,
       defaultFormat: 'chart',
-      available: hasIssueCardType(ej, 'pms_pace')
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'pms_pace'))
     },
     {
       id: 'revenue_exposure',
@@ -313,7 +313,7 @@ function detectAvailableModules(ej) {
       supportsChart: false,
       supportsTable: true,
       defaultFormat: 'table',
-      available: hasIssueCardType(ej, 'forecast_gap')
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'forecast_gap'))
     },
     {
       id: 'corporate_at_risk',
@@ -333,7 +333,7 @@ function detectAvailableModules(ej) {
       supportsChart: false,
       supportsTable: true,
       defaultFormat: 'table',
-      available: isNonEmpty(corpCard?.accounts_ahead)
+      available: !!(engineJson.corporate_account_pace_issues && engineJson.corporate_account_pace_issues.length > 0 && engineJson.corporate_account_pace_issues[0].accounts_ahead && engineJson.corporate_account_pace_issues[0].accounts_ahead.length > 0)
     },
     {
       id: 'financial_impact',
@@ -343,7 +343,7 @@ function detectAvailableModules(ej) {
       supportsChart: false,
       supportsTable: true,
       defaultFormat: 'table',
-      available: isNonEmpty(getByPath(ej, 'financial_quantification_summary.issue_level_quantification'))
+      available: isNonEmpty(getByPath(engineJson, 'financial_quantification_summary.issue_level_quantification'))
     },
     {
       id: 'causal_chain',
@@ -353,7 +353,7 @@ function detectAvailableModules(ej) {
       supportsChart: false,
       supportsTable: false,
       defaultFormat: 'table',
-      available: hasIssueCardType(ej, 'causal_chain')
+      available: !!(engineJson.issues && engineJson.issues.some(i => i.card_type === 'causal_chain'))
     }
   ];
 
@@ -421,8 +421,9 @@ async function loadLatestEngineOutput() {
     dateChip.style.display = 'inline-block';
   }
 
-  const availableModules = detectAvailableModules(engineJson);
-  renderModuleSelector(availableModules);
+  window._modules = detectAvailableModules(engineJson);
+  console.log('fixed modules:', window._modules && window._modules.map(m => m.id + ': ' + m.available));
+  renderModuleSelector(window._modules);
   showLoading(false);
 }
 
