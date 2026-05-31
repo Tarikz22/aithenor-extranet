@@ -89,10 +89,95 @@ body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(
 .login-btn { width: 100%; margin-top: 16px; border: none; border-radius: 10px; padding: 12px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
 .login-error { display: none; margin-top: 10px; color: var(--red); font-size: 12px; }
 .app-screen { display: none; }
+.rb-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.rb-section-label + .rb-section-label,
+.rb-audience-row + .rb-section-label { margin-top: 28px; }
+.rb-audience-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.rb-audience-card {
+  min-width: 160px;
+  padding: 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid var(--color-border-tertiary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  flex: 1;
+  transition: all 0.15s;
+}
+.rb-audience-card.selected {
+  background: var(--navy);
+  color: var(--white);
+  border-color: var(--navy);
+}
+.rb-audience-icon { font-size: 22px; margin-bottom: 8px; line-height: 1; }
+.rb-audience-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; color: var(--color-text-primary); }
+.rb-audience-card.selected .rb-audience-title { color: var(--white); }
+.rb-audience-desc { font-size: 12px; line-height: 1.45; color: var(--color-text-secondary); }
+.rb-audience-card.selected .rb-audience-desc { color: var(--white); opacity: 0.85; }
+.rb-module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+.rb-module-card {
+  padding: 14px;
+  border-radius: 8px;
+  border: 0.5px solid var(--color-border-tertiary);
+  background: var(--color-background-primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.rb-module-card.selected { border-left: 3px solid var(--navy); }
+.rb-module-card.deselected { background: var(--gray-100); border-left: none; }
+.rb-module-card.unavailable {
+  background: var(--gray-100);
+  opacity: 0.65;
+  cursor: not-allowed;
+  border-left: none;
+}
+.rb-module-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.rb-module-head input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; cursor: pointer; }
+.rb-module-card.unavailable input[type="checkbox"] { cursor: not-allowed; }
+.rb-module-label { font-weight: 600; font-size: 13px; color: var(--color-text-primary); line-height: 1.35; }
+.rb-module-desc { font-size: 12px; color: var(--color-text-secondary); line-height: 1.45; margin-left: 26px; }
+.rb-module-unavailable { font-size: 11px; color: var(--red); margin-top: 6px; margin-left: 26px; }
+.rb-module-footer { margin-top: 10px; margin-left: 26px; }
+.rb-format-toggle { display: inline-flex; border: 1px solid var(--color-border-tertiary); border-radius: 6px; overflow: hidden; }
+.rb-format-btn {
+  border: none;
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.rb-format-btn.active { background: var(--navy); color: var(--white); }
+.rb-format-static { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+.rb-step-error { color: var(--red); font-size: 13px; margin-bottom: 12px; }
+.rb-continue-btn {
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: var(--navy);
+  color: var(--white);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, opacity 0.15s;
+}
+.rb-continue-btn:disabled { background: var(--gray-300); color: var(--color-text-tertiary); cursor: not-allowed; }
 @media (max-width: 980px) {
   .sidebar { display: none; }
   .main { margin-left: 0; }
   .content { padding: 18px; }
+  .rb-module-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -228,6 +313,8 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let hotelCode = '';
 let engineJson = null;
 let engineDate = null;
+let selectedAudience = 'gm';
+let selectedModules = {};
 
 function unwrapEngineJson(raw) {
   let j = typeof raw === 'string'
@@ -360,8 +447,186 @@ function detectAvailableModules(engineJson) {
   return defs;
 }
 
+function renderLayoutConfig() {
+  console.log('step 2', selectedAudience, selectedModules);
+}
+
+function rbEscHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setProgressStep(stepNum) {
+  document.querySelectorAll('.progress-step').forEach((el, i) => {
+    el.classList.toggle('active', i === stepNum - 1);
+  });
+}
+
 function renderModuleSelector(availableModules) {
-  console.log('modules detected:', availableModules);
+  selectedAudience = 'gm';
+  selectedModules = {};
+  availableModules.forEach(mod => {
+    if (mod.available) {
+      selectedModules[mod.id] = {
+        selected: true,
+        format: mod.defaultFormat || 'table'
+      };
+    }
+  });
+
+  const audiences = [
+    { id: 'gm', icon: '🏨', title: 'GM', desc: 'Weekly operational brief with actions' },
+    { id: 'owner', icon: '🏦', title: 'Owner', desc: 'Asset protection narrative memo' },
+    { id: 'corporate', icon: '🏢', title: 'Corporate Office', desc: 'Compliance & benchmarks structured report' }
+  ];
+
+  function formatControlHtml(mod) {
+    if (!mod.supportsChart && !mod.supportsTable) return '';
+    if (mod.supportsChart && mod.supportsTable) {
+      const fmt = selectedModules[mod.id]?.format || mod.defaultFormat || 'chart';
+      return `<div class="rb-format-toggle" data-format-toggle="${rbEscHtml(mod.id)}">
+        <button type="button" class="rb-format-btn${fmt === 'chart' ? ' active' : ''}" data-format="chart">Chart</button>
+        <button type="button" class="rb-format-btn${fmt === 'table' ? ' active' : ''}" data-format="table">Table</button>
+      </div>`;
+    }
+    const label = mod.supportsChart ? 'Chart' : 'Table';
+    return `<span class="rb-format-static">${label}</span>`;
+  }
+
+  function moduleCardHtml(mod) {
+    if (!mod.available) {
+      return `<div class="rb-module-card unavailable" data-module-id="${rbEscHtml(mod.id)}">
+        <div class="rb-module-head">
+          <input type="checkbox" disabled>
+          <div class="rb-module-label">${rbEscHtml(mod.label)}</div>
+        </div>
+        <div class="rb-module-desc">${rbEscHtml(mod.description)}</div>
+        <div class="rb-module-unavailable">No data available</div>
+      </div>`;
+    }
+    const sel = selectedModules[mod.id]?.selected !== false;
+    const cardClass = sel ? 'selected' : 'deselected';
+    return `<div class="rb-module-card ${cardClass}" data-module-id="${rbEscHtml(mod.id)}">
+      <div class="rb-module-head">
+        <input type="checkbox" data-module-check="${rbEscHtml(mod.id)}"${sel ? ' checked' : ''}>
+        <div class="rb-module-label">${rbEscHtml(mod.label)}</div>
+      </div>
+      <div class="rb-module-desc">${rbEscHtml(mod.description)}</div>
+      <div class="rb-module-footer">${formatControlHtml(mod)}</div>
+    </div>`;
+  }
+
+  const container = document.getElementById('report-builder-content');
+  container.innerHTML = `
+    <div id="rb-step-1">
+      <div class="rb-section-label">Who is this report for?</div>
+      <div class="rb-audience-row">
+        ${audiences.map(a => `
+          <div class="rb-audience-card${selectedAudience === a.id ? ' selected' : ''}" data-audience="${a.id}" role="button" tabindex="0">
+            <div class="rb-audience-icon">${a.icon}</div>
+            <div class="rb-audience-title">${rbEscHtml(a.title)}</div>
+            <div class="rb-audience-desc">${rbEscHtml(a.desc)}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="rb-section-label">Select modules</div>
+      <div class="rb-module-grid">
+        ${availableModules.map(moduleCardHtml).join('')}
+      </div>
+
+      <div id="rb-step-error" class="rb-step-error" style="display:none;"></div>
+      <button type="button" id="rb-continue-btn" class="rb-continue-btn">Continue to Layout →</button>
+    </div>
+  `;
+
+  function selectedModuleCount() {
+    return Object.values(selectedModules).filter(m => m.selected).length;
+  }
+
+  function syncModuleCard(modId) {
+    const card = container.querySelector(`.rb-module-card[data-module-id="${modId}"]`);
+    if (!card || card.classList.contains('unavailable')) return;
+    const sel = selectedModules[modId]?.selected;
+    card.classList.toggle('selected', sel);
+    card.classList.toggle('deselected', !sel);
+    const cb = card.querySelector('[data-module-check]');
+    if (cb) cb.checked = !!sel;
+  }
+
+  function syncContinueButton() {
+    const btn = document.getElementById('rb-continue-btn');
+    if (btn) btn.disabled = selectedModuleCount() === 0;
+  }
+
+  function toggleModule(modId) {
+    if (!selectedModules[modId]) return;
+    selectedModules[modId].selected = !selectedModules[modId].selected;
+    syncModuleCard(modId);
+    syncContinueButton();
+    const errEl = document.getElementById('rb-step-error');
+    if (errEl && selectedModuleCount() > 0) errEl.style.display = 'none';
+  }
+
+  container.querySelectorAll('.rb-audience-card').forEach(card => {
+    card.addEventListener('click', () => {
+      selectedAudience = card.dataset.audience;
+      container.querySelectorAll('.rb-audience-card').forEach(c => {
+        c.classList.toggle('selected', c.dataset.audience === selectedAudience);
+      });
+    });
+  });
+
+  container.querySelectorAll('.rb-module-card:not(.unavailable)').forEach(card => {
+    const modId = card.dataset.moduleId;
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.rb-format-toggle')) return;
+      toggleModule(modId);
+    });
+    const cb = card.querySelector('[data-module-check]');
+    if (cb) {
+      cb.addEventListener('click', (e) => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        if (!selectedModules[modId]) return;
+        selectedModules[modId].selected = cb.checked;
+        syncModuleCard(modId);
+        syncContinueButton();
+      });
+    }
+  });
+
+  container.querySelectorAll('[data-format-toggle]').forEach(toggle => {
+    const modId = toggle.dataset.formatToggle;
+    toggle.querySelectorAll('.rb-format-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!selectedModules[modId]) return;
+        selectedModules[modId].format = btn.dataset.format;
+        toggle.querySelectorAll('.rb-format-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.format === btn.dataset.format);
+        });
+      });
+    });
+  });
+
+  document.getElementById('rb-continue-btn').addEventListener('click', () => {
+    const errEl = document.getElementById('rb-step-error');
+    if (selectedModuleCount() === 0) {
+      errEl.textContent = 'Please select at least one module to continue.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+    container.innerHTML = '';
+    setProgressStep(2);
+    renderLayoutConfig();
+  });
+
+  syncContinueButton();
 }
 
 function showLoading(show) {
