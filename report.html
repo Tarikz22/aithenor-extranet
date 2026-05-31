@@ -303,7 +303,7 @@ function detectAvailableModules(engineJson) {
       supportsChart: true,
       supportsTable: true,
       defaultFormat: 'chart',
-      available: !!(engineJson.pace_analysis || (Array.isArray(engineJson.segment_issue_cards) && engineJson.segment_issue_cards.some(c => c.card_type === 'pms_pace')))
+      available: !!(Array.isArray(engineJson.weekly_pickup_delta_issues) && engineJson.weekly_pickup_delta_issues.length > 0)
     },
     {
       id: 'revenue_exposure',
@@ -353,7 +353,7 @@ function detectAvailableModules(engineJson) {
       supportsChart: false,
       supportsTable: false,
       defaultFormat: 'table',
-      available: !!(Array.isArray(engineJson.segment_issue_cards) && engineJson.segment_issue_cards.some(c => c.card_type === 'causal_chain_synthesis')) || !!(engineJson.causal_chain_card != null)
+      available: !!(engineJson.cross_segment_synthesis && engineJson.cross_segment_synthesis.causal_chain_card != null)
     }
   ];
 
