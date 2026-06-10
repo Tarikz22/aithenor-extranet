@@ -248,7 +248,7 @@ const STEPS = [
   { title: 'Upload your file' },
   { title: 'Identify your tabs' },
   { title: 'Match your columns' },
-  { title: 'Map your segment codes' },
+  { title: 'Map segment values to Aithenor segments' },
   { title: 'Validate and save' }
 ];
 
@@ -293,8 +293,9 @@ const CANONICAL_FIELDS = {
 const ALIASES = {
   pms: {
     date: ['date', 'occupancy date', 'stay date', 'arrival date'],
-    segment_code: ['segment code', 'market segment code', 'seg code'],
-    segment_name: ['segment name', 'market segment name', 'market segment', 'segment'],
+    // Hilton G3 exports use "Market Segment" for short codes (BAR, CNR_*), not display names.
+    segment_code: ['segment code', 'market segment code', 'seg code', 'market segment'],
+    segment_name: ['segment name', 'market segment name', 'segment'],
     rn_ty: ['room nights ty', 'room nights this year', 'occupancy on books this year', 'rn ty', 'otb ty'],
     rn_ly: ['room nights ly actual', 'room nights last year actual', 'room nights ly', 'room nights last year', 'occupancy on books last year actual', 'occupancy on books last year', 'rn ly'],
     rn_stly: ['room nights stly', 'stly', 'occupancy on books stly'],
@@ -338,41 +339,46 @@ const ALIASES = {
   }
 };
 
-const USALI_SEGMENTS = [
-  { key: 'transient_retail',        label: 'Transient — Retail',                   group: 'Transient' },
-  { key: 'transient_discount',      label: 'Transient — Discount',                 group: 'Transient' },
-  { key: 'transient_negotiated',    label: 'Transient — Negotiated',               group: 'Transient' },
-  { key: 'transient_qualified',     label: 'Transient — Qualified',                group: 'Transient' },
-  { key: 'transient_wholesale',     label: 'Transient — Wholesale',                group: 'Transient' },
-  { key: 'group_corporate',         label: 'Group — Corporate',                    group: 'Group' },
-  { key: 'group_association',       label: 'Group — Association / Convention',     group: 'Group' },
-  { key: 'group_government',        label: 'Group — Government',                   group: 'Group' },
-  { key: 'group_tour_wholesale',    label: 'Group — Tour / Wholesale',             group: 'Group' },
-  { key: 'group_smerf',             label: 'Group — SMERF',                        group: 'Group' },
-  { key: 'contract',                label: 'Contract',                             group: 'Contract' },
-  { key: 'na',                      label: 'N/A — Not applicable',                 group: 'Other' },
-  { key: 'exclude',                 label: 'Exclude — Comp / House Use / OOO',     group: 'Other' }
+// Aithenor commercial segments used by the analyze pipeline (segment_mapping values).
+// Non-revenue rows are stored but excluded from ADR/RevPAR aggregation downstream.
+const AITHENOR_SEGMENTS = [
+  'Transient Retail',
+  'Corporate Negotiated',
+  'Corporate Negotiated - Local',
+  'Consortia',
+  'Government',
+  'Discounted Transient',
+  'Package / Marketing',
+  'Tour Operator / Wholesale',
+  'Loyalty Redemption',
+  'Groups',
+  'Long Stay / Contract',
+  'Non-revenue'
 ];
 
-const SEGMENT_SUGGESTIONS = {
-  BAR:    'transient_retail',
-  BPL:    'transient_retail',
-  DIS:    'transient_discount',
-  OTA:    'transient_discount',
-  NEG:    'transient_negotiated',
-  NEG_QY: 'transient_negotiated',
-  CTR:    'transient_negotiated',
-  CAT:    'transient_negotiated',
-  CDP:    'transient_negotiated',
-  GAH:    'transient_qualified',
-  PKG:    'transient_discount',
-  WHO:    'transient_wholesale',
-  GCE:    'group_corporate',
-  GCO:    'group_corporate',
-  GDP:    'group_corporate',
-  CMP:    'exclude',
-  HSE:    'exclude'
-};
+const AITHENOR_SEGMENT_LOOKUP = new Map(
+  AITHENOR_SEGMENTS.map((label) => [label.toLowerCase(), label])
+);
+
+// Deterministic prefix rules for PMS short codes (Hilton G3, Opera, etc.).
+function autoSuggestAithenorSegment(code) {
+  const upper = (code || '').toString().trim().toUpperCase();
+  if (!upper) return null;
+  if (upper === 'BAR') return 'Transient Retail';
+  if (upper.startsWith('CNR_')) return 'Corporate Negotiated';
+  if (upper.startsWith('LNR_')) return 'Corporate Negotiated - Local';
+  if (upper === 'CONS') return 'Consortia';
+  if (upper === 'GOV') return 'Government';
+  if (upper.startsWith('DISC_')) return 'Discounted Transient';
+  if (upper.startsWith('MKT_')) return 'Package / Marketing';
+  if (upper.startsWith('IT_')) return 'Tour Operator / Wholesale';
+  if (upper === 'LOYALTY') return 'Loyalty Redemption';
+  if (['CONV', 'GT', 'SMRF', 'CMTG'].includes(upper)) return 'Groups';
+  if (upper === 'PERM') return 'Long Stay / Contract';
+  if (['CMP', 'HOU'].includes(upper)) return 'Non-revenue';
+  if (upper === 'NEG') return 'Corporate Negotiated';
+  return null;
+}
 
 const state = {
   currentStep: 1,
@@ -386,13 +392,55 @@ const state = {
   columnMapping: { pms_columns: {}, str_columns: {}, corporate_columns: {}, groups_columns: {} },
   autoMeta: { pms: {}, str: {}, corporate: {}, groups: {} },
   showAuto: { pms: false, str: false, corporate: false, groups: false },
+  // segmentMapping: file codes → { aithenor_segment, status, sample_name }
   segmentMapping: {},
+  savedSegmentMapping: {},
+  globalSegmentMapping: {},
+  showAutoSegments: false,
+  segmentStepSkipped: false,
+  uncertainSegmentRowCount: 0,
   validationResults: [],
   detectedDateFormat: ''
 };
 
 function norm(v) {
   return (v || '').toString().trim().toLowerCase().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
+}
+
+// Score rows for canonical PMS/STR headers so G3 metadata rows are skipped.
+function detectHeaderRowIndex(rows) {
+  const aliasPool = [];
+  for (const tab of TAB_TYPES) {
+    for (const [canonical] of CANONICAL_FIELDS[tab.key]) {
+      const aliases = ALIASES[tab.key][canonical] || [canonical];
+      aliasPool.push(...aliases.map((a) => norm(a)));
+    }
+  }
+  let best = { index: 0, score: 0 };
+  for (let i = 0; i < Math.min(20, rows.length); i++) {
+    const headers = (rows[i] || []).map((h) => norm(h)).filter(Boolean);
+    if (headers.length < 3) continue;
+    const score = headers.reduce((acc, h) => acc + (aliasPool.some((a) => h === a || h.includes(a) || a.includes(h)) ? 1 : 0), 0);
+    if (score > best.score) best = { index: i, score };
+  }
+  if (best.score >= 2) return best.index;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const candidate = (rows[i] || []).map((h) => (h || '').toString().trim()).filter(Boolean);
+    if (candidate.length >= 3) return i;
+  }
+  return 0;
+}
+
+function readSavedAithenorSegment(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  if (entry.aithenor_segment) return entry.aithenor_segment;
+  // Legacy USALI exclude flag maps to Non-revenue for backward compatibility.
+  if (entry.usali_key === 'exclude') return 'Non-revenue';
+  return null;
+}
+
+function seenBeforeBadge() {
+  return `<span class="pill">Seen before</span>`;
 }
 
 function showError(message) {
@@ -580,17 +628,11 @@ async function handleFile(file) {
         // Scan the first 5 rows to find the actual header row.
         // The header row is the first row that has 3 or more non-empty string cells.
         // This handles sheets where row 0 is a title or blank line above the real headers.
-        let headers = [];
-        for (let i = 0; i < Math.min(5, limitedRows.length); i++) {
-          const candidate = (limitedRows[i] || []).map((h) => (h || '').toString().trim()).filter(Boolean);
-          if (candidate.length >= 3) {
-            headers = candidate;
-            // Trim the preview rows to start from the row after the header row
-            state.sheetRowsPreview[sheetName] = limitedRows.slice(i);
-            break;
-          }
-        }
-        state.sheetsWithHeaders[sheetName] = headers;
+        const headerRowIndex = detectHeaderRowIndex(limitedRows);
+        const headers = (limitedRows[headerRowIndex] || []).map((h) => (h || '').toString().trim());
+        // Preview rows start at the detected header row (row 0 = headers).
+        state.sheetRowsPreview[sheetName] = limitedRows.slice(headerRowIndex);
+        state.sheetsWithHeaders[sheetName] = headers.filter(Boolean);
         console.log('Sheet:', sheetName, '| Headers found:', headers);
       }
       for (const tab of TAB_TYPES) {
@@ -767,7 +809,7 @@ function renderColumnStep() {
   document.getElementById('back-step3').addEventListener('click', () => setStep(2));
   document.getElementById('next-step3').addEventListener('click', () => {
     prepareSegmentRows();
-    if (!state.tabMapping.pms) {
+    if (!state.tabMapping.pms || state.segmentStepSkipped || !Object.keys(state.segmentMapping).length) {
       setStep(5);
       runValidation();
       return;
@@ -778,62 +820,144 @@ function renderColumnStep() {
 
 function prepareSegmentRows() {
   state.segmentMapping = {};
+  state.segmentStepSkipped = false;
+  state.uncertainSegmentRowCount = 0;
   const pmsSheet = state.tabMapping.pms;
   if (!pmsSheet) return;
   const segmentHeader = mappedHeader('pms', 'segment_code');
   if (!segmentHeader) return;
+  const nameHeader = mappedHeader('pms', 'segment_name');
   const rows = getSelectedSheetRows('pms');
   const headers = rows[0] || [];
-  const idx = headers.findIndex((h) => h === segmentHeader);
-  if (idx < 0) return;
-  const uniqueCodes = new Set();
-  for (const row of rows.slice(1, 500)) {
-    const code = (row[idx] || '').toString().trim();
-    if (code) uniqueCodes.add(code);
+  const codeIdx = headers.findIndex((h) => h === segmentHeader);
+  if (codeIdx < 0) return;
+  const nameIdx = nameHeader ? headers.findIndex((h) => h === nameHeader) : -1;
+
+  const codeMeta = new Map();
+  for (const row of rows.slice(1)) {
+    const code = (row[codeIdx] || '').toString().trim();
+    if (!code) continue;
+    if (!codeMeta.has(code)) {
+      const sampleName = nameIdx >= 0 ? (row[nameIdx] || '').toString().trim() : '';
+      codeMeta.set(code, { sample_name: sampleName, row_count: 0 });
+    }
+    codeMeta.get(code).row_count += 1;
   }
-  for (const code of Array.from(uniqueCodes).sort()) {
-    const suggested = SEGMENT_SUGGESTIONS[code.toUpperCase()] || 'na';
+
+  let needsReview = false;
+  for (const code of Array.from(codeMeta.keys()).sort()) {
+    const meta = codeMeta.get(code);
+    let aithenorSegment = '';
+    let status = 'uncertain';
+
+    const saved = readSavedAithenorSegment(state.savedSegmentMapping[code]);
+    if (saved) {
+      aithenorSegment = saved;
+      status = 'confirmed';
+    } else if (AITHENOR_SEGMENT_LOOKUP.has(code.toLowerCase())) {
+      // Files already carrying final Aithenor labels (e.g. AUREM-PAR) auto-confirm silently.
+      aithenorSegment = AITHENOR_SEGMENT_LOOKUP.get(code.toLowerCase());
+      status = 'native';
+    } else {
+      const global = readSavedAithenorSegment(state.globalSegmentMapping[code]);
+      if (global) {
+        aithenorSegment = global;
+        status = 'seen_before';
+        needsReview = true;
+      } else {
+        const auto = autoSuggestAithenorSegment(code);
+        if (auto) {
+          aithenorSegment = auto;
+          status = 'auto';
+        } else {
+          needsReview = true;
+        }
+      }
+    }
+
+    if (status === 'uncertain') {
+      state.uncertainSegmentRowCount += meta.row_count;
+    }
+
     state.segmentMapping[code] = {
-      usali_key: suggested
+      aithenor_segment: aithenorSegment,
+      status,
+      sample_name: meta.sample_name,
+      row_count: meta.row_count
     };
   }
+
+  const allSilent = Object.values(state.segmentMapping).every(
+    (v) => v.status === 'confirmed' || v.status === 'native' || v.status === 'auto'
+  );
+  if (!needsReview && allSilent && Object.keys(state.segmentMapping).length > 0) {
+    state.segmentStepSkipped = true;
+  }
+}
+
+function segmentStatusBadge(status) {
+  if (status === 'auto') return autoBadge();
+  if (status === 'seen_before') return seenBeforeBadge();
+  if (status === 'native' || status === 'confirmed') return autoBadge().replace('Auto-matched', 'Confirmed');
+  return '<small style="color:#8d6506;">Needs review</small>';
 }
 
 function renderSegmentStep() {
   const body = document.getElementById('step-body');
   const entries = Object.entries(state.segmentMapping);
+  const reviewRows = [];
+  const autoRows = [];
 
-  const usaliOptions = USALI_SEGMENTS.map((s) =>
-    `<option value="${s.key}">${s.label}</option>`
-  ).join('');
-
-  body.innerHTML = `
-    <div class="section-title">Map your segment codes to USALI</div>
-    <p class="hint">Each code detected in your PMS file is mapped to the USALI standard segmentation. Review and adjust where needed. Select "Exclude" for complimentary, house use, or out-of-order rooms.</p>
-    <div class="table-grid table-head" style="grid-template-columns: 0.6fr 1fr;">
-      <div>Your PMS code</div><div>USALI segment</div>
-    </div>
-    ${entries.map(([code, v]) => `
-      <div class="table-grid ${v.usali_key === 'na' ? 'warn-row' : ''}" style="grid-template-columns: 0.6fr 1fr;">
-        <div><strong>${escapeHtml(code)}</strong></div>
+  for (const [code, v] of entries) {
+    const isAutoLike = v.status === 'auto' || v.status === 'native' || v.status === 'confirmed';
+    const html = `
+      <div class="field-row ${v.status === 'uncertain' ? 'warn-row' : (isAutoLike ? 'auto-row' : '')}">
         <div>
-          <select data-code="${escapeHtml(code)}" style="width:100%; padding:8px 10px; border:1px solid var(--gray-300); border-radius:4px; font-size:12px;">
-            ${USALI_SEGMENTS.map((s) =>
-              `<option value="${s.key}" ${v.usali_key === s.key ? 'selected' : ''}>${s.label}</option>`
+          <strong>${escapeHtml(code)}</strong>
+          <small>${v.sample_name ? escapeHtml(v.sample_name) : 'No segment name column mapped'}</small>
+          ${segmentStatusBadge(v.status)}
+        </div>
+        <div>
+          <select data-code="${escapeHtml(code)}">
+            <option value="">Select Aithenor segment</option>
+            ${AITHENOR_SEGMENTS.map((label) =>
+              `<option value="${escapeHtml(label)}" ${v.aithenor_segment === label ? 'selected' : ''}>${escapeHtml(label)}</option>`
             ).join('')}
           </select>
         </div>
       </div>
-    `).join('') || '<div class="hint">No segment codes found from the first 500 PMS rows.</div>'}
+    `;
+    if (isAutoLike) autoRows.push(html);
+    else reviewRows.push(html);
+  }
+
+  body.innerHTML = `
+    <div class="section-title">Map segment codes to Aithenor segments</div>
+    <p class="hint">Each distinct value in your segment_code column is mapped to an Aithenor commercial segment. Uncertain codes must be confirmed before those rows can be imported.</p>
+    ${reviewRows.join('') || '<div class="hint">No uncertain segment codes.</div>'}
+    ${autoRows.length ? `<button class="toggle-link" id="toggle-auto-segments">${state.showAutoSegments ? 'Hide' : 'Review'} auto-matched codes (${autoRows.length})</button>` : ''}
+    <div class="${state.showAutoSegments ? '' : 'hidden'}" id="auto-segments">${autoRows.join('')}</div>
     <div class="actions">
       <button class="btn btn-secondary" id="back-step4">Back</button>
       <div class="right"><button class="btn btn-primary" id="next-step4">Continue</button></div>
     </div>
   `;
 
+  const toggle = document.getElementById('toggle-auto-segments');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      state.showAutoSegments = !state.showAutoSegments;
+      renderSegmentStep();
+    });
+  }
+
   body.querySelectorAll('select[data-code]').forEach((el) => {
     el.addEventListener('change', (e) => {
-      state.segmentMapping[e.target.dataset.code].usali_key = e.target.value;
+      const code = e.target.dataset.code;
+      const selected = e.target.value || '';
+      state.segmentMapping[code].aithenor_segment = selected;
+      state.segmentMapping[code].status = selected ? 'confirmed' : 'uncertain';
+      recalcUncertainSegmentRows();
     });
   });
   document.getElementById('back-step4').addEventListener('click', () => setStep(3));
@@ -841,6 +965,12 @@ function renderSegmentStep() {
     setStep(5);
     runValidation();
   });
+}
+
+function recalcUncertainSegmentRows() {
+  state.uncertainSegmentRowCount = Object.values(state.segmentMapping)
+    .filter((v) => v.status === 'uncertain' || !v.aithenor_segment)
+    .reduce((sum, v) => sum + (v.row_count || 0), 0);
 }
 
 function validateField(name, ok, warnText) {
@@ -920,6 +1050,24 @@ function runValidation() {
     `ADR values appear unusual — average is €${Math.round(avgAdr || 0)}. Please confirm ADR and revenue mappings.`
   ));
 
+  recalcUncertainSegmentRows();
+  const uncertainCodes = Object.entries(state.segmentMapping)
+    .filter(([, v]) => v.status === 'uncertain' || !v.aithenor_segment)
+    .map(([code]) => code);
+  if (uncertainCodes.length) {
+    state.validationResults.push({
+      name: 'Segment value mapping',
+      ok: false,
+      text: `${uncertainCodes.length} segment code(s) unmapped (${state.uncertainSegmentRowCount} rows will be skipped on import): ${uncertainCodes.join(', ')}.`
+    });
+  } else if (Object.keys(state.segmentMapping).length) {
+    state.validationResults.push({
+      name: 'Segment value mapping',
+      ok: true,
+      text: `All ${Object.keys(state.segmentMapping).length} segment codes are mapped.`
+    });
+  }
+
   renderValidationStep();
 }
 
@@ -953,10 +1101,15 @@ function renderValidationStep() {
 function buildPayload() {
   const segmentMapping = {};
   for (const [code, v] of Object.entries(state.segmentMapping)) {
-    segmentMapping[code] = { usali_key: v.usali_key };
+    if (!v.aithenor_segment) continue;
+    // Persist confirmed value mappings per property in existing segment_mapping JSON.
+    segmentMapping[code] = {
+      aithenor_segment: v.aithenor_segment,
+      status: v.status === 'uncertain' ? 'uncertain' : 'confirmed'
+    };
   }
   const excludeSegments = Object.entries(state.segmentMapping)
-    .filter(([, v]) => v.usali_key === 'exclude')
+    .filter(([, v]) => v.aithenor_segment === 'Non-revenue')
     .map(([code]) => code);
   return {
     hotel_code: state.hotelCode,
@@ -1012,6 +1165,28 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+async function loadPersistedSegmentMappings() {
+  state.savedSegmentMapping = {};
+  state.globalSegmentMapping = {};
+  if (!state.hotelCode) return;
+  const { data, error } = await supabaseClient
+    .from('hotel_mappings')
+    .select('hotel_code, segment_mapping');
+  if (error || !Array.isArray(data)) return;
+  for (const row of data) {
+    const mapping = row.segment_mapping || {};
+    for (const [code, entry] of Object.entries(mapping)) {
+      const segment = readSavedAithenorSegment(entry);
+      if (!segment) continue;
+      if (row.hotel_code === state.hotelCode) {
+        state.savedSegmentMapping[code] = { aithenor_segment: segment };
+      } else if (!state.globalSegmentMapping[code]) {
+        state.globalSegmentMapping[code] = { aithenor_segment: segment };
+      }
+    }
+  }
+}
+
 async function boot() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
@@ -1022,6 +1197,7 @@ async function boot() {
   if (!state.hotelCode) {
     showError('No hotel_code claim found in your session. Please contact your administrator.');
   }
+  await loadPersistedSegmentMappings();
   renderStep();
 }
 
