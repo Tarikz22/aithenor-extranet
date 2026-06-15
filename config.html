@@ -339,44 +339,46 @@ const ALIASES = {
   }
 };
 
-// Aithenor commercial segments used by the analyze pipeline (segment_mapping values).
+// Aithenor commercial segments — aligned to USALI 12th Edition market-segment taxonomy.
 // Non-revenue rows are stored but excluded from ADR/RevPAR aggregation downstream.
 const AITHENOR_SEGMENTS = [
-  'Transient Retail',
-  'Corporate Negotiated',
-  'Corporate Negotiated - Local',
-  'Consortia',
-  'Government',
-  'Discounted Transient',
-  'Package / Marketing',
-  'Tour Operator / Wholesale',
-  'Loyalty Redemption',
-  'Groups',
-  'Long Stay / Contract',
-  'Non-revenue'
+  'Transient – Retail',           // BAR / walk-in / best-available rate
+  'Transient – Discount',         // promotional / discounted transient
+  'Transient – Qualified',        // government, loyalty, AAA, senior, etc.
+  'Transient – Negotiated',       // consortia, LNR, CNR, CONS corporate accounts
+  'Transient – Wholesale',        // IT / tour-operator / OTA net-rate (non-group)
+  'Group – Corporate',            // corporate meeting & incentive groups
+  'Group – Association/Convention', // convention, association, trade-show groups
+  'Group – SMERF',                // social, military, educational, religious, fraternal
+  'Group – Tour/Wholesale',       // tour-operator / wholesaler groups
+  'Contract',                     // long-stay / extended-stay / permanent guest
+  'Non-revenue'                   // complimentary, house-use; excluded from revenue KPIs
 ];
 
 const AITHENOR_SEGMENT_LOOKUP = new Map(
   AITHENOR_SEGMENTS.map((label) => [label.toLowerCase(), label])
 );
 
-// Deterministic prefix rules for PMS short codes (Hilton G3, Opera, etc.).
+// Deterministic prefix/exact rules for PMS short codes → USALI 12th Edition segments.
+// Rules are case-insensitive (input uppercased) and evaluated top-to-bottom; first match wins.
 function autoSuggestAithenorSegment(code) {
   const upper = (code || '').toString().trim().toUpperCase();
   if (!upper) return null;
-  if (upper === 'BAR') return 'Transient Retail';
-  if (upper.startsWith('CNR_')) return 'Corporate Negotiated';
-  if (upper.startsWith('LNR_')) return 'Corporate Negotiated - Local';
-  if (upper === 'CONS') return 'Consortia';
-  if (upper === 'GOV') return 'Government';
-  if (upper.startsWith('DISC_')) return 'Discounted Transient';
-  if (upper.startsWith('MKT_')) return 'Package / Marketing';
-  if (upper.startsWith('IT_')) return 'Tour Operator / Wholesale';
-  if (upper === 'LOYALTY') return 'Loyalty Redemption';
-  if (['CONV', 'GT', 'SMRF', 'CMTG'].includes(upper)) return 'Groups';
-  if (upper === 'PERM') return 'Long Stay / Contract';
-  if (['CMP', 'HOU'].includes(upper)) return 'Non-revenue';
-  if (upper === 'NEG') return 'Corporate Negotiated';
+  if (upper === 'BAR')              return 'Transient – Retail';          // best-available / rack rate
+  if (upper.startsWith('DISC_'))    return 'Transient – Discount';        // promotional discounts (prefix)
+  if (upper === 'GOV')              return 'Transient – Qualified';        // government rate
+  if (upper === 'LOYALTY')          return 'Transient – Qualified';        // loyalty-redemption stays
+  if (upper.startsWith('CNR_'))     return 'Transient – Negotiated';      // chain/global negotiated (prefix)
+  if (upper.startsWith('LNR_'))     return 'Transient – Negotiated';      // local negotiated rate (prefix)
+  if (upper === 'CONS')             return 'Transient – Negotiated';       // consortia accounts
+  if (upper.startsWith('IT_'))      return 'Transient – Wholesale';       // IT / tour-operator net rate (prefix)
+  if (upper.startsWith('MKT_'))     return 'Transient – Wholesale';       // OTA / package net rate (prefix)
+  if (upper === 'CONV')             return 'Group – Association/Convention'; // convention / trade-show groups
+  if (upper === 'CMTG')             return 'Group – Corporate';            // corporate meeting groups
+  if (upper === 'GT')               return 'Group – Tour/Wholesale';       // group tour / wholesaler
+  if (upper === 'SMRF')             return 'Group – SMERF';                // social/military/edu/religious/fraternal
+  if (upper === 'PERM')             return 'Contract';                     // permanent / extended-stay guest
+  if (['CMP', 'HOU'].includes(upper)) return 'Non-revenue';               // complimentary & house-use
   return null;
 }
 
