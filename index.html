@@ -7601,8 +7601,20 @@ async function submitUpload() {
       throw new Error(result.error || 'Upload failed');
     }
 
-    statusEl.textContent = 'Upload successful. Refreshing dashboard...';
-    statusEl.style.color = '#1A6B3C';
+    // Show a non-blocking warning when the workbook had no STR tab.
+    // str_source is set by the engine's fallback chain: 'workbook' | 'supabase' | 'none'.
+    // WHY: STR data now lives in str_daily_snapshots (imported separately via STAR upload),
+    // so a missing STR tab in the PMS workbook is normal and must not block submission.
+    if (result.engine_json?.str_source === 'supabase') {
+      statusEl.textContent = 'Upload successful (STR data loaded from STAR import). Refreshing…';
+      statusEl.style.color = '#B8973A'; // amber — success with info
+    } else if (result.engine_json?.str_source === 'none') {
+      statusEl.textContent = 'Upload successful. No STR data found — upload a STAR file for index context. Refreshing…';
+      statusEl.style.color = '#B8973A';
+    } else {
+      statusEl.textContent = 'Upload successful. Refreshing dashboard...';
+      statusEl.style.color = '#1A6B3C';
+    }
 
     currentSnapshot = '';
     currentPeriod = '';
