@@ -402,7 +402,12 @@ const state = {
   segmentStepSkipped: false,
   uncertainSegmentRowCount: 0,
   validationResults: [],
-  detectedDateFormat: ''
+  detectedDateFormat: '',
+  // STAR detection fields — populated when a STAR file is uploaded; null otherwise
+  starDetected:   false,
+  starReportType: null,   // 'weekly' | 'monthly'
+  starHeader:     null,   // { propertyName, periodStart, periodEnd }
+  starFile:       null,   // raw File object held for upload
 };
 
 function norm(v) {
@@ -571,8 +576,9 @@ function renderStep() {
 function renderUploadStep() {
   const body = document.getElementById('step-body');
   body.innerHTML = `
-    <div class="section-title">Upload PMS workbook</div>
-    <p class="hint">Accepted formats: .xlsx and .xlsm. We will only read sheet names, headers, and up to the first 500 rows for mapping setup.</p>
+    <div class="section-title">Upload PMS or STAR workbook</div>
+    <!-- Hint updated: STAR files (Weekly_STAR / Monthly_STAR) are auto-detected and bypass the PMS wizard -->
+    <p class="hint">Accepted formats: .xlsx and .xlsm. Upload a PMS export to configure column mapping, or upload a CoStar STAR report for direct import — no mapping needed.</p>
     <div class="dropzone" id="dropzone">
       <div style="font-size:13px; color:var(--gray-600); margin-bottom:12px;">Drop file here or click to browse</div>
       <button class="btn btn-primary" type="button" id="choose-file-btn">Choose file</button>
@@ -640,6 +646,20 @@ async function handleFile(file) {
       for (const tab of TAB_TYPES) {
         state.tabMapping[tab.key] = suggestTabMatch(tab.key, state.sheetNames);
       }
+
+      // ── STAR detection: runs before the PMS wizard (does not modify PMS flow) ──
+      // Check filename prefix first; fall back to sheet-name heuristic.
+      const starType = detectStarFile(state.fileName, state.sheetNames);
+      if (starType) {
+        state.starDetected   = true;
+        state.starReportType = starType;
+        state.starHeader     = parseStarHeaderClientSide(workbook);
+        state.starFile       = file; // hold File ref so importStarFile() can upload it
+        renderStarConfirmationStep();
+        return; // skip PMS wizard entirely
+      }
+
+      // Not a STAR file — proceed with normal PMS tab-mapping wizard.
       setStep(2);
     } catch {
       showError('We could not read this workbook. Please verify the file is a valid Excel export.');
@@ -647,6 +667,283 @@ async function handleFile(file) {
   };
   reader.readAsArrayBuffer(file);
 }
+
+// =============================================================================
+// STAR FILE DETECTION & IMPORT
+// These functions form a self-contained layer that runs before the PMS wizard.
+// The PMS wizard (renderTabStep and below) is not touched.
+// =============================================================================
+
+/**
+ * Returns 'weekly' | 'monthly' if the file looks like a CoStar STAR report,
+ * or null if it should go through the normal PMS wizard.
+ *
+ * Detection order (mirrors ingest-star.js detectReportType):
+ *   1. Filename prefix  → Weekly_STAR* / Monthly_STAR*
+ *   2. Sheet names      → workbook contains ("Comp" OR "Daily by Month") AND
+ *                          ("Glance" OR "Response")
+ */
+function detectStarFile(fileName, sheetNames) {
+  const fn = String(fileName || '').trim();
+
+  // Rule 1: filename prefix (case-insensitive)
+  if (/^Weekly_STAR/i.test(fn))  return 'weekly';
+  if (/^Monthly_STAR/i.test(fn)) return 'monthly';
+
+  // Rule 2: characteristic sheet names — must have at least one "data" sheet
+  // AND at least one "summary" sheet that CoStar STAR exports always include.
+  const names = (sheetNames || []).map(n => n.toLowerCase());
+  const hasDataSheet    = names.some(n => n === 'comp' || /daily.?by.?month/.test(n));
+  const hasSummarySheet = names.some(n => n === 'glance' || n === 'response');
+  if (hasDataSheet && hasSummarySheet) {
+    // Distinguish Weekly (has Glance) vs Monthly (has Comp) by sheet names.
+    // If both sheets are present default to monthly (Comp is the stronger signal).
+    const hasComp = names.some(n => n === 'comp');
+    return hasComp ? 'monthly' : 'weekly';
+  }
+
+  return null; // not a STAR file — use PMS wizard
+}
+
+/**
+ * Lightweight client-side parse of the STAR header block from the first sheet.
+ * Extracts propertyName, periodStart, periodEnd (human-readable strings).
+ * This is used only for the confirmation screen; the server re-parses on import.
+ */
+function parseStarHeaderClientSide(workbook) {
+  const result = { propertyName: null, periodStart: null, periodEnd: null };
+  const firstSheetName = (workbook.SheetNames || [])[0];
+  if (!firstSheetName) return result;
+
+  const ws = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+
+  for (let r = 0; r < Math.min(30, rows.length); r++) {
+    const row = rows[r] || [];
+    for (let c = 0; c < Math.min(row.length, 8); c++) {
+      const label = String(row[c] || '').trim();
+      if (!label) continue;
+
+      // Property name: cell starts with "Property" or "Property Name"
+      if (/^property(\s+name)?:/i.test(label)) {
+        result.propertyName = String(row[c + 1] || row[c + 2] || '').trim() || null;
+      }
+
+      // Period line: "For the Week of: ..." or "For the Month of: ..."
+      if (/for the (week|month) of:/i.test(label)) {
+        // Dates may be spread across adjacent cells — join the whole row after label
+        const combined = row.slice(c).map(v => String(v || '').trim()).filter(Boolean).join(' ');
+        const stripped = combined.replace(/for the (week|month) of:/i, '').trim();
+        // Accept MM/DD/YYYY or "Month DD, YYYY" style dates
+        const parts = stripped.match(
+          /\d{1,2}\/\d{1,2}\/\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s*\d{4}/gi
+        );
+        if (parts && parts.length >= 1) {
+          result.periodStart = parts[0];
+          result.periodEnd   = parts[1] || parts[0];
+        }
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Renders the STAR confirmation screen in place of the normal step indicator.
+ * Replaces the wizard body; the step-line and step-desc are repurposed for context.
+ */
+function renderStarConfirmationStep() {
+  // Repurpose the wizard header to show STAR context instead of step number
+  document.getElementById('step-line').textContent = 'STAR Report detected';
+  document.getElementById('step-desc').textContent = 'Review details below, then click Import to process.';
+  document.getElementById('progress-fill').style.width = '50%'; // visual progress midpoint
+
+  const h      = state.starHeader || {};
+  const type   = state.starReportType === 'weekly' ? 'Weekly' : 'Monthly';
+  const prop   = h.propertyName  || '(property not found in header)';
+  const period = (h.periodStart && h.periodEnd && h.periodStart !== h.periodEnd)
+    ? `${h.periodStart} – ${h.periodEnd}`
+    : (h.periodStart || '(period not found in header)');
+
+  const body = document.getElementById('step-body');
+  body.innerHTML = `
+    <div class="section-title">STAR Report Detected</div>
+    <!-- Confirmation card: shows parsed header fields so the user can sanity-check
+         before triggering the server-side import. -->
+    <div style="background:var(--gray-50,#f9f9f7); border:1px solid var(--gray-200,#ddd);
+                border-radius:8px; padding:20px 24px; margin-bottom:20px; line-height:1.9;">
+      <div><strong>Report type:</strong> ${escapeHtml(type)}</div>
+      <div><strong>Property:</strong>    ${escapeHtml(prop)}</div>
+      <div><strong>Period:</strong>      ${escapeHtml(period)}</div>
+      <div><strong>File:</strong>        ${escapeHtml(state.fileName)}</div>
+    </div>
+    <p class="hint">No column mapping is needed — the STAR parser locates all values
+      automatically. Click <strong>Import</strong> to upload and process this file.</p>
+    <div id="star-import-error" style="display:none; color:#C0392B; font-size:13px; margin-bottom:12px;"></div>
+    <div class="actions">
+      <div>
+        <!-- Back resets state and returns to the upload screen -->
+        <button class="btn" id="star-back-btn">Back</button>
+      </div>
+      <div class="right">
+        <button class="btn btn-primary" id="star-import-btn">Import</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('star-back-btn').addEventListener('click', () => {
+    // Clear STAR state and go back to the upload step
+    state.starDetected   = false;
+    state.starReportType = null;
+    state.starHeader     = null;
+    state.starFile       = null;
+    setStep(1);
+  });
+
+  document.getElementById('star-import-btn').addEventListener('click', importStarFile);
+}
+
+/**
+ * Uploads the STAR file to Supabase Storage then calls POST /api/ingest-star.
+ * On success renders a results summary; on failure shows an inline error.
+ */
+async function importStarFile() {
+  const importBtn = document.getElementById('star-import-btn');
+  const backBtn   = document.getElementById('star-back-btn');
+  const errEl     = document.getElementById('star-import-error');
+
+  // Disable controls and show progress
+  importBtn.disabled = true;
+  importBtn.textContent = 'Uploading…';
+  backBtn.disabled = true;
+  errEl.style.display = 'none';
+
+  try {
+    // Step 1: upload file to Supabase Storage (same bucket used by index.html)
+    const safeFileName = state.starFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${state.hotelCode}/${Date.now()}_${safeFileName}`;
+
+    const { error: uploadError } = await supabaseClient
+      .storage
+      .from('hotel-uploads')
+      .upload(filePath, state.starFile, { upsert: true });
+
+    if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+
+    // Step 2: create a 10-minute signed URL for the server to download
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient
+      .storage
+      .from('hotel-uploads')
+      .createSignedUrl(filePath, 60 * 10);
+
+    if (signedUrlError) throw new Error(`Signed URL failed: ${signedUrlError.message}`);
+
+    importBtn.textContent = 'Processing…';
+
+    // Step 3: call the STAR ingest endpoint (mirrors ingest-star.js handler signature)
+    const response = await fetch('https://aithenor-api-production.up.railway.app/api/ingest-star', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hotelCode: state.hotelCode,
+        fileUrl:   signedUrlData.signedUrl,
+        fileName:  state.starFile.name,
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Import failed');
+
+    // Step 4: show results summary
+    renderStarImportResults(result);
+
+  } catch (err) {
+    // Show inline error without wiping the confirmation screen
+    errEl.textContent = `Import failed: ${err.message}`;
+    errEl.style.display = 'block';
+    importBtn.disabled = false;
+    importBtn.textContent = 'Retry Import';
+    backBtn.disabled = false;
+  }
+}
+
+/**
+ * Renders the post-import summary screen.
+ * Displays records written, date range, and key index spot-checks from the API response.
+ *
+ * @param {object} result - JSON body returned by /api/ingest-star
+ */
+function renderStarImportResults(result) {
+  document.getElementById('step-line').textContent = 'Import complete';
+  document.getElementById('step-desc').textContent = 'STAR data has been saved.';
+  document.getElementById('progress-fill').style.width = '100%';
+
+  const daily   = result.daily   || {};
+  const monthly = result.monthly || null;
+  const type    = (result.reportType || state.starReportType || 'unknown');
+  const dr      = daily.dateRange || {};
+  const dateRangeText = dr.from
+    ? `${dr.from} – ${dr.to || dr.from}`
+    : 'n/a';
+
+  // First and last day indices for a quick sanity-check row
+  const fd = daily.firstDayIndices || {};
+  const ld = daily.lastDayIndices  || {};
+  const indexRow = (fd.date || ld.date)
+    ? `<tr>
+        <td colspan="2" style="padding-top:10px; font-weight:600; font-size:12px; color:var(--gray-500,#888);">
+          SPOT-CHECK INDICES
+        </td>
+       </tr>
+       <tr>
+         <td>First day (${escapeHtml(fd.date || '—')})</td>
+         <td>MPI ${escapeHtml(String(fd.mpi ?? '—'))} · ARI ${escapeHtml(String(fd.ari ?? '—'))} · RGI ${escapeHtml(String(fd.rgi ?? '—'))}</td>
+       </tr>
+       <tr>
+         <td>Last day (${escapeHtml(ld.date || '—')})</td>
+         <td>MPI ${escapeHtml(String(ld.mpi ?? '—'))} · ARI ${escapeHtml(String(ld.ari ?? '—'))} · RGI ${escapeHtml(String(ld.rgi ?? '—'))}</td>
+       </tr>`
+    : '';
+
+  // Monthly Comp sheet summary (only for monthly reports)
+  const monthlyRow = monthly
+    ? `<tr>
+        <td>Monthly periods (Comp sheet)</td>
+        <td>${escapeHtml(String(monthly.rowsWritten ?? '—'))} rows written</td>
+       </tr>`
+    : '';
+
+  const body = document.getElementById('step-body');
+  body.innerHTML = `
+    <div class="success-box">
+      <div class="success-title">STAR import successful — ${escapeHtml(type.charAt(0).toUpperCase() + type.slice(1))}</div>
+      <!-- Results summary table: daily records, date range, spot-check indices -->
+      <table style="width:100%; border-collapse:collapse; margin-top:14px; font-size:13px;">
+        <tr>
+          <td style="padding:4px 0; width:55%;">Daily records written</td>
+          <td>${escapeHtml(String(daily.rowsWritten ?? '—'))} of ${escapeHtml(String(daily.totalParsed ?? '—'))} parsed</td>
+        </tr>
+        <tr>
+          <td>Date range</td>
+          <td>${escapeHtml(dateRangeText)}</td>
+        </tr>
+        ${monthlyRow}
+        ${indexRow}
+      </table>
+      <div style="margin-top:20px;">
+        <button class="btn btn-primary" id="star-return-btn">Return to dashboard</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('star-return-btn').addEventListener('click', () => {
+    window.location.href = './index.html';
+  });
+}
+
+// =============================================================================
+// END STAR SECTION — PMS wizard continues below, unchanged
+// =============================================================================
 
 function renderTabStep() {
   const body = document.getElementById('step-body');
