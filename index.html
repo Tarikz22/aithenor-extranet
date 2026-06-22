@@ -4197,8 +4197,22 @@ function buildForwardImpactLine(card) {
     return 'Forecast gap detected — see analysis for detail.';
   }
 
-  const x = extractRoomNightsBehindReference(card.commercial_narrative);
   const win = extractForwardWindowShortDescription(card.window_label) || (card.window_label || '').trim();
+  // Peak/compression cards: occupancy is the meaningful impact, not a room-night gap.
+  if (card.issue_family === 'peak_exposure') {
+    return win
+      ? `Tracking above 80% occupancy on books — ${win}.`
+      : 'Tracking above 80% occupancy on books.';
+  }
+  // Prefer pace_data direct read over narrative regex — more reliable, avoids rounding edge cases.
+  if (card.pace_data) {
+    const rnBehind = (card.pace_data.reference_rn ?? 0) - (card.pace_data.otb_rn ?? 0);
+    if (rnBehind > 0) {
+      const fmt = Math.round(rnBehind).toLocaleString('en-US');
+      return `${fmt} room nights behind reference pace${win ? ` — ${win}` : ''}.`;
+    }
+  }
+  const x = extractRoomNightsBehindReference(card.commercial_narrative);
   if (x && win) return `${x} room nights behind reference pace — ${win}.`;
   if (x) return `${x} room nights behind reference pace.`;
   return 'Pace shortfall detected — see analysis for detail.';
