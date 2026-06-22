@@ -273,12 +273,11 @@ const CANONICAL_FIELDS = {
     ['hotel_revpar', 'Hotel RevPAR'], ['comp_revpar', 'Comp RevPAR'], ['rgi', 'RGI']
   ],
   corporate: [
-    ['company_name', 'Company Name'], ['account_type', 'Account Type'], ['account_manager', 'Account Manager'],
-    ['sector', 'Sector'], ['rn_fy_ly', 'Room Nights Full Year LY'], ['rn_actual_ytd', 'Room Nights Actual YTD'],
-    ['rev_actual_ytd', 'Revenue Actual YTD'], ['adr_actual_ytd', 'ADR Actual YTD'],
-    ['rn_otb_forecast', 'Room Nights OTB Forecast'], ['rev_otb_forecast', 'Revenue OTB Forecast'],
-    ['rn_full_year_projected', 'Room Nights Full Year Projected'], ['variance_vs_ly', 'Projected Room Nights vs Prior Year (e.g. Projected RN vs 2025)'],
-    ['comments', 'Comments']
+    ['company_name', 'Company Name'], ['period', 'Period'],
+    ['rn_ty', 'Room Nights TY'], ['rev_ty', 'Revenue TY'], ['adr_ty', 'ADR TY'],
+    ['rn_stly', 'Room Nights STLY'], ['rev_stly', 'Revenue STLY'], ['adr_stly', 'ADR STLY'],
+    ['rn_ly', 'Room Nights LY'], ['rev_ly', 'Revenue LY'], ['adr_ly', 'ADR LY'],
+    ['account_type', 'Account Type'], ['account_manager', 'Account Manager'], ['sector', 'Sector']
   ],
   groups: [
     ['group_name', 'Group Name'], ['market_segment', 'Market Segment'], ['revenue_type', 'Revenue Type'],
@@ -316,15 +315,20 @@ const ALIASES = {
     comp_revpar: ['comp revpar', 'compset revpar'], rgi: ['rgi', 'revenue generation index']
   },
   corporate: {
-    company_name: ['company', 'account name', 'company name'], account_type: ['account type', 'type'],
-    account_manager: ['account manager', 'manager', 'owner'], sector: ['sector', 'industry', 'vertical'],
-    rn_fy_ly: ['rn fy ly', 'full year ly', '2025 room nights', 'baseline rn'],
-    rn_actual_ytd: ['rn actual ytd', 'actual rn ytd', 'ytd room nights'],
-    rev_actual_ytd: ['rev actual ytd', 'actual revenue ytd', 'ytd revenue'],
-    adr_actual_ytd: ['adr actual ytd', 'ytd adr'], rn_otb_forecast: ['rn otb forecast', 'forecast rn otb'],
-    rev_otb_forecast: ['rev otb forecast', 'forecast revenue otb'],
-    rn_full_year_projected: ['rn full year projected', 'projected rn', 'full year projected'],
-    variance_vs_ly: ['variance vs ly', 'variance ly', 'vs ly', 'projected rn vs', 'projected vs', 'variance rn'], comments: ['comments', 'notes', 'remarks']
+    company_name: ['company', 'account name', 'company name'],
+    period: ['period', 'month', 'stay month', 'stay period'],
+    rn_ty: ['rn ty', 'room nights ty', 'room nights this year', 'rn this year'],
+    rev_ty: ['rev ty', 'revenue ty', 'revenue this year'],
+    adr_ty: ['adr ty', 'adr this year'],
+    rn_stly: ['rn stly', 'room nights stly', 'same time last year rn'],
+    rev_stly: ['rev stly', 'revenue stly'],
+    adr_stly: ['adr stly'],
+    rn_ly: ['rn ly', 'room nights ly', 'room nights last year'],
+    rev_ly: ['rev ly', 'revenue ly', 'revenue last year'],
+    adr_ly: ['adr ly', 'adr last year'],
+    account_type: ['account type', 'type'],
+    account_manager: ['account manager', 'manager', 'owner'],
+    sector: ['sector', 'industry', 'vertical']
   },
   groups: {
     group_name: ['group name', 'name', 'account'], market_segment: ['market segment', 'segment'],
