@@ -1752,10 +1752,21 @@ async function loadBriefing() {
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('empty-state').style.display = 'none';
 
+  const hotelCode = localStorage.getItem('hotelCode') || '';
+  if (!hotelCode) {
+    showLoading(false);
+    showError('Missing hotel code on user profile.');
+    return;
+  }
+
   try {
     const { data, error } = await supabaseClient
       .from('engine_outputs')
       .select('id, hotel_code, snapshot_date, period_label, engine_json')
+      // FIX: scope engine_outputs query to the logged-in user's hotel —
+      // previously this had no hotel_code filter and could leak another property's
+      // data to this user. See [issue tracker / 2026-07-01] for context.
+      .eq('hotel_code', hotelCode)
       .order('generated_at', { ascending: false })
       .limit(1)
       .single();
