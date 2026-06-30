@@ -1146,6 +1146,7 @@ function prepareSegmentRows() {
     }
     codeMeta.get(code).row_count += 1;
   }
+  console.log('[prepareSegmentRows] rows processed:', rows.slice(1).length, '| unique segment codes:', Array.from(codeMeta.keys()).sort());
 
   let needsReview = false;
   for (const code of Array.from(codeMeta.keys()).sort()) {
