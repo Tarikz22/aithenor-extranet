@@ -363,7 +363,10 @@ const SUPABASE_URL = 'https://fpnlzpfkygsyvkettjuj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbmx6cGZreWdzeXZrZXR0anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDM1NzIsImV4cCI6MjA4ODg3OTU3Mn0.VsfqeclitY91kpn-qS2NBg94BJA99YMgtrmlC9Wz8ns';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const HOTEL_CODE = 'AUREM-PAR';
+// FIX: HOTEL_CODE was hardcoded to 'AUREM-PAR', locking this page to one
+// property for all users. Now sourced from localStorage like every other page
+// in the app, set at login from session.user.user_metadata.hotel.
+const HOTEL_CODE = localStorage.getItem('hotelCode') || '';
 
 let snapshotRows = [];
 
@@ -663,6 +666,10 @@ function formatSnapLabel(row) {
 async function loadSnapshots() {
   setLoading(true);
   hideError();
+  if (!HOTEL_CODE) {
+    showError('Missing hotel code on user profile.');
+    return;
+  }
   // WHY: Fetching engine_json for all snapshots on load causes a
   // statement timeout. Only fetch lightweight fields for the dropdown.
   // Full engine_json is fetched per-snapshot when Compare is clicked.
