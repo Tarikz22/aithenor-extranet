@@ -1432,7 +1432,14 @@ async function saveMapping() {
     showError('Hotel code is missing from your authenticated session.');
     return;
   }
-  const { error } = await supabaseClient.from('hotel_mappings').upsert(payload, { onConflict: 'hotel_code' });
+  const { error } = await supabaseClient
+    .from('hotel_mappings')
+    .update({
+      segment_mapping: payload.segment_mapping,
+      exclude_segments: payload.exclude_segments,
+      updated_at: payload.updated_at
+    })
+    .eq('hotel_code', payload.hotel_code);
   if (error) {
     showError('Could not save mapping: ' + (error.message || JSON.stringify(error)));
     return;
