@@ -316,7 +316,7 @@ body {
   <div class="topbar-left">
     <div>
       <div class="topbar-brand">Aithenor</div>
-      <div class="topbar-meta">AUREM-PAR · Weekly Intelligence</div>
+      <div class="topbar-meta" id="topbar-hotel-label">Weekly Intelligence</div>
     </div>
     <div class="topbar-title" style="margin-left:8px;">Week on week</div>
   </div>
@@ -670,6 +670,11 @@ async function loadSnapshots() {
     showError('Missing hotel code on user profile.');
     return;
   }
+  // FIX: topbar label was static HTML hardcoded to "AUREM-PAR", left over from
+  // before HOTEL_CODE was made dynamic. Now set from the same HOTEL_CODE value
+  // used for the data query, so the label always matches the data shown.
+  document.getElementById('topbar-hotel-label').textContent =
+    HOTEL_CODE ? `${HOTEL_CODE} · Weekly Intelligence` : 'Weekly Intelligence';
   // WHY: Fetching engine_json for all snapshots on load causes a
   // statement timeout. Only fetch lightweight fields for the dropdown.
   // Full engine_json is fetched per-snapshot when Compare is clicked.
