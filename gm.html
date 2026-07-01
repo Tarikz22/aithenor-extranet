@@ -812,6 +812,19 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+let currentCurrencySymbol = '€'; // FIX: set from engine_json.currency in loadBriefing()
+function currencyPrefix(code) {
+  // Generic mapping so future hotels with other currencies display
+  // correctly without further code changes. EUR/USD/GBP get their
+  // standard symbol; anything else (e.g. MAD) gets its ISO code as
+  // a prefix, since most non-major currencies have no single glyph.
+  const c = (code || 'EUR').toUpperCase();
+  if (c === 'EUR') return '€';
+  if (c === 'USD') return '$';
+  if (c === 'GBP') return '£';
+  return c + ' ';
+}
+
 function firstSentence(text) {
   if (!text) return '';
   const m = text.match(/^.*?(?<!\d)\.(?!\d)/);
@@ -882,9 +895,9 @@ function buildGMDecision(issue) {
 
 function fmt(v) {
   const n = Number(v) || 0;
-  if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return '€' + Math.round(n / 1000) + 'K';
-  if (n > 0) return '€' + Math.round(n);
+  if (n >= 1000000) return currentCurrencySymbol + (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return currentCurrencySymbol + Math.round(n / 1000) + 'K';
+  if (n > 0) return currentCurrencySymbol + Math.round(n);
   return '—';
 }
 
@@ -1165,7 +1178,7 @@ function renderPriorityDecisions(issues) {
     top3.map((issue, i) => {
       const revLine = issue.revenue > 0
         ? ` <span style="color:var(--high);font-weight:600;">
-            · €${Math.round(issue.revenue / 1000)}K exposure</span>`
+            · ${currentCurrencySymbol}${Math.round(issue.revenue / 1000)}K exposure</span>`
         : '';
       return `
         <div class="priority-item">
@@ -1187,7 +1200,7 @@ function renderPriorityDecisions(issues) {
       .map(([dept, items]) => {
         const lead = items[0];
         const revLine = lead.revenue > 0
-          ? ` €${Math.round(lead.revenue / 1000)}K at stake.` : '';
+          ? ` ${currentCurrencySymbol}${Math.round(lead.revenue / 1000)}K at stake.` : '';
         return `
           <div class="signal-item">
             <strong>${escHtml(dept)}:</strong>
@@ -1320,9 +1333,9 @@ function renderFindingBriefing(issues) {
 
   const fmtDigest = v => {
     const n = Number(v) || 0;
-    if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
-    if (n >= 1000) return '€' + Math.round(n / 1000) + 'K';
-    return n > 0 ? '€' + Math.round(n) : null;
+    if (n >= 1000000) return currentCurrencySymbol + (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return currentCurrencySymbol + Math.round(n / 1000) + 'K';
+    return n > 0 ? currentCurrencySymbol + Math.round(n) : null;
   };
 
   document.getElementById('finding-grid').innerHTML =
@@ -1348,8 +1361,8 @@ function renderFindingBriefing(issues) {
       const adrGap = q.adr_gap != null ? Math.round(q.adr_gap) : null;
       const adrStatus = adrGap === null ? null
         : Math.abs(adrGap) < 5 ? 'ADR is on target.'
-        : adrGap > 0 ? `ADR is €${adrGap} below forecast.`
-        : `ADR is €${Math.abs(adrGap)} above forecast.`;
+        : adrGap > 0 ? `ADR is ${currentCurrencySymbol}${adrGap} below forecast.`
+        : `ADR is ${currentCurrencySymbol}${Math.abs(adrGap)} above forecast.`;
       const segLine = seg ? `${seg} is the primary shortfall segment.` : '';
       const volLine = rnGap && pct
         ? `${new Intl.NumberFormat('en-GB').format(rnGap)} room nights short of plan (${pct}% gap).`
@@ -1363,7 +1376,7 @@ function renderFindingBriefing(issues) {
       const pct = p.pace_gap_pct != null
         ? Math.abs(p.pace_gap_pct).toFixed(1) : null;
       const adrLine = p.otb_adr && p.reference_adr
-        ? `ADR OTB €${p.otb_adr} vs STLY €${p.reference_adr}.` : '';
+        ? `ADR OTB ${currentCurrencySymbol}${p.otb_adr} vs STLY ${currentCurrencySymbol}${p.reference_adr}.` : '';
       const volLine = rnGap && pct
         ? `${new Intl.NumberFormat('en-GB').format(rnGap)} room nights behind STLY (${pct}% gap).`
         : '';
@@ -1721,7 +1734,7 @@ function buildFallbackNarrative(ctx) {
     let p2 = `The primary commercial signal is ${ctx.primary_issue_title}.`;
     p2 += ` ${ctx.primary_decision}`;
     if (ctx.historical_revenue_at_risk) {
-      p2 += ` Revenue at risk: €${Math.round(ctx.historical_revenue_at_risk / 1000)}K.`;
+      p2 += ` Revenue at risk: ${currentCurrencySymbol}${Math.round(ctx.historical_revenue_at_risk / 1000)}K.`;
     }
     parts.push(p2);
   }
@@ -1784,6 +1797,7 @@ async function loadBriefing() {
       : (data.engine_json || {});
 
     window._ej = ej; // debug only — remove before production
+    currentCurrencySymbol = currencyPrefix(ej?.currency);
 
     const allIssues = extractAllIssues(ej);
 
