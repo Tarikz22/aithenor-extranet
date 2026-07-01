@@ -598,6 +598,7 @@ async function fetchCorporateAccountData() {
   try {
     const engineJson = typeof data.engine_json === 'string'
       ? JSON.parse(data.engine_json) : data.engine_json;
+    currentCurrency = engineJson?.currency || 'EUR';
     const corpIssues = engineJson.corporate_account_pace_issues || [];
     return corpIssues[0]?.all_accounts || [];
   } catch (e) { return []; }
@@ -605,6 +606,7 @@ async function fetchCorporateAccountData() {
 
 let currentUserEmail = '';
 let cachedCorpAccounts = null;
+let currentCurrency = 'EUR'; // FIX: set from engine_json.currency once fetched; EUR is the safe default for legacy data with no currency set.
 
 const ACTIVITY_TYPES = [
   'Sales Call', 'Blitz', 'FAM Trip', 'Agency Visit', 'Trade Show',
@@ -1558,7 +1560,7 @@ async function updateAccountIntelBlock() {
   const sign = varianceRn >= 0 ? '+' : '';
   const varColor = varianceRn >= 0 ? '#22c55e' : '#ef4444';
   const pctDisplay = (variancePct >= 0 ? '+' : '') + Number(variancePct).toFixed(1) + '%';
-  const adr = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+  const adr = new Intl.NumberFormat('en-GB', { style: 'currency', currency: currentCurrency, maximumFractionDigits: 0 })
     .format(n(match.actual_ytd_adr));
   block.style.display = 'block';
   block.innerHTML = `

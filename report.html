@@ -642,7 +642,10 @@ function rbFmtNum(v) {
 }
 
 function rbFmtEur(v) {
-  return rbNum(v).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+  // FIX: currency was hardcoded to EUR; now reads engine_json.currency
+  // (already loaded into the module-level engineJson variable), falling
+  // back to EUR for backward compatibility with data that has no currency set.
+  return rbNum(v).toLocaleString('fr-FR', { style: 'currency', currency: engineJson?.currency || 'EUR', maximumFractionDigits: 0 });
 }
 
 function rbFmtPct(v) {
