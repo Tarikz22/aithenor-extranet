@@ -297,10 +297,13 @@ async function fetchCorporateAccountData() {
   try {
     const engineJson = typeof data.engine_json === 'string'
       ? JSON.parse(data.engine_json) : data.engine_json;
+    currentCurrency = engineJson?.currency || 'EUR';
     const corpIssues = engineJson.corporate_account_pace_issues || [];
     return corpIssues[0]?.all_accounts || [];
   } catch (e) { return []; }
 }
+
+let currentCurrency = 'EUR'; // FIX: set from engine_json.currency once fetched; EUR is the safe default for legacy data with no currency set.
 
 const STATE = {
   accounts: [],
@@ -323,7 +326,9 @@ function escHtml(str) {
   return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 function n(v) { const num = Number(v); return Number.isFinite(num) ? num : 0; }
-function money(v) { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n(v)); }
+// currentCurrency is sourced from engine_json.currency, defaulting to EUR for
+// backward compatibility with hotels that have no currency set.
+function money(v) { return new Intl.NumberFormat('en-GB', { style: 'currency', currency: currentCurrency, maximumFractionDigits: 0 }).format(n(v)); }
 function int(v) { return new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 }).format(Math.round(n(v))); }
 function pct(v) { return (n(v) * 100).toFixed(1) + '%'; }
 function shortText(v) { return (v || '').toString().trim(); }
