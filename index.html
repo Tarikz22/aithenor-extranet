@@ -6656,9 +6656,11 @@ function renderFindings() {
       priority: (sc.priority != null ? String(sc.priority) : 'medium').toLowerCase(),
       trigger_display: (() => {
         const cm = sc.card_metrics || sc.cardMetrics;
-        const mpi = cm?.avgMPI ?? sc.mpi;
-        const ari = cm?.avgARI ?? sc.ari;
-        const rgi = cm?.avgRGI ?? sc.rgi;
+        // FIX: synthesis cards store MPI/ARI/RGI under str_validation, not
+        // card_metrics or a flat field — badge was always blank for this card type.
+        const mpi = cm?.avgMPI ?? sc.str_validation?.mpi ?? sc.mpi;
+        const ari = cm?.avgARI ?? sc.str_validation?.ari ?? sc.ari;
+        const rgi = cm?.avgRGI ?? sc.str_validation?.rgi ?? sc.rgi;
         const has = [mpi, ari, rgi].some(v => v != null && Number.isFinite(Number(v)));
         if (!has) return '—';
         return [
@@ -7046,9 +7048,11 @@ function renderFindings() {
         priority: (sc.priority != null ? String(sc.priority) : 'medium').toLowerCase(),
         trigger_display: (() => {
           const cm = sc.card_metrics || sc.cardMetrics;
-          const mpi = cm?.avgMPI ?? sc.mpi;
-          const ari = cm?.avgARI ?? sc.ari;
-          const rgi = cm?.avgRGI ?? sc.rgi;
+          // FIX: synthesis cards store MPI/ARI/RGI under str_validation, not
+          // card_metrics or a flat field — badge was always blank for this card type.
+          const mpi = cm?.avgMPI ?? sc.str_validation?.mpi ?? sc.mpi;
+          const ari = cm?.avgARI ?? sc.str_validation?.ari ?? sc.ari;
+          const rgi = cm?.avgRGI ?? sc.str_validation?.rgi ?? sc.rgi;
           const has = [mpi, ari, rgi].some(v => v != null && Number.isFinite(Number(v)));
           if (!has) return '—';
           return [
