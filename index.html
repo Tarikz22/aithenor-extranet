@@ -2148,10 +2148,20 @@ function formatNumber(n) {
   return value.toString();
 }
 
+function currencyPrefix(code) {
+  // Generic mapping so future hotels with other currencies display
+  // correctly without further code changes.
+  const c = (code || 'EUR').toUpperCase();
+  if (c === 'EUR') return '€';
+  if (c === 'USD') return '$';
+  if (c === 'GBP') return '£';
+  return c + ' ';
+}
+
 function formatCurrency(value) {
   const amount = Number(value) || 0;
   if (!amount) return '—';
-  return '€' + formatNumber(amount);
+  return currencyPrefix(currentEngineJson?.currency) + formatNumber(amount);
 }
 
 function formatDate(dateStr) {
@@ -2470,7 +2480,7 @@ ANSWER RULES:
 - If the answer requires a calculation, show it briefly
 - If data for the question is not available in context, say exactly what is missing
 - Never invent numbers not in the context
-- Use € for currency
+- Use ${currencyPrefix(currentEngineJson?.currency)} for currency
 - Speak as a senior commercial director, not a chatbot
 - No filler phrases like "Great question" or "Certainly"
 - If the question is about a trend over time and only one snapshot exists, say so honestly
@@ -3415,12 +3425,12 @@ function formatRiskRange(minValue, maxValue) {
     const gapRatio = min > 0 ? Math.abs(max - min) / min : 1;
     if (Math.abs(max - min) < 1 || gapRatio < 0.2) {
       const midpoint = Math.round((min + max) / 2);
-      return `€${formatNumber(midpoint)} revenue at risk`;
+      return `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(midpoint)} revenue at risk`;
     }
     if (Math.abs(max - min) < 1) {
-      return `€${formatNumber(max)} revenue at risk`;
+      return `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(max)} revenue at risk`;
     }
-    return `€${formatNumber(min)}-€${formatNumber(max)} revenue at risk`;
+    return `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(min)}-${currencyPrefix(currentEngineJson?.currency)}${formatNumber(max)} revenue at risk`;
   }
   return '';
 }
@@ -3494,8 +3504,8 @@ function formatCommercialInterpretationForDisplay(card, interpretationRaw) {
       const minE = Number(qsRr.min ?? qsRr.low ?? qsRr.from);
       const maxE = Number(qsRr.max ?? qsRr.high ?? qsRr.to);
       if (Number.isFinite(maxE) && maxE > 0) {
-        const minStr = Number.isFinite(minE) && minE > 0 ? `€${formatNumber(minE)}` : '';
-        const maxStr = `€${formatNumber(maxE)}`;
+        const minStr = Number.isFinite(minE) && minE > 0 ? `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(minE)}` : '';
+        const maxStr = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(maxE)}`;
         const band = minStr ? `${minStr}-${maxStr}` : maxStr;
         return `ADR gap versus fair share: estimated ${band} revenue shortfall.`;
       }
@@ -3548,8 +3558,8 @@ function getQuantifiedFinancialLabel(card) {
         const minE = Number(qsRr.min ?? qsRr.low ?? qsRr.from);
         const maxE = Number(qsRr.max ?? qsRr.high ?? qsRr.to);
         if (Number.isFinite(maxE) && maxE > 0) {
-          const minStr = Number.isFinite(minE) && minE > 0 ? `€${formatNumber(minE)}` : '';
-          const maxStr = `€${formatNumber(maxE)}`;
+          const minStr = Number.isFinite(minE) && minE > 0 ? `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(minE)}` : '';
+          const maxStr = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(maxE)}`;
           const band = minStr ? `${minStr}-${maxStr}` : maxStr;
           return `ADR gap versus fair share: estimated ${band} revenue shortfall.`;
         }
@@ -3559,7 +3569,7 @@ function getQuantifiedFinancialLabel(card) {
   }
 
   if (card.value_at_stake > 0) {
-    return `€${formatNumber(card.value_at_stake)} revenue at risk`;
+    return `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(card.value_at_stake)} revenue at risk`;
   }
   const commercialInterpretation = (p5.commercial_interpretation || qs.commercial_interpretation || '').toString().trim();
   if (commercialInterpretation) {
@@ -3602,7 +3612,7 @@ function estimateFallbackImpact(card) {
     return `~${Math.round(roomNights)} room nights at risk`;
   }
   const estimated = estimateFallbackImpactValue(card);
-  if (estimated > 0) return `€${formatNumber(estimated)}+ estimated revenue at risk`;
+  if (estimated > 0) return `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(estimated)}+ estimated revenue at risk`;
   const confidence = getConfidenceLevel(card);
   return confidence === 'high' ? 'High revenue exposure' : 'Moderate revenue exposure';
 }
@@ -3707,7 +3717,7 @@ function buildInsightLine(card) {
 function formatImpactEuroPlus(value) {
   const v = Number(value);
   if (!Number.isFinite(v) || v <= 0) return '';
-  return `€${formatNumber(v)}+`;
+  return `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(v)}+`;
 }
 
 function getImpactIssueFamilyKey(card) {
@@ -4196,7 +4206,7 @@ function buildForwardImpactLine(card) {
     const revFmt = v => new Intl.NumberFormat('en-GB',
       { maximumFractionDigits: 0 }).format(Math.round(v));
     if (revGap != null && revGap > 0 && rnGap != null) {
-      return `€${revFmt(revGap)} revenue gap vs forecast — ` +
+      return `${currencyPrefix(currentEngineJson?.currency)}${revFmt(revGap)} revenue gap vs forecast — ` +
         `${Math.round(rnGap)} room nights (${rnGapPct != null
           ? rnGapPct.toFixed(1)
           : '?'}%) short of plan.`;
@@ -4451,7 +4461,7 @@ function buildForecastGapAnalysisGroupedText(analysisText) {
     /Forecast:\s*([\d,]+)\s*RN\s*\/\s*([\d,]+)\s*revenue\.\s*OTB:\s*([\d,]+)\s*RN\s*\/\s*([\d,]+)\s*revenue\.\s*Revenue gap:\s*([\d,]+)\./i,
     (_, fRN, fRev, oRN, oRev, gap) => {
       const eur = n => Number(String(n).replace(/,/g, '') || 0).toLocaleString('en-GB');
-      return `The forecast stands at ${fRN} RN / €${eur(fRev)} against current OTB of ${oRN} RN / €${eur(oRev)} — a revenue gap of €${eur(gap)}.`;
+      return `The forecast stands at ${fRN} RN / ${currencyPrefix(currentEngineJson?.currency)}${eur(fRev)} against current OTB of ${oRN} RN / ${currencyPrefix(currentEngineJson?.currency)}${eur(oRev)} — a revenue gap of ${currencyPrefix(currentEngineJson?.currency)}${eur(gap)}.`;
     }
   );
 
@@ -4844,22 +4854,22 @@ function renderDashboard() {
   let summaryRevenueRiskLabel = visibleCards.length ? 'High revenue exposure' : 'Impact under review';
   if (rangeMaxWithCorp > 0) {
     if (rangeMinWithCorp > 0 && Math.abs(rangeMaxWithCorp - rangeMinWithCorp) / rangeMinWithCorp < 0.2) {
-      summaryRevenueRiskLabel = `€${formatNumber(Math.round((rangeMinWithCorp + rangeMaxWithCorp) / 2))} at risk`;
+      summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(Math.round((rangeMinWithCorp + rangeMaxWithCorp) / 2))} at risk`;
     } else if (Math.abs(rangeMaxWithCorp - rangeMinWithCorp) < 1) {
-      summaryRevenueRiskLabel = `€${formatNumber(rangeMaxWithCorp)} at risk`;
+      summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(rangeMaxWithCorp)} at risk`;
     } else {
-      summaryRevenueRiskLabel = `€${formatNumber(rangeMinWithCorp)}-€${formatNumber(rangeMaxWithCorp)} at risk`;
+      summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(rangeMinWithCorp)}-${currencyPrefix(currentEngineJson?.currency)}${formatNumber(rangeMaxWithCorp)} at risk`;
     }
   } else if (strongestVisibleValue > 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(strongestVisibleValue + corpRisk)} at risk`;
+    summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(strongestVisibleValue + corpRisk)} at risk`;
   } else if (estimatedExposureTotal > 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(estimatedExposureTotal + corpRisk)}+ estimated at risk`;
+    summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(estimatedExposureTotal + corpRisk)}+ estimated at risk`;
   } else if (summaryRoomNights > 0) {
     summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
   } else if (summaryLegacyValue > 0 && visibleCards.length === 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(summaryLegacyValue + corpRisk)} at risk`;
+    summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(summaryLegacyValue + corpRisk)} at risk`;
   } else if (corpRisk > 0) {
-    summaryRevenueRiskLabel = `€${formatNumber(corpRisk)} at risk`;
+    summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(corpRisk)} at risk`;
   }
 
   document.getElementById('sidebar-hotel').textContent = hotelName;
@@ -4931,7 +4941,7 @@ function renderDashboard() {
       ).join('') + (atRisk.length > 3
         ? `<div style="font-size:12px;color:#F0997B;">+${atRisk.length - 3} more</div>` : '');
       alertRevenueEl.textContent = totalRevAtRisk > 0
-        ? `€${Math.round(totalRevAtRisk).toLocaleString('en-GB')} at risk` : '';
+        ? `${currencyPrefix(currentEngineJson?.currency)}${Math.round(totalRevAtRisk).toLocaleString('en-GB')} at risk` : '';
     } else {
       alertBar.style.display = 'none';
     }
@@ -4973,7 +4983,7 @@ function renderDashboard() {
     const colorClass = dir === 'negative' ? 'kpi-neg' : dir === 'positive' ? 'kpi-pos' : 'kpi-warn';
     const displayVal = val !== null
       ? (Math.abs(val) >= 1000
-          ? `€${Math.round(val).toLocaleString('en-GB')}`
+          ? `${currencyPrefix(currentEngineJson?.currency)}${Math.round(val).toLocaleString('en-GB')}`
           : val % 1 === 0 ? String(Math.round(val)) : val.toFixed(1))
       : '—';
     cell.innerHTML = `
@@ -5122,7 +5132,7 @@ function computeGroupSummaries(engineJson) {
     ? fqs.issue_level_quantification.reduce((s, q) =>
         s + (q?.quantified_signals?.revenue_range?.max || 0), 0)
     : 0;
-  const histMetric = histAllRev > 0 ? `€${fmt(histAllRev)}` : null;
+  const histMetric = histAllRev > 0 ? `${currencyPrefix(currentEngineJson?.currency)}${fmt(histAllRev)}` : null;
 
   const primaryIssue = issues[0] || null;
   const primaryDriver = primaryIssue?.primary_driver || null;
@@ -5297,7 +5307,7 @@ function computeGroupSummaries(engineJson) {
       : primaryMix?.pattern === 'concentration'
         ? `${primaryMix.quantification?.dominant_segment || '—'} concentration risk`
         : 'No mix shift patterns detected';
-  const mixMetric = mixRevTotal > 0 ? `€${fmt(mixRevTotal)}` : null;
+  const mixMetric = mixRevTotal > 0 ? `${currencyPrefix(currentEngineJson?.currency)}${fmt(mixRevTotal)}` : null;
 
   // Pills: pattern | losing segment | gaining segment | ADR spread
   const mixPills = [];
@@ -5453,7 +5463,7 @@ function computeGroupSummaries(engineJson) {
   const fcAvgOtbPct = fcOtbPcts.length > 0
     ? Math.round(fcOtbPcts.reduce((a, b) => a + b, 0) / fcOtbPcts.length)
     : null;
-  const fcMetric = fcRevTotal > 0 ? `€${fmt(fcRevTotal)}` : null;
+  const fcMetric = fcRevTotal > 0 ? `${currencyPrefix(currentEngineJson?.currency)}${fmt(fcRevTotal)}` : null;
 
   // Primary shortfall segment across all windows
   const fcPrimarySegs = fcGap
@@ -5482,7 +5492,7 @@ function computeGroupSummaries(engineJson) {
     f?.forecast_may_be_aggressive === true);
   let fcBrief = fcAvgOtbPct != null
     ? `OTB at ${fcAvgOtbPct}% of plan — ${fcRevTotal > 0 ?
-        `€${fmt(fcRevTotal)} revenue gap` : 'gap vs forecast'}`
+        `${currencyPrefix(currentEngineJson?.currency)}${fmt(fcRevTotal)} revenue gap` : 'gap vs forecast'}`
     : 'No forecast data available';
   if (hasAggressiveForecast && fcAvgOtbPct != null) {
     fcBrief = `OTB at ${fcAvgOtbPct}% of plan — forecast may be overstated`;
@@ -6044,7 +6054,7 @@ function fiPct01Or100(r) {
 function fiFmtEuroAmt(n) {
   const x = fiSafeNum(n);
   if (x == null) return '—';
-  return '€' + x.toLocaleString();
+  return currencyPrefix(currentEngineJson?.currency) + x.toLocaleString();
 }
 
 function fiFmtRnVal(n) {
@@ -6247,7 +6257,7 @@ function renderGroupPipelineIssueCard(card, snapshotDate, index) {
       : (top.rn != null ? Math.round(top.rn) : null);
     const topRevRaw = fiSafeNum(top.room_revenue ?? top.revenue ?? top.rev);
     const topRev = topRevRaw != null ? Math.round(topRevRaw) : null;
-    facts.push(`Largest: ${top.group_name}${topRn ? ` — ${topRn} RN` : ''}${topRev ? ` / €${topRev.toLocaleString('en-GB')}` : ''}`);
+    facts.push(`Largest: ${top.group_name}${topRn ? ` — ${topRn} RN` : ''}${topRev ? ` / ${currencyPrefix(currentEngineJson?.currency)}${topRev.toLocaleString('en-GB')}` : ''}`);
   }
 
   const action = top?.group_name
