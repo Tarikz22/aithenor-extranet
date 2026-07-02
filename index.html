@@ -3579,30 +3579,12 @@ function getQuantifiedFinancialLabel(card) {
 }
 
 function estimateFallbackImpactValue(card) {
-  const { mpi, ari, rgi } = parseTriggerMetrics(card.trigger_display);
-  const family = getIssueFamily(card);
-  const confidence = getConfidenceLevel(card);
-  const priority = normalize(card.priority);
-  let base = 0;
-
-  if (family === 'pricing') base = 40000;
-  else if (family === 'discount') base = 25000;
-  else if (family === 'direct') base = 30000;
-  else base = 20000;
-
-  if (priority === 'high' || priority === 'critical') base *= 1.35;
-  if (confidence === 'high') base *= 1.2;
-  if (confidence === 'low') base *= 0.8;
-
-  if (ari !== null && mpi !== null) {
-    const gap = Math.max(0, ari - mpi);
-    base += gap * 450;
-  } else if (rgi !== null && rgi < 100) {
-    base += (100 - rgi) * 500;
-  }
-
-  const rounded = Math.round(base / 5000) * 5000;
-  return rounded > 0 ? rounded : 0;
+  // F1-6: this function used to invent an exposure figure from hardcoded bases
+  // (€40k/€25k/€30k) scaled by MPI/ARI when no quantified sources existed —
+  // fabricated specificity the engine categorically refuses to produce.
+  // Bypassed to always return 0 so it can never feed the header or any impact
+  // line. When no real quantification exists, no figure is shown.
+  return 0;
 }
 
 function estimateFallbackImpact(card) {
@@ -4379,12 +4361,14 @@ function cleanupForwardAnalysisDoublePeriods(analysisText) {
 }
 
 function tokenizeForwardAnalysisSentences(text) {
+  // F1-3: previously dropped any sentence containing "snapshot history", which
+  // deleted the engine's snapshot-over-snapshot delta narrative. Filter removed
+  // so repeat uploads surface their non-redundant history content.
   return String(text || '')
     .split(/\n\n+/)
     .flatMap(para => para.split(/(?<=[.!?])\s+/))
     .map(s => s.trim())
-    .filter(Boolean)
-    .filter(s => !s.toLowerCase().includes('snapshot history'));
+    .filter(Boolean);
 }
 
 function buildForwardAnalysisParagraphBlocks(text) {
@@ -4832,10 +4816,9 @@ function renderDashboard() {
   }, 0);
   const summaryLegacyValue = visibleCards.reduce((sum, card) => sum + (Number(card.value_at_stake) || 0), 0);
   const strongestVisibleValue = visibleCards.reduce((max, card) => Math.max(max, Number(card.value_at_stake) || 0), 0);
-  const estimatedExposureTotal = visibleCards.reduce((sum, card) => {
-    const est = estimateFallbackImpactValue(card);
-    return est > 0 ? sum + est : sum;
-  }, 0);
+  // F1-6: estimatedExposureTotal (built from estimateFallbackImpactValue's
+  // invented figures) removed from the header. Only real quantification
+  // sources may produce an "at risk" figure; otherwise render "—".
   const corpRisk = Number(
     currentEngineJson?.corporate_account_pace_issues
       ?.find(c => (c.card_type || '').toString().trim() === 'corporate_pace_risk')
@@ -4851,7 +4834,9 @@ function renderDashboard() {
     visibleCards.filter(c => actionedIds.has(c.id)).length +
     visibleForwardCards.filter(c => actionedIds.has(c.id)).length;
   const pct = combinedFindingsCount ? Math.round((actionedCount / combinedFindingsCount) * 100) : 0;
-  let summaryRevenueRiskLabel = visibleCards.length ? 'High revenue exposure' : 'Impact under review';
+  // F1-6: default is "—" (no figure) instead of the vague "High revenue
+  // exposure" / "Impact under review" labels; never invent a number.
+  let summaryRevenueRiskLabel = '—';
   if (rangeMaxWithCorp > 0) {
     if (rangeMinWithCorp > 0 && Math.abs(rangeMaxWithCorp - rangeMinWithCorp) / rangeMinWithCorp < 0.2) {
       summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(Math.round((rangeMinWithCorp + rangeMaxWithCorp) / 2))} at risk`;
@@ -4862,8 +4847,6 @@ function renderDashboard() {
     }
   } else if (strongestVisibleValue > 0) {
     summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(strongestVisibleValue + corpRisk)} at risk`;
-  } else if (estimatedExposureTotal > 0) {
-    summaryRevenueRiskLabel = `${currencyPrefix(currentEngineJson?.currency)}${formatNumber(estimatedExposureTotal + corpRisk)}+ estimated at risk`;
   } else if (summaryRoomNights > 0) {
     summaryRevenueRiskLabel = `${Math.round(summaryRoomNights)} room nights at risk`;
   } else if (summaryLegacyValue > 0 && visibleCards.length === 0) {
@@ -6359,11 +6342,19 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
       : Array.isArray(pipeline?.pipeline_groups) ? pipeline.pipeline_groups : [];
     const topGroup = pipelineGroups[0] ?? null;
 
-    // Title: pace gap + pipeline cover in one line
+    // F1-2: prefer the engine-written `situation` from the matched
+    // weekly_pickup_delta_issues / group_pipeline_issues entry as the tile's
+    // primary line. The frontend-composed title is kept ONLY as fallback when
+    // the engine field is null/empty, so verified engine text is no longer
+    // replaced by hardcoded sentences.
+    const engineSituation = (pickup?.situation != null ? String(pickup.situation) : '').trim()
+      || (pipeline?.situation != null ? String(pipeline.situation) : '').trim();
+
+    // Title: pace gap + pipeline cover in one line (fallback only)
     const titleParts = [];
     if (gapRn !== null) titleParts.push(`${gapRn} RN to forecast`);
     if (covPct !== null) titleParts.push(`${covPct}% covered by pipeline`);
-    const title = titleParts.join(' — ') || `Days ${wLabel}`;
+    const title = engineSituation || titleParts.join(' — ') || `Days ${wLabel}`;
 
     // Facts
     const facts = [];
@@ -6379,9 +6370,17 @@ function buildForwardIntelligenceCardsHtml(engineJson, snapshotDate) {
       facts.push(`Largest group: ${topGroup.group_name}${topRn ? ` — ${topRn} RN` : ''}`);
     }
 
+    // F1-2: prefer the engine-written `decision` as the tile's action line.
+    // The frontend-composed branches below (incl. the hardcoded "hold rate and
+    // distribution" sentence) now run ONLY when the engine field is null/empty.
+    const engineDecision = (pickup?.decision != null ? String(pickup.decision) : '').trim()
+      || (pipeline?.decision != null ? String(pipeline.decision) : '').trim();
+
     // Action: pickup if widening, group conversion if closing or no pickup data
     let action = '';
-    if (!isClosing && required !== null && weeksLeft !== null) {
+    if (engineDecision) {
+      action = engineDecision;
+    } else if (!isClosing && required !== null && weeksLeft !== null) {
       action = `Need ${required} RN/week for ${weeksLeft} weeks — identify dragging segment and intervene now`;
     } else if (topGroup?.group_name && pipeline?.forecast_gap_rn) {
       const closePct = topGroup?.room_nights && pipeline?.forecast_gap_rn
@@ -6712,9 +6711,6 @@ function renderFindings() {
     let cardTitle = String(sic.title || sic.display_name || 'Segment signal');
     // Strip scenario codes from title e.g. "(S4)", "(S5)", "(S7)"
     cardTitle = cardTitle.replace(/\s*\(S\d+\)\s*/gi, '').trim();
-    const scenarioType = String(sic.scenario_type || sic.scenario || sic.issue_family || '').trim().toUpperCase();
-    const isS4 = scenarioType === 'S4';
-    const isS7 = scenarioType === 'S7';
     const rawImpact = sic.financial_impact || {};
     const impactEur = fiSafeNum(
       rawImpact.impact_eur
@@ -6725,19 +6721,23 @@ function renderFindings() {
       ?? rawImpact.low
       ?? null
     );
-    const adrMatch = (sic.situation || '').match(/ADR is ([+\-][\d.]+)%/);
-    const adrPct = adrMatch ? adrMatch[1] : 'positive';
-    const rnMatch = (sic.situation || '').match(/([+\-][\d.]+)%\s+room\s+night/i)
-      || (sic.situation || '').match(/room\s+nights?.*?([+\-][\d.]+)%/i);
-    const rnPct = rnMatch ? Number(rnMatch[1]) : null;
-    const rnPctDisp = Number.isFinite(rnPct) ? String(Math.abs(rnPct).toFixed(1)).replace(/\.0$/, '') : 'current';
-    let impactDescription = sic.financial_impact?.description || sic.decision || '';
-    if (Number.isFinite(impactEur) && impactEur < 0) {
-      if (isS4) {
-        impactDescription = `${sic.display_name || 'This segment'} revenue is marginally behind last year — ADR improvement of ${adrPct}% is not yet sufficient to offset the ${rnPctDisp}% room night decline. If volume continues to soften, the revenue gap will widen.`;
-      } else if (isS7) {
-        impactDescription = 'both volume and the revenue base are deteriorating';
-      }
+    // F1-5: removed the S4/S7 override that replaced the engine's
+    // financial_impact.description with a hardcoded template sentence and never
+    // showed the numeric impact_eur. Impact is now the stored description,
+    // prefixed with the formatted amount when impact_eur (or an alias) is a
+    // finite number, e.g. "-434,000 MAD — Retail Transient revenue is...".
+    // Currency label comes from engine_json.currency — no hardcoded € sign.
+    // When description and impact_eur are both absent, the existing fallback
+    // chain (sic.decision) still applies.
+    const engineImpactDesc = (sic.financial_impact?.description != null
+      ? String(sic.financial_impact.description) : '').trim();
+    let impactDescription = engineImpactDesc || sic.decision || '';
+    if (impactEur !== null) {
+      const currencyLabel = String(engineJson?.currency || '').trim();
+      const impactAmount = `${Math.round(impactEur).toLocaleString('en-GB')}${currencyLabel ? ' ' + currencyLabel : ''}`;
+      impactDescription = engineImpactDesc
+        ? `${impactAmount} — ${engineImpactDesc}`
+        : (impactDescription || impactAmount);
     }
     const sicCard = {
       id: 'SEG_' + (sic.finding_key || sic.segment || '') + '_'
@@ -7188,6 +7188,16 @@ function renderCard(card) {
          <div class="nc-text" style="white-space:pre-line;">${escHtml(card.commercial_narrative)}</div>
        </div>` : '';
 
+  // F1-4: segment_issue_cards map their engine `diagnosis` to card.root_cause,
+  // but it was never rendered — verified engine text silently discarded.
+  // Shown as a Diagnosis section between Signal and Impact, only when non-empty.
+  const rootCauseText = (card.root_cause != null ? String(card.root_cause) : '').trim();
+  const diagnosisHtml = rootCauseText
+    ? `<div class="nc-section">
+         <div class="nc-label">Diagnosis</div>
+         <div class="nc-text">${escHtml(rootCauseText)}</div>
+       </div>` : '';
+
   return `
     <div class="finding-card nc-card ${isOpportunity ? 'opportunity' : ''} ${isActioned ? 'actioned' : ''}"
          data-id="${escHtml(card.id)}" data-findings-priority="${escHtml(findingsPr)}">
@@ -7209,6 +7219,7 @@ function renderCard(card) {
           <div class="nc-label">Signal</div>
           <div class="nc-text">${escHtml(signalDisplay)}</div>
         </div>
+        ${diagnosisHtml}
         ${analysisHtml}
         <div class="nc-section">
           <div class="nc-label">Impact</div>
@@ -7291,19 +7302,22 @@ function renderForwardCard(card) {
   }
 
   if (forwardAnalysisNarrative) {
+    // F1-3: "snapshot history" paragraph filter removed — it stripped the
+    // engine's snapshot-over-snapshot delta content from forward cards.
     forwardAnalysisNarrative = forwardAnalysisNarrative
       .split('\n\n')
       .map(para => para.trim())
       .filter(Boolean)
-      .filter(s => !s.toLowerCase().includes('snapshot history'))
-      .map(p => p.trim())
-      .filter(Boolean)
       .join('\n\n')
       .trim();
   }
+  // F1-1: Render the engine-stored enforced_decision_line for ALL forward cards.
+  // Previously buildForwardPaceDecisionLineByHorizon overwrote it with a hardcoded
+  // horizon template for every non-forecast_gap card, destroying verified engine text.
+  // The template builder is now ONLY a fallback when the stored line is null/empty.
   const rawDecisionLine = (card.enforced_decision_line || '').toString().trim();
   let decisionLine = rawDecisionLine;
-  if (card.granularity !== 'forecast_gap') {
+  if (!decisionLine && card.granularity !== 'forecast_gap') {
     const bucket = inferForwardHorizonBucket(card);
     const segLab = extractForwardDragSegment(narrative);
     const rnLab = extractRoomNightsBehindReference(narrative);
